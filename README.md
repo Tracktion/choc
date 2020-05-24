@@ -1,4 +1,4 @@
-## choc: _"Clean Header Only Classes"_
+## CHOC: _"Clean Header Only Classes"_
 
 A random assortment of simple, header-only C++ classes with as few dependencies as possible.
 
@@ -14,7 +14,7 @@ So with that goal in mind, the plan is for everything in here to be:
 
 The choice of content is driven only by what I (and other contributors) need for our own projects. So there are some text and container helpers, some audio bits and pieces, some classes that are helpful for compilers and parsers, and quite a bit of miscellany. This may change over time.
 
-Hopefully other people will find useful things in here too! But if you use it, please note that choc is not trying to be a public resource: don't be surprised if requests for help, advice, features, PRs, bikeshedding, etc get politely ignored :)
+Hopefully other people will find useful things in here too! But if you use it, please note that choc is not trying to be a "product" or even a public resource: requests for help, advice, features, PRs, bikeshedding, etc are likely to be respectfully ignored :)
 
 
 -- Jules

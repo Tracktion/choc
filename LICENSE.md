@@ -1,4 +1,4 @@
-## choc: licensing
+## CHOC: licensing
 
 I'd like anyone to feel able to use this library code without worrying about the legal implications, so it's released under the permissive ISC license:
 
