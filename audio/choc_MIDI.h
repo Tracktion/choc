@@ -64,11 +64,11 @@ struct NoteNumber
     float getFrequency() const                                  { return noteNumberToFrequency (static_cast<int> (note)); }
 
     /** Returns the note name, adding sharps and flats where necessary */
-    const char* getName() const                                 { return "C\0\0C#\0D\0\0Eb\0E\0\0F\0\0F#\0G\0\0G#\0A\0\0Bb\0B" + (3 * getChromaticScaleIndex()); }
+    const char* getName() const                                 { return std::addressof ("C\0\0C#\0D\0\0Eb\0E\0\0F\0\0F#\0G\0\0G#\0A\0\0Bb\0B"[3 * getChromaticScaleIndex()]); }
     /** Returns the note name, adding sharps where necessary */
-    const char* getNameWithSharps() const                       { return "C\0\0C#\0D\0\0D#\0E\0\0F\0\0F#\0G\0\0G#\0A\0\0A#\0B" + (3 * getChromaticScaleIndex()); }
+    const char* getNameWithSharps() const                       { return std::addressof ("C\0\0C#\0D\0\0D#\0E\0\0F\0\0F#\0G\0\0G#\0A\0\0A#\0B"[3 * getChromaticScaleIndex()]); }
     /** Returns the note name, adding flats where necessary */
-    const char* getNameWithFlats() const                        { return "C\0\0Db\0D\0\0Eb\0E\0\0F\0\0Gb\0G\0\0Ab\0A\0\0Bb\0B" + (3 * getChromaticScaleIndex()); }
+    const char* getNameWithFlats() const                        { return std::addressof ("C\0\0Db\0D\0\0Eb\0E\0\0F\0\0Gb\0G\0\0Ab\0A\0\0Bb\0B"[3 * getChromaticScaleIndex()]); }
     /** Returns true if this is a "white" major scale note. */
     bool isWhiteNote() const                                    { return (0b101010110101 & (1 << getChromaticScaleIndex())) != 0; }
     /** Returns the note name and octave number (using default choices for things like sharp/flat/octave number). */
@@ -80,6 +80,9 @@ struct NoteNumber
 */
 struct ShortMessage
 {
+    ShortMessage() = default;
+    ShortMessage (uint8_t byte0, uint8_t byte1, uint8_t byte2)  : data { byte0, byte1, byte2 } {}
+
     uint8_t data[3] = {};
 
     bool isNull() const                                 { return data[0] == 0; }
