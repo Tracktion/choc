@@ -25,7 +25,9 @@
 #define CHOC_STRING_UTILS_HEADER_INCLUDED
 
 #include <string>
+#include <vector>
 #include <cmath>
+#include <assert.h>
 
 #ifndef CHOC_ASSERT
  #define CHOC_ASSERT(x)  assert(x);
@@ -33,7 +35,6 @@
 
 namespace choc::text
 {
-
 
 //==============================================================================
 /** Converts a hex character to a number 0-15, or -1 if it's not a valid hex digit. */
