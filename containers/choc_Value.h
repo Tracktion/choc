@@ -171,6 +171,9 @@ public:
     /** Returns the class-name of this type if it's an object, or throws an Error if it's not. */
     std::string_view getObjectClassName() const;
 
+    /** Returns true if this is an object with the given class-name. */
+    bool isObjectWithClassName (std::string_view name) const;
+
     bool operator== (const Type&) const;
     bool operator!= (const Type&) const;
 
@@ -499,6 +502,9 @@ public:
     */
     std::string_view getObjectClassName() const;
 
+    /** Returns true if this is an object with the given class-name. */
+    bool isObjectWithClassName (std::string_view name) const;
+
     /** Returns the name and value of a member by index.
         This will throw an error if the value is not an object of if the index is out of range. (Use
         size() to find out how many members there are). To get a named value from an object, you can
@@ -557,7 +563,8 @@ public:
         @see Value::serialise
     */
     template <typename Handler>
-    static void deserialise (InputData&, Handler&& handleResult);
+    static void deserialise (InputData&, Handler&& handleResult,
+                             Allocator* allocator = nullptr);
 
 private:
     //==============================================================================
@@ -743,6 +750,9 @@ public:
         This will throw an error if the value is not an object.
     */
     std::string_view getObjectClassName() const                         { return value.getObjectClassName(); }
+
+    /** Returns true if this is an object with the given class-name. */
+    bool isObjectWithClassName (std::string_view name) const            { return value.isObjectWithClassName (name); }
 
     /** Returns the name and value of a member by index.
         This will throw an error if the value is not an object of if the index is out of range. (Use
@@ -1620,6 +1630,11 @@ inline std::string_view Type::getObjectClassName() const
     return content.object->className;
 }
 
+inline bool Type::isObjectWithClassName (std::string_view name) const
+{
+    return isObject() && content.object->className == name;
+}
+
 inline bool Type::operator== (const Type& other) const
 {
     if (mainType != other.mainType)
@@ -2120,7 +2135,8 @@ inline ValueView ValueView::operator[] (std::string_view name) const
     return ValueView (std::move (info.elementType), data + info.offset, stringDictionary);
 }
 
-inline std::string_view ValueView::getObjectClassName() const   { return type.getObjectClassName(); }
+inline std::string_view ValueView::getObjectClassName() const               { return type.getObjectClassName(); }
+inline bool ValueView::isObjectWithClassName (std::string_view name) const  { return type.isObjectWithClassName (name); }
 
 inline MemberNameAndValue ValueView::getObjectMemberAt (uint32_t index) const
 {
@@ -2215,7 +2231,7 @@ void ValueView::serialise (OutputStream& output) const
         auto newHandle = stringDataSize + 1u;
         writeUnaligned<uint32_t> (handleCopyAddress, newHandle);
         newHandles[numStrings++] = newHandle;
-        stringDataSize += stringDictionary->getStringForHandle ({ oldHandle }).length() + 1u;
+        stringDataSize += static_cast<uint32_t> (stringDictionary->getStringForHandle ({ oldHandle }).length() + 1u);
     });
 
     output.write (localCopy, dataSize);
@@ -2231,11 +2247,10 @@ void ValueView::serialise (OutputStream& output) const
 }
 
 template <typename Handler>
-void ValueView::deserialise (InputData& input, Handler&& handleResult)
+void ValueView::deserialise (InputData& input, Handler&& handleResult, Allocator* allocator)
 {
-    FixedPoolAllocator<8192> localAllocator;
     ValueView result;
-    result.type = Type::deserialise (input, std::addressof (localAllocator));
+    result.type = Type::deserialise (input, allocator);
     auto valueDataSize = result.type.getValueDataSize();
     Type::SerialisationHelpers::expect (input.end >= input.start + valueDataSize);
     result.data = const_cast<uint8_t*> (input.start);
@@ -2626,7 +2641,7 @@ inline Value Value::deserialise (InputData& input)
     if (input.end > input.start)
     {
         auto stringDataSize = Type::SerialisationHelpers::readVariableLengthInt (input);
-        Type::SerialisationHelpers::expect (stringDataSize <= input.end - input.start);
+        Type::SerialisationHelpers::expect (stringDataSize <= static_cast<uint32_t> (input.end - input.start));
         v.dictionary.strings.resize (stringDataSize);
         memcpy (v.dictionary.strings.data(), input.start, stringDataSize);
         Type::SerialisationHelpers::expect (v.dictionary.strings.back() == 0);
