@@ -828,6 +828,16 @@ static void copyIntersectionAndClearOutside (DestBuffer&& dest, const SourceBuff
         dest.getChannelRange ({ overlap.numChannels, dstSize.numChannels }).clear();
 }
 
+template <typename DestBuffer, typename SourceBuffer>
+static void addIntersection (DestBuffer&& dest, const SourceBuffer& source)
+{
+    auto overlap = dest.getSize().getIntersection (source.getSize());
+
+    if (! overlap.isEmpty())
+        add (dest.getSection (overlap.getChannelRange(), overlap.getFrameRange()),
+             source.getSection (overlap.getChannelRange(), overlap.getFrameRange()));
+}
+
 template <typename BufferType, typename GainType>
 void applyGain (BufferType&& buffer, GainType gainMultiplier)
 {
