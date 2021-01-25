@@ -21,26 +21,23 @@
    OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#ifndef CHOC_SINGLE_READER_MULTI_WRITER_FIFO_HEADER_INCLUDED
-#define CHOC_SINGLE_READER_MULTI_WRITER_FIFO_HEADER_INCLUDED
+#ifndef CHOC_MULTI_READER_MULTI_WRITER_FIFO_HEADER_INCLUDED
+#define CHOC_MULTI_READER_MULTI_WRITER_FIFO_HEADER_INCLUDED
 
-#include <mutex>
-
-#include "choc_SingleReaderSingleWriterFIFO.h"
-#include "../platform/choc_SpinLock.h"
+#include "choc_SingleReaderMultipleWriterFIFO.h"
 
 namespace choc::fifo
 {
 
 //==============================================================================
 /**
-    A simple atomic single-reader, multiple-writer FIFO.
+    A simple atomic multiple-reader, multiple-writer FIFO.
 */
 template <typename Item>
-struct SingleReaderMultipleWriterFIFO
+struct MultipleReaderMultipleWriterFIFO
 {
-    SingleReaderMultipleWriterFIFO() = default;
-    ~SingleReaderMultipleWriterFIFO() = default;
+    MultipleReaderMultipleWriterFIFO() = default;
+    ~MultipleReaderMultipleWriterFIFO() = default;
 
     /** Clears the FIFO and allocates a size for it.
         Note that this is not thread-safe with respect to the other methods - it must
@@ -62,19 +59,19 @@ struct SingleReaderMultipleWriterFIFO
     uint32_t getFreeSlots() const                               { return fifo.getFreeSlots(); }
 
     /** Attempts to push an into into the FIFO, returning false if no space was available. */
-    bool push (const Item&);
+    bool push (const Item& item)                                { return fifo.push (item); }
 
     /** Attempts to push an into into the FIFO, returning false if no space was available. */
-    bool push (Item&&);
+    bool push (Item&& item)                                     { return fifo.push (item); }
 
     /** If any items are available, this copies the first into the given target, and returns true. */
-    bool pop (Item& result)                                     { return fifo.pop (result); }
+    bool pop (Item&);
 
 private:
-    choc::fifo::SingleReaderSingleWriterFIFO<Item> fifo;
-    choc::threading::SpinLock writeLock;
+    choc::fifo::SingleReaderMultipleWriterFIFO<Item> fifo;
+    choc::threading::SpinLock readLock;
 
-    SingleReaderMultipleWriterFIFO (const SingleReaderMultipleWriterFIFO&) = delete;
+    MultipleReaderMultipleWriterFIFO (const MultipleReaderMultipleWriterFIFO&) = delete;
 };
 
 
@@ -89,16 +86,10 @@ private:
 //
 //==============================================================================
 
-template <typename Item> bool SingleReaderMultipleWriterFIFO<Item>::push (const Item& item)
+template <typename Item> bool MultipleReaderMultipleWriterFIFO<Item>::pop (Item& result)
 {
-    const std::lock_guard<decltype (writeLock)> lock (writeLock);
-    return fifo.push (item);
-}
-
-template <typename Item> bool SingleReaderMultipleWriterFIFO<Item>::push (Item&& item)
-{
-    const std::lock_guard<decltype (writeLock)> lock (writeLock);
-    return fifo.push (std::move (item));
+    const std::lock_guard<decltype (readLock)> lock (readLock);
+    return fifo.pop (result);
 }
 
 } // choc::fifo
