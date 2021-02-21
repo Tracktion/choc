@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <chrono>
 #include <assert.h>
 
 #ifndef CHOC_ASSERT
@@ -135,7 +136,9 @@ int hexDigitToInt (uint32_t unicodeChar);
 template <typename IntegerType>
 std::string createHexString (IntegerType value, int minNumDigits = 0);
 
-
+/// Returns a truncated, easy-to-read version of a time as hours, seconds or milliseconds,
+/// depending on its magnitude. The use-cases include things like logging or console app output.
+std::string getDurationDescription (std::chrono::duration<double, std::micro>);
 
 //==============================================================================
 //        _        _           _  _
@@ -417,6 +420,64 @@ inline bool endsWith (std::string_view t, std::string_view s)
 {
     auto len1 = t.length(), len2 = s.length();
     return len1 >= len2 && t.substr (len1 - len2) == s;
+}
+
+inline std::string getDurationDescription (std::chrono::duration<double, std::micro> d)
+{
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds> (d).count();
+
+    if (microseconds < 0)    return "-" + getDurationDescription (-d);
+    if (microseconds == 0)   return "0 sec";
+
+    std::string result;
+
+    auto addLevel = [&] (int64_t size, std::string_view units, int64_t decimalScale, int64_t modulo) -> bool
+    {
+        if (microseconds < size)
+            return false;
+
+        if (! result.empty())
+            result += ' ';
+
+        auto scaled = (microseconds * decimalScale + size / 2) / size;
+        auto whole = scaled / decimalScale;
+
+        if (modulo != 0)
+            whole = whole % modulo;
+
+        result += std::to_string (whole);
+
+        if (auto fraction = scaled % decimalScale)
+        {
+            result += '.';
+            result += ('0' + static_cast<char> (fraction / 10));
+
+            if (fraction % 10 != 0)
+                result += ('0' + static_cast<char> (fraction % 10));
+        }
+
+        result += (whole == 1 && units.length() > 3 && units.back() == 's') ? units.substr (0, units.length() - 1) : units;
+        return true;
+    };
+
+    bool hours = addLevel (60000000ll * 60ll, " hours", 1, 0);
+    bool mins  = addLevel (60000000ll,        " min", 1, hours ? 60 : 0);
+
+    if (hours)
+        return result;
+
+    if (mins)
+    {
+        addLevel (1000000, " sec", 1, 60);
+    }
+    else
+    {
+        if (! addLevel (1000000,   " sec", 100, 0))
+            if (! addLevel (1000,  " ms", 100, 0))
+                addLevel (1,       " microseconds", 100, 0);
+    }
+
+    return result;
 }
 
 template <typename StringType>
