@@ -372,6 +372,20 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ ("1 hour 2 min", choc::text::getDurationDescription (std::chrono::seconds (3726)));
         CHOC_EXPECT_EQ ("-1 hour 2 min", choc::text::getDurationDescription (std::chrono::seconds (-3726)));
     }
+
+    {
+        CHOC_TEST (BytesSizes)
+
+        CHOC_EXPECT_EQ ("0 bytes", choc::text::getByteSizeDescription (0));
+        CHOC_EXPECT_EQ ("1 byte", choc::text::getByteSizeDescription (1));
+        CHOC_EXPECT_EQ ("2 bytes", choc::text::getByteSizeDescription (2));
+        CHOC_EXPECT_EQ ("1 KB", choc::text::getByteSizeDescription (1024));
+        CHOC_EXPECT_EQ ("1.1 KB", choc::text::getByteSizeDescription (1024 + 100));
+        CHOC_EXPECT_EQ ("1 MB", choc::text::getByteSizeDescription (1024 * 1024));
+        CHOC_EXPECT_EQ ("1.2 MB", choc::text::getByteSizeDescription ((1024 + 200) * 1024));
+        CHOC_EXPECT_EQ ("1 GB", choc::text::getByteSizeDescription (1024 * 1024 * 1024));
+        CHOC_EXPECT_EQ ("1.3 GB", choc::text::getByteSizeDescription ((1024 + 300) * 1024 * 1024));
+    }
 }
 
 //==============================================================================
