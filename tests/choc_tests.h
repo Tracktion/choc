@@ -34,6 +34,7 @@
 #include "../text/choc_UTF8.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_DirtyList.h"
+#include "../containers/choc_Span.h"
 #include "../containers/choc_Value.h"
 #include "../containers/choc_MultipleReaderMultipleWriterFIFO.h"
 #include "../containers/choc_SingleReaderMultipleWriterFIFO.h"
@@ -200,7 +201,29 @@ std::string convertToString (Type n)
 }
 
 //==============================================================================
+//
+//  The tests themselves....
+//
 //==============================================================================
+inline void testContainerUtils (TestProgress& progress)
+{
+    CHOC_CATEGORY (Containers);
+
+    {
+        CHOC_TEST (Span)
+
+        std::vector<int>  v { 1, 2, 3 };
+        int a[] = { 1, 2, 3 };
+
+        CHOC_EXPECT_TRUE (choc::span<int>().empty());
+        CHOC_EXPECT_FALSE (choc::span<int> (a).empty());
+        CHOC_EXPECT_TRUE (choc::span<int> (v).size() == 3);
+        CHOC_EXPECT_TRUE (choc::span<int> (v).tail().size() == 2);
+        CHOC_EXPECT_TRUE (choc::span<int> (v).createVector().size() == 3);
+        CHOC_EXPECT_TRUE (choc::span<int> (v) == choc::span<int> (a));
+    }
+}
+
 inline void testStringUtilities (TestProgress& progress)
 {
     CHOC_CATEGORY (Strings);
@@ -1523,6 +1546,7 @@ inline void testJavascript (TestProgress& progress)
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
+    testContainerUtils (progress);
     testStringUtilities (progress);
     testValues (progress);
     testJSON (progress);
