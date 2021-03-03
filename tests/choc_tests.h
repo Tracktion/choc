@@ -843,10 +843,11 @@ inline void testMIDI (TestProgress& progress)
             CHOC_EXPECT_EQ (0,           note.getChromaticScaleIndex());
             CHOC_EXPECT_EQ (3,           note.getOctaveNumber());
             CHOC_EXPECT_NEAR (261.625f,  note.getFrequency(), 0.001f);
-            CHOC_EXPECT_EQ ("C",         std::string (note.getName()));
-            CHOC_EXPECT_EQ ("C",         std::string (note.getNameWithSharps()));
-            CHOC_EXPECT_EQ ("C",         std::string (note.getNameWithFlats()));
-            CHOC_EXPECT_TRUE (note.isWhiteNote());
+            CHOC_EXPECT_EQ ("C",         note.getName());
+            CHOC_EXPECT_EQ ("C",         note.getNameWithSharps());
+            CHOC_EXPECT_EQ ("C",         note.getNameWithFlats());
+            CHOC_EXPECT_TRUE (note.isNatural());
+            CHOC_EXPECT_FALSE (note.isAccidental());
             CHOC_EXPECT_EQ ("C3",        note.getNameWithOctaveNumber());
         }
 
@@ -857,10 +858,11 @@ inline void testMIDI (TestProgress& progress)
             CHOC_EXPECT_EQ (1,           note.getChromaticScaleIndex());
             CHOC_EXPECT_EQ (4,           note.getOctaveNumber());
             CHOC_EXPECT_NEAR (554.365f,  note.getFrequency(), 0.001f);
-            CHOC_EXPECT_EQ ("C#",        std::string (note.getName()));
-            CHOC_EXPECT_EQ ("C#",        std::string (note.getNameWithSharps()));
-            CHOC_EXPECT_EQ ("Db",        std::string (note.getNameWithFlats()));
-            CHOC_EXPECT_FALSE (note.isWhiteNote());
+            CHOC_EXPECT_EQ ("C#",        note.getName());
+            CHOC_EXPECT_EQ ("C#",        note.getNameWithSharps());
+            CHOC_EXPECT_EQ ("Db",        note.getNameWithFlats());
+            CHOC_EXPECT_FALSE (note.isNatural());
+            CHOC_EXPECT_TRUE (note.isAccidental());
             CHOC_EXPECT_EQ ("C#4",       note.getNameWithOctaveNumber());
         }
     }
