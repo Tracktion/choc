@@ -43,7 +43,7 @@ namespace choc::json
 struct ParseError
 {
     const char* message;
-    size_t line, column;
+    choc::text::LineAndColumn lineAndColumn;
 };
 
 /** Parses some JSON text into a choc::value::Value object, using the given pool.
@@ -222,29 +222,9 @@ inline std::string toString (const value::ValueView& v)
 }
 
 //==============================================================================
-struct LineAndColumn { size_t line = 0, column = 0; };
-
-template <typename StringType>
-static inline LineAndColumn getLineAndColumn (StringType start, StringType targetPos)
-{
-    if (start == nullptr || targetPos == nullptr)
-        return {};
-
-    LineAndColumn lc { 1, 1 };
-
-    while (start < targetPos && ! start.empty())
-    {
-        ++lc.column;
-        if (*start++ == '\n')  { lc.line++; lc.column = 1; }
-    }
-
-    return lc;
-}
-
 [[noreturn]] static inline void throwParseError (const char* error, text::UTF8Pointer source, text::UTF8Pointer errorPos)
 {
-    auto pos = getLineAndColumn (source, errorPos);
-    throw ParseError { error, pos.line, pos.column };
+    throw ParseError { error, text::findLineAndColumn (source, errorPos) };
 }
 
 inline value::Value parse (text::UTF8Pointer text)

@@ -417,6 +417,19 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ ("1 GB", choc::text::getByteSizeDescription (1024 * 1024 * 1024));
         CHOC_EXPECT_EQ ("1.3 GB", choc::text::getByteSizeDescription ((1024 + 300) * 1024 * 1024));
     }
+
+    {
+        CHOC_TEST (UTF8)
+        {
+            auto text = "line1\xd7\x90\n\xcf\x88line2\nli\xe1\xb4\x81ne3\nline4\xe1\xb4\xa8";
+            choc::text::UTF8Pointer p (text);
+
+            CHOC_EXPECT_TRUE (choc::text::findInvalidUTF8Data (text, std::string_view (text).length()) == nullptr);
+            CHOC_EXPECT_EQ (2u, choc::text::findLineAndColumn (p, p.find ("ine2")).line);
+            CHOC_EXPECT_EQ (3u, choc::text::findLineAndColumn (p, p.find ("ine2")).column);
+            CHOC_EXPECT_TRUE (p.find ("ine4").findStartOfLine (p).startsWith ("line4"));
+        }
+    }
 }
 
 //==============================================================================
@@ -663,8 +676,8 @@ inline void testJSON (TestProgress& progress)
         catch (choc::json::ParseError& e)
         {
             CHOC_EXPECT_EQ (e.message, message);
-            CHOC_EXPECT_EQ (e.line, line);
-            CHOC_EXPECT_EQ (e.column, column);
+            CHOC_EXPECT_EQ (e.lineAndColumn.line, line);
+            CHOC_EXPECT_EQ (e.lineAndColumn.column, column);
         }
     };
 

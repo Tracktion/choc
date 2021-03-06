@@ -101,6 +101,13 @@ struct UTF8Pointer
     /// past it, and return true. If not, it will return false without modifying this pointer.
     bool skipIfStartsWith (const char* textToMatch);
 
+    /// Iterates backwards from this position to find the first character that follows
+    /// a new-line. The pointer provided marks the furthest back that the function should search
+    UTF8Pointer findStartOfLine (UTF8Pointer startOfValidText) const;
+
+    /// Searches forwards for the next character that is followed by a new-line or a null-terminator.
+    UTF8Pointer findEndOfLine() const;
+
     //==============================================================================
     struct EndIterator {};
 
@@ -163,6 +170,19 @@ bool isUnicodeLowSurrogate (uint32_t codepoint);
 /// Combines a high and low surrogate into a single codepoint.
 uint32_t createUnicodeFromHighAndLowSurrogates (uint32_t high, uint32_t low);
 
+//==============================================================================
+/// Represents a line and column index within a block of text.
+struct LineAndColumn
+{
+    /// Valid line and column values start at 1.
+    /// If either is 0, it means that the LineAndColumn object is uninitialised.
+    size_t line = 0, column = 0;
+};
+
+/// Given a block of text and a position within it, this will work out the
+/// line and column of that position.
+LineAndColumn findLineAndColumn (UTF8Pointer fullText,
+                                 UTF8Pointer targetPosition);
 
 
 //==============================================================================
@@ -395,8 +415,65 @@ inline bool UTF8Pointer::skipIfStartsWith (const char* textToMatch)
     return false;
 }
 
+inline UTF8Pointer UTF8Pointer::findStartOfLine (UTF8Pointer start) const
+{
+    if (text == nullptr)
+        return {};
+
+    auto l = *this;
+    CHOC_ASSERT (l.text >= start.text && start.text != nullptr)
+
+    while (l.text > start.text)
+    {
+        auto prev = l;
+        auto c = *--prev;
+
+        if (c == '\r' || c == '\n')
+            break;
+
+        l = prev;
+    }
+
+    return l;
+}
+
+UTF8Pointer UTF8Pointer::findEndOfLine() const
+{
+    if (text == nullptr)
+        return {};
+
+    auto l = *this;
+
+    while (! l.empty())
+    {
+        auto c = l.popFirstChar();
+
+        if (c == '\r' || c == '\n')
+            break;
+    }
+
+    return l;
+}
+
 inline UTF8Pointer::Iterator UTF8Pointer::begin() const      { CHOC_ASSERT (text != nullptr); return Iterator (text); }
 inline UTF8Pointer::EndIterator UTF8Pointer::end() const     { return EndIterator(); }
+
+inline LineAndColumn findLineAndColumn (UTF8Pointer start, UTF8Pointer targetPosition)
+{
+    if (start == nullptr || targetPosition == nullptr)
+        return {};
+
+    CHOC_ASSERT (start <= targetPosition);
+    LineAndColumn lc { 1, 1 };
+
+    while (start < targetPosition && ! start.empty())
+    {
+        ++lc.column;
+        if (*start++ == '\n')  { lc.line++; lc.column = 1; }
+    }
+
+    return lc;
+}
 
 //==============================================================================
 inline uint32_t convertUnicodeCodepointToUTF8 (char* dest, uint32_t unicodeChar)
