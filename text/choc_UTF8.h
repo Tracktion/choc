@@ -177,6 +177,13 @@ struct LineAndColumn
     /// Valid line and column values start at 1.
     /// If either is 0, it means that the LineAndColumn object is uninitialised.
     size_t line = 0, column = 0;
+
+    /// Returns true if neither the line nor column is zero.
+    bool isValid() const noexcept          { return line != 0 && column != 0; }
+
+    /// Turns this location into a [line]:[col] string suitable for use in a
+    /// standard compiler error message format.
+    std::string toString() const;
 };
 
 /// Given a block of text and a position within it, this will work out the
@@ -474,6 +481,8 @@ inline LineAndColumn findLineAndColumn (UTF8Pointer start, UTF8Pointer targetPos
 
     return lc;
 }
+
+inline std::string LineAndColumn::toString() const   { return std::to_string (line) + ':' + std::to_string (column); }
 
 //==============================================================================
 inline uint32_t convertUnicodeCodepointToUTF8 (char* dest, uint32_t unicodeChar)
