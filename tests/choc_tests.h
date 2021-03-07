@@ -40,6 +40,7 @@
 #include "../containers/choc_SingleReaderMultipleWriterFIFO.h"
 #include "../containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "../containers/choc_VariableSizeFIFO.h"
+#include "../containers/choc_SmallVector.h"
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
