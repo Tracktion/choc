@@ -30,6 +30,9 @@
 namespace choc::text
 {
 
+/// An integer type to represent a unicode code-point.
+using UnicodeChar = uint32_t;
+
 //==============================================================================
 /** A non-owning pointer which can iterate over a chunk of null-terminated UTF8 text
     and read it as wide unicode characters.
@@ -57,7 +60,7 @@ struct UTF8Pointer
 
     //==============================================================================
     /// Returns the first unicode character in the string.
-    uint32_t operator*() const;
+    UnicodeChar operator*() const;
 
     /// Skips past the first unicode character.
     /// Moving beyond the end of the string is undefined behaviour and will trigger an assertion.
@@ -86,7 +89,7 @@ struct UTF8Pointer
     /// Skips past the first unicode character and returns it as a code-point.
     /// Calling this when the current character is the terminator will leave the pointer in an
     /// invalid state.
-    uint32_t popFirstChar();
+    UnicodeChar popFirstChar();
 
     /// Finds the next occurrence of the given string, or return a nullptr if not found.
     UTF8Pointer find (const char* textToFind) const;
@@ -117,7 +120,7 @@ struct UTF8Pointer
         Iterator (const Iterator&) = default;
         Iterator& operator= (const Iterator&) = default;
 
-        uint32_t operator*() const              { return *UTF8Pointer (text); }
+        UnicodeChar operator*() const           { return *UTF8Pointer (text); }
         Iterator& operator++()                  { UTF8Pointer p (text); ++p; text = p.text; return *this; }
         Iterator operator++ (int)               { auto old = *this; ++*this; return old; }
         bool operator== (EndIterator) const     { return *text == 0; }
@@ -159,16 +162,19 @@ const char* findInvalidUTF8Data (const void* dataToCheck, size_t maxNumBytesToRe
 
 /// Writes the bytes for a unicode character, and returns the number of bytes that were needed.
 /// The buffer passed in needs to have at least 4 bytes capacity.
-uint32_t convertUnicodeCodepointToUTF8 (char* dest, uint32_t unicodeChar);
+uint32_t convertUnicodeCodepointToUTF8 (char* dest, UnicodeChar codepoint);
+
+/// Appends a unicode codepoint to a std::string as a sequence of UTF8 bytes.
+void appendUTF8 (std::string& target, UnicodeChar codepoint);
 
 /// Checks whether a given codepoint is a high-surrogate
-bool isUnicodeHighSurrogate (uint32_t codepoint);
+bool isUnicodeHighSurrogate (UnicodeChar codepoint);
 
 /// Checks whether a given codepoint is a low-surrogate
-bool isUnicodeLowSurrogate (uint32_t codepoint);
+bool isUnicodeLowSurrogate (UnicodeChar codepoint);
 
 /// Combines a high and low surrogate into a single codepoint.
-uint32_t createUnicodeFromHighAndLowSurrogates (uint32_t high, uint32_t low);
+UnicodeChar createUnicodeFromHighAndLowSurrogates (UnicodeChar high, UnicodeChar low);
 
 //==============================================================================
 /// Represents a line and column index within a block of text.
@@ -265,7 +271,7 @@ inline const char* findInvalidUTF8Data (const void* dataToCheck, size_t numBytes
     return source + offset;
 }
 
-inline uint32_t UTF8Pointer::operator*() const
+inline UnicodeChar UTF8Pointer::operator*() const
 {
     return UTF8Pointer (*this).popFirstChar();
 }
@@ -334,11 +340,11 @@ inline UTF8Pointer UTF8Pointer::operator+ (int numCharsToSkip) const
     return operator+ (static_cast<size_t> (numCharsToSkip));
 }
 
-inline uint32_t UTF8Pointer::popFirstChar()
+inline UnicodeChar UTF8Pointer::popFirstChar()
 {
     CHOC_ASSERT (text != nullptr); // mustn't use this on nullptrs
     auto firstByte = static_cast<signed char> (*text++);
-    uint32_t unicodeChar = static_cast<unsigned char> (firstByte);
+    UnicodeChar unicodeChar = static_cast<unsigned char> (firstByte);
 
     if (firstByte < 0)
     {
@@ -485,7 +491,7 @@ inline LineAndColumn findLineAndColumn (UTF8Pointer start, UTF8Pointer targetPos
 inline std::string LineAndColumn::toString() const   { return std::to_string (line) + ':' + std::to_string (column); }
 
 //==============================================================================
-inline uint32_t convertUnicodeCodepointToUTF8 (char* dest, uint32_t unicodeChar)
+inline uint32_t convertUnicodeCodepointToUTF8 (char* dest, UnicodeChar unicodeChar)
 {
     if (unicodeChar < 0x80)
     {
@@ -511,10 +517,17 @@ inline uint32_t convertUnicodeCodepointToUTF8 (char* dest, uint32_t unicodeChar)
     return extraBytes + 1;
 }
 
-inline bool isUnicodeHighSurrogate (uint32_t codepoint)   { return codepoint >= 0xd800 && codepoint <= 0xdbff; }
-inline bool isUnicodeLowSurrogate  (uint32_t codepoint)   { return codepoint >= 0xdc00 && codepoint <= 0xdfff; }
+inline void appendUTF8 (std::string& target, UnicodeChar unicodeChar)
+{
+    char bytes[4];
+    auto num = convertUnicodeCodepointToUTF8 (bytes, unicodeChar);
+    target.append (bytes, num);
+}
 
-inline uint32_t createUnicodeFromHighAndLowSurrogates (uint32_t codepoint1, uint32_t codepoint2)
+inline bool isUnicodeHighSurrogate (UnicodeChar codepoint)   { return codepoint >= 0xd800 && codepoint <= 0xdbff; }
+inline bool isUnicodeLowSurrogate  (UnicodeChar codepoint)   { return codepoint >= 0xdc00 && codepoint <= 0xdfff; }
+
+inline UnicodeChar createUnicodeFromHighAndLowSurrogates (UnicodeChar codepoint1, UnicodeChar codepoint2)
 {
     if (! isUnicodeHighSurrogate (codepoint1))   return codepoint1;
     if (! isUnicodeLowSurrogate (codepoint2))    return 0;
