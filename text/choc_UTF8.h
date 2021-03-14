@@ -104,6 +104,10 @@ struct UTF8Pointer
     /// past it, and return true. If not, it will return false without modifying this pointer.
     bool skipIfStartsWith (const char* textToMatch);
 
+    /// Returns a pointer to the first non-whitespace character in the given string (which may
+    /// be the terminating null character if it's all whitespace).
+    UTF8Pointer findEndOfWhitespace() const;
+
     /// Iterates backwards from this position to find the first character that follows
     /// a new-line. The pointer provided marks the furthest back that the function should search
     UTF8Pointer findStartOfLine (UTF8Pointer startOfValidText) const;
@@ -426,6 +430,17 @@ inline bool UTF8Pointer::skipIfStartsWith (const char* textToMatch)
     }
 
     return false;
+}
+
+inline UTF8Pointer UTF8Pointer::findEndOfWhitespace() const
+{
+    auto p = *this;
+
+    if (p.text != nullptr)
+        while (choc::text::isWhitespace (*p.text))
+            ++p;
+
+    return p;
 }
 
 inline UTF8Pointer UTF8Pointer::findStartOfLine (UTF8Pointer start) const

@@ -35,6 +35,7 @@ namespace choc::text
 
 //==============================================================================
 inline bool isWhitespace (char c)                               { return c == ' ' || (c <= 13 && c >= 9); }
+inline bool isDigit (char c)                                    { return static_cast<uint32_t> (c - '0') < 10; }
 
 /// Replaces all occurrences of a one or more substrings.
 /// The arguments must be a sequence of pairs of strings, where the first of each pair is the string to
