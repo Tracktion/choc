@@ -28,6 +28,8 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
+#include <memory>
+#include <algorithm>
 #include "../platform/choc_Assert.h"
 
 namespace choc::text

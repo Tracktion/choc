@@ -22,6 +22,7 @@
 #ifndef CHOC_MIDIFILE_HEADER_INCLUDED
 #define CHOC_MIDIFILE_HEADER_INCLUDED
 
+#include <functional>
 #include "choc_MIDISequence.h"
 
 namespace choc::midi

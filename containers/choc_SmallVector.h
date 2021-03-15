@@ -158,7 +158,7 @@ SmallVector<ElementType, preSize>::SmallVector (const SmallVector& other)  : Sma
 
 template <typename ElementType, size_t preSize>
 template <typename VectorType>
-SmallVector<ElementType, preSize>::SmallVector<ElementType, preSize>::SmallVector (const VectorType& initialContent)  : SmallVector()
+SmallVector<ElementType, preSize>::SmallVector (const VectorType& initialContent)  : SmallVector()
 {
     reserve (initialContent.size());
 
@@ -239,7 +239,7 @@ SmallVector<ElementType, preSize>& SmallVector<ElementType, preSize>::operator= 
 
 template <typename ElementType, size_t preSize>
 template <typename VectorType>
-SmallVector<ElementType, preSize>& SmallVector<ElementType, preSize>::SmallVector<ElementType, preSize>::operator= (const VectorType& other)
+SmallVector<ElementType, preSize>& SmallVector<ElementType, preSize>::operator= (const VectorType& other)
 {
     if (other.size() > numElements)
     {

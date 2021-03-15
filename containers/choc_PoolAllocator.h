@@ -25,6 +25,7 @@
 #define CHOC_POOL_HEADER_INCLUDED
 
 #include <vector>
+#include <array>
 #include <cstdlib>
 #include "../platform/choc_Assert.h"
 

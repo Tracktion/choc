@@ -24,6 +24,7 @@
 #ifndef CHOC_FLOAT_TO_STRING_HEADER_INCLUDED
 #define CHOC_FLOAT_TO_STRING_HEADER_INCLUDED
 
+#include <cstring>
 #include <string>
 #include "../math/choc_MathHelpers.h"
 
