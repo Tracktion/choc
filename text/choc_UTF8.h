@@ -20,7 +20,7 @@
 #define CHOC_UTF8_HEADER_INCLUDED
 
 #include <cstddef>
-#include "../platform/choc_Assert.h"
+#include "choc_StringUtilities.h"
 
 namespace choc::text
 {
