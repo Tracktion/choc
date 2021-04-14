@@ -442,7 +442,7 @@ inline UTF8Pointer UTF8Pointer::findStartOfLine (UTF8Pointer start) const
         return {};
 
     auto l = *this;
-    CHOC_ASSERT (l.text >= start.text && start.text != nullptr)
+    CHOC_ASSERT (l.text >= start.text && start.text != nullptr);
 
     while (l.text > start.text)
     {
@@ -458,7 +458,7 @@ inline UTF8Pointer UTF8Pointer::findStartOfLine (UTF8Pointer start) const
     return l;
 }
 
-UTF8Pointer UTF8Pointer::findEndOfLine() const
+inline UTF8Pointer UTF8Pointer::findEndOfLine() const
 {
     if (text == nullptr)
         return {};
