@@ -395,8 +395,6 @@ inline UTF8Pointer UTF8Pointer::find (const char* textToFind) const
     for (auto t = *this;; ++t)
         if (t.startsWith (textToFind) || t.empty())
             return t;
-
-    return {};
 }
 
 inline bool UTF8Pointer::skipIfStartsWith (char charToMatch)
