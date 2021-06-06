@@ -469,7 +469,7 @@ struct SeparateChannelLayout
     {
         if (size.numChannels == 0)
         {
-            auto allocated = new void*[1];
+            void** allocated = new void*[1];
             *allocated = allocated;
             return { reinterpret_cast<SampleType* const*> (allocated), 0 };
         }
