@@ -213,7 +213,7 @@ struct Context::Pimpl
             return (void) duk_push_lstring (ctx, s.data(), s.length());
         }
 
-        if (v.isArray())
+        if (v.isArray() || v.isVector())
         {
             auto arrayIndex = duk_push_array (ctx);
             duktape::duk_uarridx_t elementIndex = 0;
