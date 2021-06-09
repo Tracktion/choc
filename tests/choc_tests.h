@@ -39,6 +39,8 @@
 #include "../containers/choc_VariableSizeFIFO.h"
 #include "../containers/choc_SmallVector.h"
 #include "../containers/choc_PoolAllocator.h"
+#include "../containers/choc_ObjectPointer.h"
+#include "../containers/choc_ObjectReference.h"
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
@@ -220,6 +222,29 @@ inline void testContainerUtils (TestProgress& progress)
         CHOC_EXPECT_TRUE (choc::span<int> (v).tail().size() == 2);
         CHOC_EXPECT_TRUE (choc::span<int> (v).createVector().size() == 3);
         CHOC_EXPECT_TRUE (choc::span<int> (v) == choc::span<int> (a));
+    }
+
+    {
+        CHOC_TEST (SmartPointers)
+
+        struct Foo { int x; };
+        using P = choc::ObjectPointer<Foo>;
+        Foo f1, f2;
+        P a;
+        CHOC_EXPECT_TRUE (a == nullptr && ! a);
+        P b = f1;
+        CHOC_EXPECT_TRUE (b != nullptr && !! b);
+        CHOC_EXPECT_TRUE (a != b);
+        CHOC_EXPECT_TRUE (b == f1);
+        CHOC_EXPECT_TRUE (std::addressof (*b) == std::addressof (f1));
+        b = f2;
+        CHOC_EXPECT_TRUE (std::addressof (*b) == std::addressof (f2));
+
+        using R = choc::ObjectReference<Foo>;
+        R c (f1);
+        CHOC_EXPECT_TRUE (c == f1);
+        c = f2;
+        CHOC_EXPECT_TRUE (c == f2);
     }
 }
 
