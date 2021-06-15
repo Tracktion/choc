@@ -302,7 +302,7 @@ struct Context::Pimpl
                     {
                         firstField = false;
 
-                        if ((duk_get_type (ctx, -2) == DUK_TYPE_STRING && duk_to_string (ctx, -2) == objectNameAttribute))
+                        if ((duk_get_type (ctx, -2) == static_cast<duktape::duk_int_t> (DUK_TYPE_STRING) && duk_to_string (ctx, -2) == std::string (objectNameAttribute)))
                         {
                             object = choc::value::createObject (duk_to_string (ctx, -1));
                             continue;
