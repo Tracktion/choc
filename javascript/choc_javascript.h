@@ -202,7 +202,7 @@ struct Context::Pimpl
         duk_pop (context);
     }
 
-    static inline const std::string objectNameAttribute = "_objectName";
+    static constexpr const char* objectNameAttribute = "_objectName";
 
     static void pushValue (duktape::duk_context* ctx, const choc::value::ValueView& v)
     {
@@ -235,7 +235,7 @@ struct Context::Pimpl
 
             auto className = v.getObjectClassName();
             duk_push_lstring (ctx, className.data(), className.length());
-            duk_put_prop_lstring (ctx, objectIndex, objectNameAttribute.data(), objectNameAttribute.length());
+            duk_put_prop_string (ctx, objectIndex, objectNameAttribute);
 
             v.visitObjectMembers ([&] (std::string_view name, const choc::value::ValueView& value)
             {
@@ -290,7 +290,7 @@ struct Context::Pimpl
                     return {};
                 }
 
-                // Handle a plain object - requires an object name attribute as the first field
+                // Handle a plain object - supports an object name attribute as the first field
                 choc::value::Value object = choc::value::createObject ("object");
                 bool firstField = true;
 
