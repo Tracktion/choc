@@ -202,6 +202,8 @@ struct Context::Pimpl
         duk_pop (context);
     }
 
+    static inline const std::string objectNameAttribute = "_objectName";
+
     static void pushValue (duktape::duk_context* ctx, const choc::value::ValueView& v)
     {
         if (v.isInt() || v.isFloat())   return duk_push_number (ctx, v.get<double>());
@@ -230,6 +232,10 @@ struct Context::Pimpl
         if (v.isObject())
         {
             auto objectIndex = duk_push_object (ctx);
+
+            auto className = v.getObjectClassName();
+            duk_push_lstring (ctx, className.data(), className.length());
+            duk_put_prop_lstring (ctx, objectIndex, objectNameAttribute.data(), objectNameAttribute.length());
 
             v.visitObjectMembers ([&] (std::string_view name, const choc::value::ValueView& value)
             {
@@ -284,13 +290,26 @@ struct Context::Pimpl
                     return {};
                 }
 
-                // Handle a plain object
-                auto object = choc::value::createObject ("object");
+                // Handle a plain object - requires an object name attribute as the first field
+                choc::value::Value object;
+                bool firstField = true;
 
                 for (duk_enum (ctx, index, DUK_ENUM_OWN_PROPERTIES_ONLY);
                      duk_next (ctx, -1, 1);
                      duk_pop_2 (ctx))
                 {
+                    if (firstField)
+                    {
+                        bool isObjectNameAttribute = (duk_get_type (ctx, -2) == DUK_TYPE_STRING && duk_to_string (ctx, -2) == objectNameAttribute);
+
+                        object = choc::value::createObject (isObjectNameAttribute ? duk_to_string (ctx, -1) : "object");
+
+                        firstField = false;
+
+                        if (isObjectNameAttribute)
+                            continue;
+                    }
+
                     object.addMember (duk_to_string (ctx, -2), readValue (ctx, -1));
                 }
 
