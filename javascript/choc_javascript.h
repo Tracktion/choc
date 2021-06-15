@@ -291,7 +291,7 @@ struct Context::Pimpl
                 }
 
                 // Handle a plain object - requires an object name attribute as the first field
-                choc::value::Value object;
+                choc::value::Value object = choc::value::createObject ("object");
                 bool firstField = true;
 
                 for (duk_enum (ctx, index, DUK_ENUM_OWN_PROPERTIES_ONLY);
@@ -300,14 +300,13 @@ struct Context::Pimpl
                 {
                     if (firstField)
                     {
-                        bool isObjectNameAttribute = (duk_get_type (ctx, -2) == DUK_TYPE_STRING && duk_to_string (ctx, -2) == objectNameAttribute);
-
-                        object = choc::value::createObject (isObjectNameAttribute ? duk_to_string (ctx, -1) : "object");
-
                         firstField = false;
 
-                        if (isObjectNameAttribute)
+                        if ((duk_get_type (ctx, -2) == DUK_TYPE_STRING && duk_to_string (ctx, -2) == objectNameAttribute))
+                        {
+                            object = choc::value::createObject (duk_to_string (ctx, -1));
                             continue;
+                        }
                     }
 
                     object.addMember (duk_to_string (ctx, -2), readValue (ctx, -1));
