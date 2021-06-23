@@ -57,6 +57,10 @@ struct ObjectPointer  final
     template <typename SourceObjectType, typename = typename std::enable_if<std::is_convertible<SourceObjectType*, ObjectType*>::value>::type>
     ObjectPointer (SourceObjectType& object) noexcept : pointer (std::addressof (object)) {}
 
+    /// Creates an ObjectPointer from a raw pointer.
+    template <typename SourceObjectType, typename = typename std::enable_if<std::is_convertible<SourceObjectType*, ObjectType*>::value>::type>
+    explicit ObjectPointer (SourceObjectType* object) noexcept : pointer (object) {}
+
     /// Creates an ObjectPointer that points to another ObjectPointer (which may be of a
     /// different object type if it can be trivially cast to the target type).
     template <typename SourceObjectType, typename = typename std::enable_if<std::is_convertible<SourceObjectType*, ObjectType*>::value>::type>
