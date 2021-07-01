@@ -626,18 +626,18 @@ ChannelArrayView<SampleType> createChannelArrayView (SampleType* const* channelP
 template <typename SourceBufferView>
 auto createAllocatedCopy (const SourceBufferView& source);
 
-/// Returns an allocated mono buffer with the given size. Note that the buffer is left
-/// uninitialised, so call clear() on it if you need a clear one.
+/// Returns an allocated mono buffer with the given size, using a generator function
+/// to initialise the samples. See setAllSamples() for a description of the generator function.
 template <typename FrameCountType, typename GeneratorFunction>
 auto createMonoBuffer (FrameCountType numFrames, GeneratorFunction&& generateSample);
 
-/// Returns an allocated interleaved buffer with the given size. Note that the buffer is left
-/// uninitialised, so call clear() on it if you need a clear one.
+/// Returns an allocated interleaved buffer with the given size, using a generator function
+/// to initialise the samples. See setAllSamples() for a description of the generator function.
 template <typename ChannelCountType, typename FrameCountType, typename GeneratorFunction>
 auto createInterleavedBuffer (ChannelCountType numChannels, FrameCountType numFrames, GeneratorFunction&& generateSample);
 
-/// Returns an allocated channel-array buffer with the given size. Note that the buffer is left
-/// uninitialised, so call clear() on it if you need a clear one.
+/// Returns an allocated channel-array buffer with the given size, using a generator function
+/// to initialise the samples. See setAllSamples() for a description of the generator function.
 template <typename ChannelCountType, typename FrameCountType, typename GeneratorFunction>
 auto createChannelArrayBuffer (ChannelCountType numChannels, FrameCountType numFrames, GeneratorFunction&& generateSample);
 
