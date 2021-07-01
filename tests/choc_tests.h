@@ -44,6 +44,7 @@
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
+#include "../audio/choc_SincInterpolator.h"
 
 #ifndef CHOC_JAVASCRIPT_IMPLEMENTATION
  #define CHOC_JAVASCRIPT_IMPLEMENTATION 1
@@ -1336,6 +1337,45 @@ inline void testChannelSets (TestProgress& progress)
         choc::buffer::ChannelArrayBuffer<float> dest (2, 10);
         copy (dest, source);
         CHOC_EXPECT_EQ (true, contentMatches (source, dest));
+    }
+
+    {
+        CHOC_TEST (SincInterpolator)
+
+        auto sourceBuffer = choc::buffer::createChannelArrayBuffer (2, 2200, [] (choc::buffer::ChannelCount,
+                                                                                 choc::buffer::FrameCount frame) -> float
+        {
+            return -0.75f + std::fmod (static_cast<float> (frame) * 0.025f, 1.5f);
+        });
+
+        auto findMaxDiff = [] (auto buffer1, auto buffer2)
+        {
+            float maxDiff = 0;
+
+            for (choc::buffer::FrameCount frame = 0; frame < buffer1.getNumFrames(); ++frame)
+                for (choc::buffer::ChannelCount chan = 0; chan < buffer1.getNumChannels(); ++chan)
+                    maxDiff = std::max (maxDiff, std::abs (buffer1.getSample (chan, frame) - buffer2.getSample (chan, frame)));
+
+            return maxDiff;
+        };
+
+        for (auto ratio : { 1.0, 1.0181, 1.1013, 1.2417, 1.97004, 2.0, 2.0628, 3.77391 })
+        {
+            auto resampledNumFrames = static_cast<choc::buffer::FrameCount> (ratio * sourceBuffer.getNumFrames());
+
+            choc::buffer::ChannelArrayBuffer<float> resampledBuffer (sourceBuffer.getNumChannels(), resampledNumFrames);
+            choc::interpolation::sincInterpolate (resampledBuffer, sourceBuffer);
+
+            choc::buffer::ChannelArrayBuffer<float> roundTripResult (sourceBuffer.getSize());
+            choc::interpolation::sincInterpolate (roundTripResult, resampledBuffer);
+
+            choc::buffer::FrameCount margin = 50;
+            choc::buffer::FrameRange range { margin, sourceBuffer.getNumFrames() - margin };
+
+            auto maxDiff = findMaxDiff (sourceBuffer.getFrameRange (range),
+                                        roundTripResult.getFrameRange (range));
+            CHOC_EXPECT_TRUE (maxDiff < 0.01f);
+        }
     }
 }
 
