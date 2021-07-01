@@ -211,8 +211,13 @@ struct Context::Pimpl
 
         if (v.isString())
         {
-            auto s = v.getString();
-            return (void) duk_push_lstring (ctx, s.data(), s.length());
+            auto utf8 = v.getString();
+
+            if (choc::text::isValidCESU8 (utf8))
+                return (void) duk_push_lstring (ctx, utf8.data(), utf8.length());
+
+            auto cesu8 = choc::text::convertUTF8ToCESU8 (choc::text::UTF8Pointer (std::string (utf8).data()));
+            return (void) duk_push_lstring (ctx, cesu8.data(), cesu8.length());
         }
 
         if (v.isArray() || v.isVector())
@@ -261,10 +266,15 @@ struct Context::Pimpl
 
             case DUK_TYPE_STRING:
             {
-                duktape::duk_size_t len = 0;
+                if (auto s = duk_get_string (ctx, index))
+                {
+                    choc::text::UTF8Pointer cesu8 (s);
 
-                if (auto s = duk_get_lstring (ctx, index, std::addressof (len)))
-                    return choc::value::createString (std::string_view (s, len));
+                    if (choc::text::containsSurrogatePairs (cesu8))
+                        return choc::value::createString (choc::text::convertSurrogatePairsToUTF8 (cesu8));
+
+                    return choc::value::createString (std::string_view (s));
+                }
 
                 return choc::value::createString ({});
             }
