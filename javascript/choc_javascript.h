@@ -109,12 +109,12 @@ namespace choc::javascript
 //
 //==============================================================================
 
+namespace choc::javascript
+{
+
 /// In order to avoid pulling in the whole of the dependencies, you should set this
 /// macro to 1 in one of your compile units
 #if CHOC_JAVASCRIPT_IMPLEMENTATION
-
-namespace choc::javascript
-{
 
 namespace duktape
 {
@@ -471,14 +471,14 @@ inline const choc::value::Value* ArgumentList::operator[] (size_t index) const
 }
 
 
-#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
-//==============================================================================
-
 template <typename ValueView>
 choc::value::Value Context::invoke (std::string_view functionName, const ValueView* args, size_t numArgs)
 {
     return pimpl->invoke (functionName, args, numArgs);
 }
+
+#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
+//==============================================================================
 
 template <typename PrimitiveType>
 PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
