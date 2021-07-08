@@ -1391,7 +1391,7 @@ inline void testChannelSets (TestProgress& progress)
                                                                   [] (choc::buffer::ChannelCount chan,
                                                                       choc::buffer::FrameCount frame) -> float
             {
-                return chan + frame * 0.01f;
+                return (float) chan + (float) frame * 0.01f;
             });
 
             auto interleaved = ib.interleave (source);
