@@ -568,9 +568,9 @@ inline void testValues (TestProgress& progress)
         }
 
         auto v2 = choc::value::createObject ("foo",
-                                            "x", choc::value::createVector (3, [] (uint32_t) { return true; }),
-                                            "y", choc::value::createVector (3, [] (uint32_t) { return true; }),
-                                            "z", choc::value::createVector (3, [] (uint32_t) { return 1.0; }));
+                                             "x", choc::value::createVector (3, [] (uint32_t) { return true; }),
+                                             "y", choc::value::createVector (3, [] (uint32_t) { return true; }),
+                                             "z", choc::value::createVector (3, [] (uint32_t) { return 1.0; }));
 
         CHOC_EXPECT_EQ (3u, ((size_t) v2["y"].getRawData()) & 3);
         CHOC_EXPECT_EQ (2u, ((size_t) v2["z"].getRawData()) & 3);
@@ -686,10 +686,13 @@ inline void testJSON (TestProgress& progress)
     {
         CHOC_TEST (ConvertDoubles)
 
-        CHOC_EXPECT_EQ ("2.5",                      choc::json::doubleToString (2.5));
-        CHOC_EXPECT_EQ ("\"NaN\"",                  choc::json::doubleToString (std::numeric_limits<double>::quiet_NaN()));
-        CHOC_EXPECT_EQ ("\"Infinity\"",             choc::json::doubleToString (std::numeric_limits<double>::infinity()));
-        CHOC_EXPECT_EQ ("\"-Infinity\"",            choc::json::doubleToString (-std::numeric_limits<double>::infinity()));
+        CHOC_EXPECT_EQ ("2.5",            choc::json::doubleToString (2.5));
+        CHOC_EXPECT_EQ ("\"NaN\"",        choc::json::doubleToString (std::numeric_limits<double>::quiet_NaN()));
+        CHOC_EXPECT_EQ ("\"Infinity\"",   choc::json::doubleToString (std::numeric_limits<double>::infinity()));
+        CHOC_EXPECT_EQ ("\"-Infinity\"",  choc::json::doubleToString (-std::numeric_limits<double>::infinity()));
+        CHOC_EXPECT_EQ (1.28,             choc::json::parseValue ("1.28").getFloat64());
+        CHOC_EXPECT_EQ (-4,               choc::json::parseValue ("-4.0").getFloat64());
+        CHOC_EXPECT_EQ ("1234",           std::string (choc::json::parseValue ("\"1234\"").getString()));
     }
 
     auto checkError = [&] (const std::string& json, const std::string& message, size_t line, size_t column)
@@ -1622,20 +1625,21 @@ inline void testJavascript (TestProgress& progress)
         {
             choc::javascript::Context context;
 
-            context.registerFunction ("addUp", [] (const choc::value::Value* args, size_t numArgs) -> choc::value::Value
+            context.registerFunction ("addUp", [] (choc::javascript::ArgumentList args) -> choc::value::Value
                                                    {
                                                        int total = 0;
-                                                       for (size_t i = 0; i < numArgs; ++i)
-                                                           total += args[i].get<int>();
+                                                       for (size_t i = 0; i < args.numArgs; ++i)
+                                                           total += args.get<int>(i);
 
                                                        return choc::value::createInt32 (total);
                                                    });
 
-            context.registerFunction ("concat", [] (const choc::value::Value* args, size_t numArgs) -> choc::value::Value
+            context.registerFunction ("concat", [] (choc::javascript::ArgumentList args) -> choc::value::Value
                                                    {
                                                        std::string s;
-                                                       for (size_t i = 0; i < numArgs; ++i)
-                                                           s += args[i].get<std::string>();
+
+                                                       for (auto& arg : args)
+                                                           s += arg.get<std::string>();
 
                                                        return choc::value::createString (s);
                                                    });

@@ -20,6 +20,7 @@
 #define CHOC_JAVASCRIPT_HEADER_INCLUDED
 
 #include "../containers/choc_Value.h"
+#include "../text/choc_JSON.h"
 
 /**
     A simple javascript engine (currently using duktape internally)
@@ -32,6 +33,34 @@ namespace choc::javascript
         std::string message;
     };
 
+    //==============================================================================
+    /// Helper class to hold and provide access to the arguments in a javascript
+    /// function callback.
+    struct ArgumentList
+    {
+        const choc::value::Value* args;
+        size_t numArgs;
+
+        /// Returns the number of arguments
+        size_t size() const noexcept                                        { return numArgs; }
+        /// Returns true if there are no arguments
+        bool empty() const noexcept                                         { return numArgs == 0; }
+
+        /// Returns an argument, or a nullptr if the index is out of range.
+        const choc::value::Value* operator[] (size_t index) const;
+
+        /// Gets an argument as a primitive type (or a string).
+        /// If the index is out of range or the object isn't a suitable type,
+        /// then the default value provided will be returned instead.
+        template <typename PrimitiveType>
+        PrimitiveType get (size_t argIndex, PrimitiveType defaultValue = {}) const;
+
+        /// Standard iterator
+        const choc::value::Value* begin() const noexcept                    { return args; }
+        const choc::value::Value* end() const noexcept                      { return args + numArgs; }
+    };
+
+    //==============================================================================
     /**
         An execution context which you use for running javascript code.
 
@@ -57,7 +86,7 @@ namespace choc::javascript
         choc::value::Value invoke (std::string_view functionName, const ValueView* args, size_t numArgs);
 
         /// This is the prototype for a lambda which can be bound as a javascript function.
-        using NativeFunction = std::function<choc::value::Value(const choc::value::Value* args, size_t numArgs)>;
+        using NativeFunction = std::function<choc::value::Value(ArgumentList)>;
 
         /// Binds a lambda function to a global name so that javascript code can invoke it.
         void registerFunction (std::string_view name, NativeFunction fn);
@@ -127,8 +156,6 @@ namespace duktape
 }
 
 //==============================================================================
-//using namespace duktape;
-
 struct Context::Pimpl
 {
     Pimpl() : context (duktape::duk_create_heap (nullptr, nullptr, nullptr, nullptr, fatalError))
@@ -369,7 +396,7 @@ struct Context::Pimpl
 
         duktape::duk_ret_t invokeWithArgs (duktape::duk_context* ctx, const choc::value::Value* args, size_t numArgs)
         {
-            auto result = std::invoke (function, args, numArgs);
+            auto result = std::invoke (function, ArgumentList { args, numArgs });
 
             if (result.isVoid())
                 return 0;
@@ -433,18 +460,48 @@ inline choc::value::Value Context::evaluate (std::string_view javascriptCode)
     return pimpl->evaluate (std::move (javascriptCode));
 }
 
+inline void Context::registerFunction (std::string_view name, NativeFunction fn)
+{
+    pimpl->registerFunction (std::move (name), std::move (fn));
+}
+
+inline const choc::value::Value* ArgumentList::operator[] (size_t index) const
+{
+    return index < numArgs ? args + index : nullptr;
+}
+
+
+#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
+//==============================================================================
+
 template <typename ValueView>
 choc::value::Value Context::invoke (std::string_view functionName, const ValueView* args, size_t numArgs)
 {
     return pimpl->invoke (functionName, args, numArgs);
 }
 
-inline void Context::registerFunction (std::string_view name, NativeFunction fn)
+template <typename PrimitiveType>
+PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
 {
-    pimpl->registerFunction (std::move (name), std::move (fn));
+    if (auto a = (*this)[index])
+    {
+        try
+        {
+            if constexpr (! std::is_same<const PrimitiveType, const std::string>::value)
+                if (a->isString())
+                    return choc::json::parseValue (a->getString()).get<PrimitiveType>();
+
+            return a->get<PrimitiveType>();
+        }
+        catch (choc::value::Error)
+        {}
+        catch (choc::json::ParseError)
+        {}
+    }
+
+    return defaultValue;
 }
 
-}
+} // namespace choc::javascript
 
-#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
 #endif // CHOC_JAVASCRIPT_HEADER_INCLUDED
