@@ -84,6 +84,40 @@ struct DeinterleavingScratchBuffer
     }
 };
 
+
+//==============================================================================
+/// Creates an InterleavedBufferView which points to the data in a choc::value::ValueView.
+/// The ValueView must be an array of either primitive values or vectors.
+/// @see createValueViewFromBuffer()
+template <typename SampleType>
+inline InterleavedView<SampleType> createInterleavedViewFromValue (const choc::value::ValueView& value)
+{
+    auto& arrayType = value.getType();
+    CHOC_ASSERT (arrayType.isArray());
+    auto numFrames = arrayType.getNumElements();
+    auto sourceData = const_cast<SampleType*> (reinterpret_cast<const SampleType*> (value.getRawData()));
+    auto frameType = arrayType.getElementType();
+
+    if (frameType.isVector())
+    {
+        CHOC_ASSERT (frameType.getElementType().isPrimitiveType<SampleType>());
+        return createInterleavedView (sourceData, frameType.getNumElements(), numFrames);
+    }
+
+    CHOC_ASSERT (frameType.isPrimitiveType<SampleType>());
+    return createInterleavedView (sourceData, 1, numFrames);
 }
+
+//==============================================================================
+/// Creates a ValueView for an array of vectors that represents the given 2D buffer.
+/// @see createInterleavedViewFromValue()
+template <typename SampleType>
+inline choc::value::ValueView createValueViewFromBuffer (const InterleavedView<SampleType>& source)
+{
+    return choc::value::create2DArrayView (source.data.data, source.getNumFrames(), source.getNumChannels());
+}
+
+
+} // namespace choc::buffer
 
 #endif
