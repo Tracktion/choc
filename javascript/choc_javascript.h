@@ -348,13 +348,28 @@ struct Context::Pimpl
 
             auto numArgs = duk_get_top (ctx);
 
+            if (numArgs <= 4)
+            {
+                choc::value::Value args[4];
+
+                for (decltype (numArgs) i = 0; i < numArgs; ++i)
+                    args[i] = readValue (ctx, i);
+
+                return fn.invokeWithArgs (ctx, args, (size_t) numArgs);
+            }
+
             std::vector<choc::value::Value> args;
             args.reserve ((size_t) numArgs);
 
             for (decltype (numArgs) i = 0; i < numArgs; ++i)
                 args.push_back (readValue (ctx, i));
 
-            auto result = std::invoke (fn.function, args.data(), numArgs);
+            return fn.invokeWithArgs (ctx, args.data(), (size_t) numArgs);
+        }
+
+        duktape::duk_ret_t invokeWithArgs (duktape::duk_context* ctx, const choc::value::Value* args, size_t numArgs)
+        {
+            auto result = std::invoke (function, args, numArgs);
 
             if (result.isVoid())
                 return 0;
