@@ -45,6 +45,7 @@
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
 #include "../audio/choc_SincInterpolator.h"
+#include "../audio/choc_SampleBufferUtilities.h"
 
 #ifndef CHOC_JAVASCRIPT_IMPLEMENTATION
  #define CHOC_JAVASCRIPT_IMPLEMENTATION 1
@@ -918,6 +919,17 @@ inline void testChannelSets (TestProgress& progress)
 {
     CHOC_CATEGORY (ChannelSets);
 
+    auto findMaxDiff = [] (auto buffer1, auto buffer2)
+    {
+        float maxDiff = 0;
+
+        for (choc::buffer::FrameCount frame = 0; frame < buffer1.getNumFrames(); ++frame)
+            for (choc::buffer::ChannelCount chan = 0; chan < buffer1.getNumChannels(); ++chan)
+                maxDiff = std::max (maxDiff, std::abs (buffer1.getSample (chan, frame) - buffer2.getSample (chan, frame)));
+
+        return maxDiff;
+    };
+
     {
         CHOC_TEST (InterleavedChannelSetApplyClear)
 
@@ -1348,17 +1360,6 @@ inline void testChannelSets (TestProgress& progress)
             return -0.75f + std::fmod (static_cast<float> (frame) * 0.025f, 1.5f);
         });
 
-        auto findMaxDiff = [] (auto buffer1, auto buffer2)
-        {
-            float maxDiff = 0;
-
-            for (choc::buffer::FrameCount frame = 0; frame < buffer1.getNumFrames(); ++frame)
-                for (choc::buffer::ChannelCount chan = 0; chan < buffer1.getNumChannels(); ++chan)
-                    maxDiff = std::max (maxDiff, std::abs (buffer1.getSample (chan, frame) - buffer2.getSample (chan, frame)));
-
-            return maxDiff;
-        };
-
         for (auto ratio : { 1.0, 1.0181, 1.1013, 1.2417, 1.97004, 2.0, 2.0628, 3.77391 })
         {
             auto resampledNumFrames = static_cast<choc::buffer::FrameCount> (ratio * sourceBuffer.getNumFrames());
@@ -1376,6 +1377,34 @@ inline void testChannelSets (TestProgress& progress)
                                         roundTripResult.getFrameRange (range));
             CHOC_EXPECT_TRUE (maxDiff < 0.01f);
         }
+    }
+
+    {
+        CHOC_TEST (Interleaving)
+
+        choc::buffer::InterleavingScratchBuffer<float> ib;
+        choc::buffer::DeinterleavingScratchBuffer<float> db;
+
+        auto test = [&] (choc::buffer::ChannelCount numChans, choc::buffer::FrameCount numFrames)
+        {
+            auto source = choc::buffer::createChannelArrayBuffer (numChans, numFrames,
+                                                                  [] (choc::buffer::ChannelCount chan,
+                                                                      choc::buffer::FrameCount frame) -> float
+            {
+                return chan + frame * 0.01f;
+            });
+
+            auto interleaved = ib.interleave (source);
+            auto roundTripped = db.deinterleave (interleaved);
+
+            auto maxDiff = findMaxDiff (source, roundTripped);
+            CHOC_EXPECT_TRUE (maxDiff < 0.01f);
+        };
+
+        test (1, 50);
+        test (2, 100);
+        test (3, 50);
+        test (5, 120);
     }
 }
 
