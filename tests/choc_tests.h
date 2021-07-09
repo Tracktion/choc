@@ -46,11 +46,6 @@
 #include "../audio/choc_SampleBuffers.h"
 #include "../audio/choc_SincInterpolator.h"
 #include "../audio/choc_SampleBufferUtilities.h"
-
-#ifndef CHOC_JAVASCRIPT_IMPLEMENTATION
- #define CHOC_JAVASCRIPT_IMPLEMENTATION 1
-#endif
-
 #include "../javascript/choc_javascript.h"
 
 /**
@@ -1649,11 +1644,21 @@ inline void testJavascript (TestProgress& progress)
             CHOC_EXPECT_EQ ("abcdef", context.evaluate ("concat (\"abc\", \"def\")").get<std::string>());
             CHOC_EXPECT_TRUE (context.evaluate ("const xx = concat (\"abc\", \"def\")").isVoid());
 
-            choc::value::Value args[] = { choc::value::createInt32 (100), choc::value::createInt32 (200), choc::value::createInt32 (300) };
-            CHOC_EXPECT_EQ (0, context.invoke ("addUp", (const choc::value::ValueView*) nullptr, 0).get<int>());
-            CHOC_EXPECT_EQ (100, context.invoke ("addUp", args, 1).get<int>());
-            CHOC_EXPECT_EQ (300, context.invoke ("addUp", args, 2).get<int>());
-            CHOC_EXPECT_EQ (600, context.invoke ("addUp", args, 3).get<int>());
+            CHOC_EXPECT_EQ (0,   context.invoke ("addUp").get<int>());
+            CHOC_EXPECT_EQ (123, context.invoke ("addUp", 123).get<int>());
+            CHOC_EXPECT_EQ (100, context.invoke ("addUp", 50, 50).get<int>());
+            CHOC_EXPECT_EQ (300, context.invoke ("addUp", 100, choc::value::createInt32 (200)).get<int>());
+            CHOC_EXPECT_EQ (16,  context.invoke ("addUp", 2.0, choc::value::createFloat64 (4.0), 8, 2).get<int>());
+
+            std::vector<int> args = { 100, 1, 10 };
+            CHOC_EXPECT_EQ (111, context.invokeWithArgList ("addUp", args).get<int>());
+
+            context.evaluate ("function appendStuff (n) { return n + \"xx\"; }");
+
+            CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", std::string_view ("abc")).getString()));
+            CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", std::string ("abc")).getString()));
+            CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", "abc").getString()));
+            CHOC_EXPECT_EQ ("truexx", std::string (context.invoke ("appendStuff", true).getString()));
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }

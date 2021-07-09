@@ -80,10 +80,23 @@ namespace choc::javascript
         /// If there are any parse errors, this will throw a choc::javascript::Error exception.
         choc::value::Value evaluate (std::string_view javascriptCode);
 
-        /// Attemps to invoke a global function with a list of arguments.
-        /// If there are any parse errors, this will throw a choc::javascript::Error exception.
-        template <typename ValueView>
-        choc::value::Value invoke (std::string_view functionName, const ValueView* args, size_t numArgs);
+        /// Attempts to invoke a global function with no arguments.
+        /// Any parse errors will throw a choc::javascript::Error exception.
+        choc::value::Value invoke (std::string_view functionName);
+
+        /// Attempts to invoke a global function with the arguments provided.
+        /// The arguments can be primitives, strings, choc::value::ValueView or
+        /// choc::value::Value types.
+        /// Any parse errors will throw a choc::javascript::Error exception.
+        template <typename... Args>
+        choc::value::Value invoke (std::string_view functionName, Args&&... args);
+
+        /// Attempts to invoke a global function with an array of arguments.
+        /// The objects in the argument list can be primitives, strings, choc::value::ValueView
+        /// or choc::value::Value types.
+        /// Any parse errors will throw a choc::javascript::Error exception.
+        template <typename ArgList>
+        choc::value::Value invokeWithArgList (std::string_view functionName, const ArgList& args);
 
         /// This is the prototype for a lambda which can be bound as a javascript function.
         using NativeFunction = std::function<choc::value::Value(ArgumentList)>;
@@ -94,6 +107,14 @@ namespace choc::javascript
     private:
         struct Pimpl;
         std::unique_ptr<Pimpl> pimpl;
+
+        void prepareForCall (std::string_view, size_t);
+        choc::value::Value performCall (size_t);
+        void addValueArgument (const choc::value::ValueView&);
+        void addDoubleArgument (double);
+        void addBoolArgument (bool);
+        void addStringArgument (std::string_view);
+        template <typename Type> void pushValue (const Type&);
     };
 }
 
@@ -112,9 +133,79 @@ namespace choc::javascript
 namespace choc::javascript
 {
 
+template <typename Type>
+void Context::pushValue (const Type& v)
+{
+    if constexpr (std::is_same<Type, choc::value::Value>::value)
+        addValueArgument (v.getView());
+    else if constexpr (std::is_same<Type, choc::value::ValueView>::value)
+        addValueArgument (v);
+    else if constexpr (std::is_same<Type, bool>::value)
+        addBoolArgument (v);
+    else if constexpr (std::is_integral<Type>::value || std::is_floating_point<Type>::value)
+        addDoubleArgument (static_cast<double> (v));
+    else
+        addStringArgument (std::string_view (v));
+}
+
+inline choc::value::Value Context::invoke (std::string_view functionName)
+{
+    prepareForCall (functionName, 0);
+    return performCall (0);
+}
+
+template <typename... Args>
+choc::value::Value Context::invoke (std::string_view functionName, Args&&... args)
+{
+    prepareForCall (functionName, sizeof...(args));
+    (pushValue (std::forward<Args> (args)), ...);
+    return performCall (sizeof...(args));
+}
+
+template <typename ArgList>
+choc::value::Value Context::invokeWithArgList (std::string_view functionName, const ArgList& args)
+{
+    prepareForCall (functionName, args.size());
+
+    for (auto& arg : args)
+        pushValue (arg);
+
+    return performCall (args.size());
+}
+
+template <typename PrimitiveType>
+PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
+{
+    if (auto a = (*this)[index])
+    {
+        try
+        {
+            if constexpr (! std::is_same<const PrimitiveType, const std::string>::value)
+                if (a->isString())
+                    return choc::json::parseValue (a->getString()).get<PrimitiveType>();
+
+            return a->get<PrimitiveType>();
+        }
+        catch (choc::value::Error)
+        {}
+        catch (choc::json::ParseError)
+        {}
+    }
+
+    return defaultValue;
+}
+
+} // namespace choc::javascript
+
+#endif // CHOC_JAVASCRIPT_HEADER_INCLUDED
+
+//==============================================================================
 /// In order to avoid pulling in the whole of the dependencies, you should set this
 /// macro to 1 in one of your compile units
 #if CHOC_JAVASCRIPT_IMPLEMENTATION
+
+namespace choc::javascript
+{
 
 namespace duktape
 {
@@ -197,8 +288,7 @@ struct Context::Pimpl
         return result;
     }
 
-    template <typename ValueView>
-    choc::value::Value invoke (std::string_view functionName, const ValueView* args, size_t numArgs)
+    void prepareForCall (std::string_view functionName, size_t numArgs)
     {
         evalString (functionName);
 
@@ -206,10 +296,10 @@ struct Context::Pimpl
             throw Error { "No such function" };
 
         duk_require_stack_top (context, (duktape::duk_idx_t) numArgs);
+    }
 
-        for (size_t i = 0; i < numArgs; ++i)
-            pushValue (context, args[i]);
-
+    choc::value::Value performCall (size_t numArgs)
+    {
         if (duk_pcall (context, (duktape::duk_idx_t) numArgs) != DUK_EXEC_SUCCESS)
             throwError();
 
@@ -231,21 +321,25 @@ struct Context::Pimpl
 
     static constexpr const char* objectNameAttribute = "_objectName";
 
+    void pushValue (const choc::value::ValueView& v)    { pushValue (context, v); }
+    void pushValue (double value)                       { duk_push_number (context, value); }
+    void pushValue (bool value)                         { duk_push_boolean (context, value); }
+    void pushValue (std::string_view value)             { pushValue (context, value); }
+
+    static void pushValue (duktape::duk_context* ctx, std::string_view value)
+    {
+        if (choc::text::isValidCESU8 (value))
+            return (void) duk_push_lstring (ctx, value.data(), value.length());
+
+        auto cesu8 = choc::text::convertUTF8ToCESU8 (choc::text::UTF8Pointer (std::string (value).data()));
+        duk_push_lstring (ctx, cesu8.data(), cesu8.length());
+    }
+
     static void pushValue (duktape::duk_context* ctx, const choc::value::ValueView& v)
     {
         if (v.isInt() || v.isFloat())   return duk_push_number (ctx, v.get<double>());
         if (v.isBool())                 return duk_push_boolean (ctx, v.getBool());
-
-        if (v.isString())
-        {
-            auto utf8 = v.getString();
-
-            if (choc::text::isValidCESU8 (utf8))
-                return (void) duk_push_lstring (ctx, utf8.data(), utf8.length());
-
-            auto cesu8 = choc::text::convertUTF8ToCESU8 (choc::text::UTF8Pointer (std::string (utf8).data()));
-            return (void) duk_push_lstring (ctx, cesu8.data(), cesu8.length());
-        }
+        if (v.isString())               return pushValue (ctx, v.getString());
 
         if (v.isArray() || v.isVector())
         {
@@ -339,7 +433,8 @@ struct Context::Pimpl
                     {
                         firstField = false;
 
-                        if ((duk_get_type (ctx, -2) == static_cast<duktape::duk_int_t> (DUK_TYPE_STRING) && duk_to_string (ctx, -2) == std::string (objectNameAttribute)))
+                        if ((duk_get_type (ctx, -2) == static_cast<duktape::duk_int_t> (DUK_TYPE_STRING)
+                             && duk_to_string (ctx, -2) == std::string (objectNameAttribute)))
                         {
                             object = choc::value::createObject (duk_to_string (ctx, -1));
                             continue;
@@ -470,38 +565,13 @@ inline const choc::value::Value* ArgumentList::operator[] (size_t index) const
     return index < numArgs ? args + index : nullptr;
 }
 
-
-template <typename ValueView>
-choc::value::Value Context::invoke (std::string_view functionName, const ValueView* args, size_t numArgs)
-{
-    return pimpl->invoke (functionName, args, numArgs);
-}
-
-#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
-//==============================================================================
-
-template <typename PrimitiveType>
-PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
-{
-    if (auto a = (*this)[index])
-    {
-        try
-        {
-            if constexpr (! std::is_same<const PrimitiveType, const std::string>::value)
-                if (a->isString())
-                    return choc::json::parseValue (a->getString()).get<PrimitiveType>();
-
-            return a->get<PrimitiveType>();
-        }
-        catch (choc::value::Error)
-        {}
-        catch (choc::json::ParseError)
-        {}
-    }
-
-    return defaultValue;
-}
+inline void Context::prepareForCall (std::string_view name, size_t numArgs) { pimpl->prepareForCall (name, numArgs); }
+inline choc::value::Value Context::performCall (size_t numArgs)             { return pimpl->performCall (numArgs); }
+inline void Context::addValueArgument (const choc::value::ValueView& v)     { pimpl->pushValue (v); }
+inline void Context::addDoubleArgument (double v)                           { pimpl->pushValue (v); }
+inline void Context::addBoolArgument (bool v)                               { pimpl->pushValue (v); }
+inline void Context::addStringArgument (std::string_view v)                 { pimpl->pushValue (v); }
 
 } // namespace choc::javascript
 
-#endif // CHOC_JAVASCRIPT_HEADER_INCLUDED
+#endif // CHOC_JAVASCRIPT_IMPLEMENTATION
