@@ -46,6 +46,7 @@
 #include "../audio/choc_SampleBuffers.h"
 #include "../audio/choc_SincInterpolator.h"
 #include "../audio/choc_SampleBufferUtilities.h"
+#include "../audio/choc_AudioMIDIBlockDispatcher.h"
 #include "../javascript/choc_javascript.h"
 
 /**
