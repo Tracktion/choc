@@ -1610,7 +1610,7 @@ inline void testJavascript (TestProgress& progress)
         }
         catch (const choc::javascript::Error& e)
         {
-            CHOC_EXPECT_EQ ("SyntaxError: parse error (line 1, end of input)\n    at [anon] (eval:1) internal\n    at [anon] (duk_js_compiler.c:3740) internal", e.message);
+            CHOC_EXPECT_EQ ("SyntaxError: parse error (line 1, end of input)", e.message);
         }
     }
 

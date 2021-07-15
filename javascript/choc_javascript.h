@@ -269,7 +269,7 @@ struct Context::Pimpl
 
     void throwError()
     {
-        std::string message = duk_safe_to_stacktrace (context, -1);
+        std::string message = duk_safe_to_string (context, -1);
         reset();
         throw Error { message };
     }
