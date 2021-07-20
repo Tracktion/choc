@@ -19,10 +19,9 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
-#include <iostream>
-
 #include "../platform/choc_Platform.h"
 #include "../platform/choc_SpinLock.h"
+#include "../platform/choc_DynamicLibrary.h"
 #include "../text/choc_CodePrinter.h"
 #include "../text/choc_FloatToString.h"
 #include "../text/choc_HTML.h"
@@ -48,6 +47,8 @@
 #include "../audio/choc_SampleBufferUtilities.h"
 #include "../audio/choc_AudioMIDIBlockDispatcher.h"
 #include "../javascript/choc_javascript.h"
+
+#include <iostream>
 
 /**
     To keep things simpole for users, I've just shoved all the tests for everything into this
