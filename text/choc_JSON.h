@@ -145,8 +145,8 @@ inline std::string getEscapedQuotedString (std::string_view s)
 
 inline std::string doubleToString (double value)
 {
-    if (std::isfinite (value))    return choc::text::floatToString (value);
-    if (std::isnan (value))       return "\"NaN\"";
+    if (std::isfinite (value))  return choc::text::floatToString (value, -1, true);
+    if (std::isnan (value))     return "\"NaN\"";
 
     return value >= 0 ?  "\"Infinity\""
                       : "\"-Infinity\"";
@@ -165,7 +165,7 @@ void writeAsJSON (Stream& output, const value::ValueView& value)
             if (v.isVoid())                   { out << "null"; return; }
             if (v.isString())                 { out << getEscapedQuotedString (v.getString()); return; }
             if (v.isBool())                   { out << (v.getBool() ? "true" : "false"); return; }
-            if (v.isFloat())                  { out << v.get<double>(); return; }
+            if (v.isFloat())                  { out << doubleToString (v.get<double>()); return; }
             if (v.isInt())                    { out << v.get<int64_t>(); return; }
             if (v.isObject())                 return dumpObject (v);
             if (v.isArray() || v.isVector())  return dumpArrayOrVector (v);
