@@ -547,30 +547,30 @@ struct Context::Pimpl
     std::vector<std::unique_ptr<RegisteredFunction>> registeredFunctions;
 };
 
-inline Context::Context()  : pimpl (std::make_unique<Pimpl>()) {}
-inline Context::~Context() = default;
+Context::Context()  : pimpl (std::make_unique<Pimpl>()) {}
+Context::~Context() = default;
 
-inline choc::value::Value Context::evaluate (std::string_view javascriptCode)
+choc::value::Value Context::evaluate (std::string_view javascriptCode)
 {
     return pimpl->evaluate (std::move (javascriptCode));
 }
 
-inline void Context::registerFunction (std::string_view name, NativeFunction fn)
+void Context::registerFunction (std::string_view name, NativeFunction fn)
 {
     pimpl->registerFunction (std::move (name), std::move (fn));
 }
 
-inline const choc::value::Value* ArgumentList::operator[] (size_t index) const
+const choc::value::Value* ArgumentList::operator[] (size_t index) const
 {
     return index < numArgs ? args + index : nullptr;
 }
 
-inline void Context::prepareForCall (std::string_view name, size_t numArgs) { pimpl->prepareForCall (name, numArgs); }
-inline choc::value::Value Context::performCall (size_t numArgs)             { return pimpl->performCall (numArgs); }
-inline void Context::addValueArgument (const choc::value::ValueView& v)     { pimpl->pushValue (v); }
-inline void Context::addDoubleArgument (double v)                           { pimpl->pushValue (v); }
-inline void Context::addBoolArgument (bool v)                               { pimpl->pushValue (v); }
-inline void Context::addStringArgument (std::string_view v)                 { pimpl->pushValue (v); }
+void Context::prepareForCall (std::string_view name, size_t numArgs) { pimpl->prepareForCall (name, numArgs); }
+choc::value::Value Context::performCall (size_t numArgs)             { return pimpl->performCall (numArgs); }
+void Context::addValueArgument (const choc::value::ValueView& v)     { pimpl->pushValue (v); }
+void Context::addDoubleArgument (double v)                           { pimpl->pushValue (v); }
+void Context::addBoolArgument (bool v)                               { pimpl->pushValue (v); }
+void Context::addStringArgument (std::string_view v)                 { pimpl->pushValue (v); }
 
 } // namespace choc::javascript
 
