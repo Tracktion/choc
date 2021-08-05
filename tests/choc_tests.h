@@ -28,6 +28,7 @@
 #include "../text/choc_JSON.h"
 #include "../text/choc_StringUtilities.h"
 #include "../text/choc_UTF8.h"
+#include "../text/choc_TextTable.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_DirtyList.h"
 #include "../containers/choc_Span.h"
@@ -443,15 +444,29 @@ inline void testStringUtilities (TestProgress& progress)
 
     {
         CHOC_TEST (UTF8)
-        {
-            auto text = "line1\xd7\x90\n\xcf\x88line2\nli\xe1\xb4\x81ne3\nline4\xe1\xb4\xa8";
-            choc::text::UTF8Pointer p (text);
 
-            CHOC_EXPECT_TRUE (choc::text::findInvalidUTF8Data (text, std::string_view (text).length()) == nullptr);
-            CHOC_EXPECT_EQ (2u, choc::text::findLineAndColumn (p, p.find ("ine2")).line);
-            CHOC_EXPECT_EQ (3u, choc::text::findLineAndColumn (p, p.find ("ine2")).column);
-            CHOC_EXPECT_TRUE (p.find ("ine4").findStartOfLine (p).startsWith ("line4"));
-        }
+        auto text = "line1\xd7\x90\n\xcf\x88line2\nli\xe1\xb4\x81ne3\nline4\xe1\xb4\xa8";
+        choc::text::UTF8Pointer p (text);
+
+        CHOC_EXPECT_TRUE (choc::text::findInvalidUTF8Data (text, std::string_view (text).length()) == nullptr);
+        CHOC_EXPECT_EQ (2u, choc::text::findLineAndColumn (p, p.find ("ine2")).line);
+        CHOC_EXPECT_EQ (3u, choc::text::findLineAndColumn (p, p.find ("ine2")).column);
+        CHOC_EXPECT_TRUE (p.find ("ine4").findStartOfLine (p).startsWith ("line4"));
+    }
+
+    {
+        CHOC_TEST (TextTable)
+
+        choc::text::TextTable table;
+        table << "1" << "234" << "5";
+        table.newRow();
+        table << "" << "2345" << "x" << "y";
+        table.newRow();
+        table << "2345";
+
+        CHOC_EXPECT_EQ (table.getNumRows(), 3u);
+        CHOC_EXPECT_EQ (table.getNumColumns(), 4u);
+        CHOC_EXPECT_EQ (table.toString ("<", ";", ">"), std::string ("<1   ;234 ;5; ><    ;2345;x;y><2345;    ; ; >"));
     }
 }
 
