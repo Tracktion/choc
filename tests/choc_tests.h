@@ -29,6 +29,7 @@
 #include "../text/choc_StringUtilities.h"
 #include "../text/choc_UTF8.h"
 #include "../text/choc_TextTable.h"
+#include "../text/choc_Files.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_DirtyList.h"
 #include "../containers/choc_Span.h"
@@ -467,6 +468,24 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ (table.getNumRows(), 3u);
         CHOC_EXPECT_EQ (table.getNumColumns(), 4u);
         CHOC_EXPECT_EQ (table.toString ("<", ";", ">"), std::string ("<1   ;234 ;5; ><    ;2345;x;y><2345;    ; ; >"));
+    }
+}
+
+inline void testFileUtilities (TestProgress& progress)
+{
+    CHOC_CATEGORY (Files);
+
+    {
+        CHOC_TEST (WildcardPattern)
+
+        choc::file::WildcardPattern p1 ("*.xyz;*.foo", false), p2 ("*", false), p3, p4 ("abc?.x", true);
+
+        CHOC_EXPECT_TRUE (p1.matches ("sdf.xyz") && p1.matches ("sdf.XyZ") && p1.matches (".xyz") && p1.matches ("dfg.foo"));
+        CHOC_EXPECT_FALSE (p1.matches ("sdf.xxyz") || p1.matches ("") || p1.matches ("abc.xy") || p1.matches (".xyzz"));
+        CHOC_EXPECT_TRUE (p2.matches ("") && p2.matches ("abcd"));
+        CHOC_EXPECT_TRUE (p3.matches ("") && p3.matches ("dfgdfg"));
+        CHOC_EXPECT_TRUE (p4.matches ("abcd.x"));
+        CHOC_EXPECT_FALSE (p4.matches ("abcd.X") || p4.matches ("abcdd.x") || p4.matches ("abc.x"));
     }
 }
 
@@ -1686,6 +1705,7 @@ inline bool runAllTests (TestProgress& progress)
 {
     testContainerUtils (progress);
     testStringUtilities (progress);
+    testFileUtilities (progress);
     testValues (progress);
     testJSON (progress);
     testMIDI (progress);
