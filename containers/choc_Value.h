@@ -36,6 +36,19 @@ struct MemberNameAndType;
 struct MemberNameAndValue;
 struct ElementTypeAndOffset;
 
+// This macro lets you override the primitive type that will be used for
+// encoding bool elements in a choc::value::ValueView. This setting makes
+// no difference to the way the serialisation is done, but affects the way
+// elements are packed in memory in a live value object. By default this uses
+// a uint32_t for bools, so that all data elements are 4-byte aligned, but you
+// could change it to a uint8_t if you want to pack the data more tightly at
+// the expense of aligned read/write access.
+#ifdef CHOC_VALUE_BOOL_STORAGE_TYPE
+ using BoolStorageType = CHOC_VALUE_BOOL_STORAGE_TYPE;
+#else
+ using BoolStorageType = uint32_t;
+#endif
+
 //==============================================================================
 /** An exception object which is thrown by the Type, Value and ValueView classes when various
     runtime checks fail.
@@ -275,16 +288,16 @@ private:
     enum class MainType  : uint8_t
     {
         void_           = 0,
-        int32           = 0x04,
-        int64           = 0x08,
-        float32         = 0x14,
-        float64         = 0x18,
-        boolean         = 0x01,
-        string          = 0x24,
-        vector          = 0x30,
-        primitiveArray  = 0x40,
-        complexArray    = 0x80,
-        object          = 0x90
+        int32           = 0x00 + sizeof (int32_t),
+        int64           = 0x00 + sizeof (int64_t),
+        float32         = 0x10 + sizeof (float),
+        float64         = 0x10 + sizeof (double),
+        boolean         = 0x30 + sizeof (BoolStorageType),
+        string          = 0x40 + sizeof (uint32_t),
+        vector          = 0x50,
+        primitiveArray  = 0x60,
+        complexArray    = 0x70,
+        object          = 0x80
     };
 
     static constexpr uint32_t maxNumVectorElements = 256;
@@ -931,9 +944,36 @@ namespace
     template <typename Type> static constexpr bool isPrimitiveType()    { return matchesType<Type, int32_t, int64_t, float, double, bool, StringDictionary::Handle>(); }
     template <typename Type> static constexpr bool isStringType()       { return matchesType<Type, std::string, std::string&, std::string_view, const char*>(); }
     template <typename Type> static constexpr bool isValueType()        { return matchesType<Type, Value, ValueView>(); }
+    template <typename Type> static constexpr size_t getTypeSize()      { return std::is_same<const Type, const bool>::value ? sizeof (BoolStorageType) : sizeof (Type); }
 
-    template <typename TargetType> TargetType readUnaligned (const void* src)          { TargetType v; memcpy (std::addressof (v), src, sizeof (v)); return v; }
-    template <typename TargetType> void writeUnaligned (void* dest, TargetType src)    { memcpy (dest, std::addressof (src), sizeof (TargetType)); }
+    template <typename TargetType> TargetType readUnaligned (const void* src)
+    {
+        if constexpr (std::is_same<const TargetType, const bool>::value)
+        {
+            BoolStorageType b;
+            memcpy (std::addressof (b), src, sizeof (b));
+            return b != 0;
+        }
+        else
+        {
+            TargetType v;
+            memcpy (std::addressof (v), src, sizeof (v));
+            return v;
+        }
+    }
+
+    template <typename TargetType> void writeUnaligned (void* dest, TargetType src)
+    {
+        if constexpr (std::is_same<const TargetType, const bool>::value)
+        {
+            BoolStorageType b = src ? 1 : 0;
+            memcpy (dest, std::addressof (b), sizeof (b));
+        }
+        else
+        {
+            memcpy (dest, std::addressof (src), sizeof (TargetType));
+        }
+    }
 
     static constexpr const char* serialisedClassMemberName = "$class";
 
@@ -1659,7 +1699,7 @@ inline size_t Type::getValueDataSize() const
         case MainType::float32:         return 4;
         case MainType::int64:
         case MainType::float64:         return 8;
-        case MainType::boolean:         return 1;
+        case MainType::boolean:         return getTypeSize<bool>();
         case MainType::string:          return sizeof (StringDictionary::Handle::handle);
         case MainType::vector:          return content.vector.getValueDataSize();
         case MainType::primitiveArray:  return content.primitiveArray.getValueDataSize();
@@ -1897,10 +1937,10 @@ struct Type::SerialisationHelpers
             switch (static_cast<EncodedType> (readByte()))
             {
                 case EncodedType::int32:      return Type (MainType::int32, num);
-                case EncodedType::int64:      return Type (MainType::int64, num);;
-                case EncodedType::float32:    return Type (MainType::float32, num);;
-                case EncodedType::float64:    return Type (MainType::float64, num);;
-                case EncodedType::boolean:    return Type (MainType::boolean, num);;
+                case EncodedType::int64:      return Type (MainType::int64, num);
+                case EncodedType::float32:    return Type (MainType::float32, num);
+                case EncodedType::float64:    return Type (MainType::float64, num);
+                case EncodedType::boolean:    return Type (MainType::boolean, num);
                 case EncodedType::string:
                 case EncodedType::vector:
                 case EncodedType::array:
@@ -1997,7 +2037,7 @@ template <typename TargetType> TargetType ValueView::readPrimitive (Type::MainTy
         case Type::MainType::int64:       return static_cast<TargetType> (readContentAs<int64_t>());
         case Type::MainType::float32:     return static_cast<TargetType> (readContentAs<float>());
         case Type::MainType::float64:     return static_cast<TargetType> (readContentAs<double>());
-        case Type::MainType::boolean:     return static_cast<TargetType> (readContentAs<uint8_t>() != 0);
+        case Type::MainType::boolean:     return static_cast<TargetType> (readContentAs<bool>());
 
         case Type::MainType::vector:
         case Type::MainType::string:
@@ -2013,7 +2053,7 @@ inline int32_t  ValueView::getInt32() const     { check (type.isInt32(),   "Valu
 inline int64_t  ValueView::getInt64() const     { check (type.isInt64(),   "Value is not an int64");   return readContentAs<int64_t>(); }
 inline float    ValueView::getFloat32() const   { check (type.isFloat32(), "Value is not a float32");  return readContentAs<float>(); }
 inline double   ValueView::getFloat64() const   { check (type.isFloat64(), "Value is not a float64");  return readContentAs<double>(); }
-inline bool     ValueView::getBool() const      { check (type.isBool(),    "Value is not a bool");     return readContentAs<uint8_t>() != 0; }
+inline bool     ValueView::getBool() const      { check (type.isBool(),    "Value is not a bool");     return readContentAs<bool>(); }
 
 template <typename TargetType> TargetType ValueView::get() const
 {
@@ -2060,11 +2100,7 @@ template <typename PrimitiveType> void ValueView::setUnchecked (PrimitiveType v)
     static_assert (isPrimitiveType<PrimitiveType>() || isStringType<PrimitiveType>(),
                    "The template type needs to be one of the supported primitive types");
 
-    if constexpr (matchesType<PrimitiveType, bool>())
-    {
-        *data = v ? 1 : 0;
-    }
-    else if constexpr (matchesType<PrimitiveType, StringDictionary::Handle>())
+    if constexpr (matchesType<PrimitiveType, StringDictionary::Handle>())
     {
         setUnchecked (static_cast<int32_t> (v.handle));
     }
@@ -2359,7 +2395,7 @@ inline Value::Value (int32_t n)           : Value (Type::createInt32(),   std::a
 inline Value::Value (int64_t n)           : Value (Type::createInt64(),   std::addressof (n), sizeof (n)) {}
 inline Value::Value (float n)             : Value (Type::createFloat32(), std::addressof (n), sizeof (n)) {}
 inline Value::Value (double n)            : Value (Type::createFloat64(), std::addressof (n), sizeof (n)) {}
-inline Value::Value (bool n)              : Value (Type::createBool(),    std::addressof (n), sizeof (n)) {}
+inline Value::Value (bool n)              : Value (Type::createBool())     { writeUnaligned (value.data, n); }
 inline Value::Value (std::string_view s)  : Value (Type::createString())   { writeUnaligned (value.data, dictionary.getHandleForString (s)); }
 
 inline Value& Value::operator= (const ValueView& source)
@@ -2451,7 +2487,7 @@ inline Value createEmptyArray()                    { return Value (Type::createE
 template <typename ElementType>
 inline Value createVector (const ElementType* source, uint32_t numElements)
 {
-    return Value (Type::createVector<ElementType> (numElements), source, sizeof (ElementType) * numElements);
+    return Value (Type::createVector<ElementType> (numElements), source, getTypeSize<ElementType>() * numElements);
 }
 
 template <typename GetElementValue>
@@ -2465,7 +2501,7 @@ inline Value createVector (uint32_t numElements, const GetElementValue& getValue
     for (uint32_t i = 0; i < numElements; ++i)
     {
         writeUnaligned (dest, getValueForIndex (i));
-        dest += sizeof (ElementType);
+        dest += getTypeSize<ElementType>();
     }
 
     return v;
@@ -2486,7 +2522,7 @@ inline Value createArray (uint32_t numElements, const GetElementValue& getValueF
         for (uint32_t i = 0; i < numElements; ++i)
         {
             writeUnaligned (dest, getValueForIndex (i));
-            dest += sizeof (ElementType);
+            dest += getTypeSize<ElementType>();
         }
 
         return v;
@@ -2516,7 +2552,7 @@ inline Value createArray (uint32_t numArrayElements, uint32_t numVectorElements,
         for (uint32_t i = 0; i < numVectorElements; ++i)
         {
             writeUnaligned (dest, getValueAt (j, i));
-            dest += sizeof (ElementType);
+            dest += getTypeSize<ElementType>();
         }
     }
 
@@ -2528,7 +2564,7 @@ Value create2DArray (const ElementType* sourceData, uint32_t numArrayElements, u
 {
     static_assert (isPrimitiveType<ElementType>(), "The template type needs to be one of the supported primitive types");
     Value v (Type::createArrayOfVectors<ElementType> (numArrayElements, numVectorElements));
-    memcpy (v.getRawData(), sourceData, numArrayElements * numVectorElements * sizeof (ElementType));
+    memcpy (v.getRawData(), sourceData, numArrayElements * numVectorElements * getTypeSize<ElementType>());
     return v;
 }
 
@@ -2542,7 +2578,7 @@ void Value::addArrayElement (ElementType v)
     if constexpr (matchesType<ElementType, int64_t>())   { value.type.addArrayElements (Type::createInt64(),   1); appendData (std::addressof (v), sizeof (v)); return; }
     if constexpr (matchesType<ElementType, float>())     { value.type.addArrayElements (Type::createFloat32(), 1); appendData (std::addressof (v), sizeof (v)); return; }
     if constexpr (matchesType<ElementType, double>())    { value.type.addArrayElements (Type::createFloat64(), 1); appendData (std::addressof (v), sizeof (v)); return; }
-    if constexpr (matchesType<ElementType, bool>())      { value.type.addArrayElements (Type::createBool(),    1); uint8_t b = v ? 1 : 0; appendData (std::addressof (b), sizeof (b)); return; }
+    if constexpr (matchesType<ElementType, bool>())      { value.type.addArrayElements (Type::createBool(),    1); BoolStorageType b = v ? 1 : 0; appendData (std::addressof (b), sizeof (b)); return; }
 
     if constexpr (isStringType<ElementType>())
     {
@@ -2601,7 +2637,7 @@ void Value::addMember (std::string_view name, MemberType v, Others&&... others)
     else if constexpr (matchesType<MemberType, int64_t>())   { appendMember (name, Type::createInt64(),   std::addressof (v), sizeof (v)); }
     else if constexpr (matchesType<MemberType, float>())     { appendMember (name, Type::createFloat32(), std::addressof (v), sizeof (v)); }
     else if constexpr (matchesType<MemberType, double>())    { appendMember (name, Type::createFloat64(), std::addressof (v), sizeof (v)); }
-    else if constexpr (matchesType<MemberType, bool>())      { uint8_t b = v ? 1 : 0; appendMember (name, Type::createBool(), std::addressof (b), sizeof (b)); }
+    else if constexpr (matchesType<MemberType, bool>())      { BoolStorageType b = v ? 1 : 0; appendMember (name, Type::createBool(), std::addressof (b), sizeof (b)); }
 
     if constexpr (sizeof...(others) != 0)
         addMember (std::forward<Others> (others)...);

@@ -555,7 +555,7 @@ inline void testValues (TestProgress& progress)
                                             "int32Field", (int32_t) 1,
                                             "boolField", true);
         CHOC_EXPECT_TRUE (v.isObject());
-        CHOC_EXPECT_EQ (5ul, v.getRawDataSize());
+        CHOC_EXPECT_EQ (4ul + sizeof (choc::value::BoolStorageType), v.getRawDataSize());
         CHOC_EXPECT_EQ (2ul, v.size());
 
         auto member0 = v.getObjectMemberAt (0);
@@ -622,7 +622,7 @@ inline void testValues (TestProgress& progress)
             auto v1 = choc::value::createEmptyArray();
             v1.addArrayElement (false);
             v1.addArrayElement (2.0);
-            CHOC_EXPECT_EQ (1u, ((size_t) v1[1].getRawData()) & 3);
+            CHOC_EXPECT_EQ (sizeof (choc::value::BoolStorageType), ((size_t) v1[1].getRawData()) - (size_t) v1.getRawData());
         }
 
         auto v2 = choc::value::createObject ("foo",
@@ -630,8 +630,8 @@ inline void testValues (TestProgress& progress)
                                              "y", choc::value::createVector (3, [] (uint32_t) { return true; }),
                                              "z", choc::value::createVector (3, [] (uint32_t) { return 1.0; }));
 
-        CHOC_EXPECT_EQ (3u, ((size_t) v2["y"].getRawData()) & 3);
-        CHOC_EXPECT_EQ (2u, ((size_t) v2["z"].getRawData()) & 3);
+        CHOC_EXPECT_EQ (3 * sizeof (choc::value::BoolStorageType), ((size_t) v2["y"].getRawData()) - (size_t) v2.getRawData());
+        CHOC_EXPECT_EQ (6 * sizeof (choc::value::BoolStorageType), ((size_t) v2["z"].getRawData()) - (size_t) v2.getRawData());
     }
 
     {
@@ -674,7 +674,7 @@ inline void testValues (TestProgress& progress)
         v.addMember ("object", choc::value::createObject ("object",
                                                           "int32", choc::value::createPrimitive (1)));
 
-        CHOC_EXPECT_EQ (90ul, v.getRawDataSize());
+        CHOC_EXPECT_EQ (88ul + 2 * sizeof (choc::value::BoolStorageType), v.getRawDataSize());
 
         struct Serialiser
         {
