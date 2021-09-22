@@ -533,18 +533,20 @@ public:
     void visitObjectMembers (Visitor&&) const;
 
     //==============================================================================
-    /// Creates a copy of this view with a different string dictionary.
-    ValueView withDictionary (StringDictionary* newDictionary)      { return ValueView (type, data, newDictionary); }
-    /// Gets a pointer to the string dictionary that the view is using, or nullptr if it doesn't have one.
-    StringDictionary* getDictionary() const                         { return stringDictionary; }
-    /// Allows you to directly modify the dictionary that this view is using.
-    void setDictionary (StringDictionary* newDictionary)            { stringDictionary = newDictionary; }
+    /// Gets a pointer to the string dictionary that the view is using, or nullptr
+    /// if it doesn't have one.
+    StringDictionary* getDictionary() const     { return stringDictionary; }
+
+    /// Allows you to change the string dictionary which this view is using.
+    /// Changing the dictionary will visit all the strings inside the object,
+    /// remapping old handles into new ones from the new dictionary.
+    void setDictionary (StringDictionary* newDictionary);
 
     /// Gets a pointer to the memory that this view is using for its content.
     void* getRawData()                          { return data; }
     /// Gets a pointer to the memory that this view is using for its content.
     const void* getRawData() const              { return data; }
-    /// Allows you to directly sert the internal pointer to the data that this view is
+    /// Allows you to directly modify the internal pointer to the data that this view is
     /// using. Obviously this should only be used if you really know what you're doing!
     void setRawData (void* newAddress)          { data = static_cast<uint8_t*> (newAddress); }
 
@@ -576,6 +578,7 @@ public:
 private:
     //==============================================================================
     friend class Value;
+
     Type type;
     uint8_t* data = nullptr;
     StringDictionary* stringDictionary = nullptr;
@@ -816,14 +819,15 @@ public:
     /// @internal
     Value (Type&&, const void*, size_t);
     /// @internal
-    Value (const Type&, const void*, size_t);
+    Value (Type&&, const void*, size_t, StringDictionary*);
+    /// @internal
+    Value (const Type&, const void*, size_t, StringDictionary*);
 
 private:
     //==============================================================================
     void appendData (const void*, size_t);
     void appendValue (ValueView);
     void appendMember (std::string_view, Type&&, const void*, size_t);
-    void importStringHandles (ValueView&, const StringDictionary& old);
 
     struct SimpleStringDictionary  : public StringDictionary
     {
@@ -2300,6 +2304,53 @@ void ValueView::deserialise (InputData& input, Handler&& handleResult, Allocator
 }
 
 //==============================================================================
+inline void ValueView::setDictionary (StringDictionary* newDictionary)
+{
+    if (stringDictionary == newDictionary)
+        return;
+
+    auto oldDictionary = stringDictionary;
+    stringDictionary = newDictionary;
+
+    if (stringDictionary == nullptr || oldDictionary == nullptr || ! type.usesStrings())
+        return;
+
+    struct Importer
+    {
+        const StringDictionary& oldDic;
+
+        void importStrings (ValueView& v)
+        {
+            if (v.getType().usesStrings())
+            {
+                if (v.isString())
+                {
+                    auto oldHandle = StringDictionary::Handle { v.readContentAs<decltype (StringDictionary::Handle::handle)>() };
+                    v.setUnchecked (v.stringDictionary->getHandleForString (oldDic.getStringForHandle (oldHandle)));
+                }
+                else if (v.isArray())
+                {
+                    for (auto element : v)
+                        importStrings (element);
+                }
+                else if (v.isObject())
+                {
+                    auto numMembers = v.size();
+
+                    for (uint32_t i = 0; i < numMembers; ++i)
+                    {
+                        auto member = v[i];
+                        importStrings (member);
+                    }
+                }
+            }
+        }
+    };
+
+    Importer { *oldDictionary }.importStrings (*this);
+}
+
+//==============================================================================
 inline Value::Value() : value (dictionary) {}
 
 inline Value::Value (Value&& other)
@@ -2344,28 +2395,36 @@ inline Value::Value (Type&& t)
 {
 }
 
-inline Value::Value (const Type& t, const void* source, size_t size)
+inline Value::Value (Type&& t, const void* source, size_t size)
    : packedData (static_cast<const uint8_t*> (source), static_cast<const uint8_t*> (source) + size),
      value (t, packedData.data(), std::addressof (dictionary))
 {
 }
 
-inline Value::Value (Type&& t, const void* source, size_t size)
+inline Value::Value (const Type& t, const void* source, size_t size, StringDictionary* d)
    : packedData (static_cast<const uint8_t*> (source), static_cast<const uint8_t*> (source) + size),
-     value (std::move (t), packedData.data(), std::addressof (dictionary))
+     value (t, packedData.data(), d)
 {
 }
 
-inline Value::Value (const ValueView& source) : Value (source.type, source.getRawData(), source.type.getValueDataSize())
+inline Value::Value (Type&& t, const void* source, size_t size, StringDictionary* d)
+   : packedData (static_cast<const uint8_t*> (source), static_cast<const uint8_t*> (source) + size),
+     value (std::move (t), packedData.data(), d)
 {
-    if (source.stringDictionary != nullptr && value.type.usesStrings())
-        importStringHandles (value, *source.stringDictionary);
 }
 
-inline Value::Value (ValueView&& source) : Value (std::move (source.type), source.getRawData(), source.type.getValueDataSize())
+inline Value::Value (const ValueView& source) : Value (source.type, source.getRawData(),
+                                                       source.type.getValueDataSize(), source.getDictionary())
 {
-    if (source.stringDictionary != nullptr && value.type.usesStrings())
-        importStringHandles (value, *source.stringDictionary);
+    // doing this as a separate step forces an import of string handles if needed
+    value.setDictionary (std::addressof (dictionary));
+}
+
+inline Value::Value (ValueView&& source) : Value (std::move (source.type), source.getRawData(),
+                                                  source.type.getValueDataSize(), source.getDictionary())
+{
+    // doing this as a separate step forces an import of string handles if needed
+    value.setDictionary (std::addressof (dictionary));
 }
 
 inline Value::Value (int32_t n)           : Value (Type::createInt32(),   std::addressof (n), sizeof (n)) {}
@@ -2383,8 +2442,13 @@ inline Value& Value::operator= (const ValueView& source)
     memcpy (value.data, source.getRawData(), getRawDataSize());
     dictionary.strings.clear();
 
-    if (source.stringDictionary != nullptr && source.getType().usesStrings())
-        importStringHandles (value, *source.stringDictionary);
+    if (auto sourceDictionary = source.getDictionary())
+    {
+        // this sequence forces an update of the string handles if needed
+        value.setDictionary (nullptr); // reset the dictionary pointer: doesn't change any handles.
+        value.setDictionary (sourceDictionary); // changing dictionary from nullptr, which also does nothing.
+        value.setDictionary (std::addressof (dictionary)); // now will update from the source dictionary to our own
+    }
 
     return *this;
 }
@@ -2400,52 +2464,12 @@ inline void Value::appendValue (ValueView newValue)
     auto oldSize = packedData.size();
     appendData (newValue.getRawData(), newValue.getType().getValueDataSize());
 
-    if (auto sourceDictionary = newValue.stringDictionary)
+    if (newValue.stringDictionary != nullptr)
     {
-        if (newValue.getType().usesStrings())
-        {
-            newValue.data = packedData.data() + oldSize;
-            newValue.stringDictionary = std::addressof (dictionary);
-            importStringHandles (newValue, *sourceDictionary);
-        }
+        // this will force an update of any handles in the new data
+        newValue.setRawData (packedData.data() + oldSize);
+        newValue.setDictionary (std::addressof (dictionary));
     }
-}
-
-inline void Value::importStringHandles (ValueView& target, const StringDictionary& oldDictionary)
-{
-    struct StringHandleImporter
-    {
-        const StringDictionary& oldDic;
-
-        void importStrings (ValueView& v)
-        {
-            if (v.getType().usesStrings())
-            {
-                if (v.isString())
-                {
-                    auto oldHandle = StringDictionary::Handle { v.readContentAs<decltype (StringDictionary::Handle::handle)>() };
-                    v.setUnchecked (v.stringDictionary->getHandleForString (oldDic.getStringForHandle (oldHandle)));
-                }
-                else if (v.isArray())
-                {
-                    for (auto element : v)
-                        importStrings (element);
-                }
-                else if (v.isObject())
-                {
-                    auto numMembers = v.size();
-
-                    for (uint32_t i = 0; i < numMembers; ++i)
-                    {
-                        auto member = v[i];
-                        importStrings (member);
-                    }
-                }
-            }
-        }
-    };
-
-    StringHandleImporter { oldDictionary }.importStrings (target);
 }
 
 inline Value createPrimitive (int32_t n)           { return Value (n); }
