@@ -84,6 +84,8 @@ struct SmallVector
     size_type length() const noexcept;
     size_type capacity() const noexcept;
 
+    bool contains (const ElementType&) const;
+
     void clear() noexcept;
     void resize (size_type newSize);
     void reserve (size_type requiredNumElements);
@@ -344,6 +346,16 @@ typename SmallVector<ElementType, preSize>::size_type SmallVector<ElementType, p
 
 template <typename ElementType, size_t preSize>
 bool SmallVector<ElementType, preSize>::empty() const noexcept      { return numElements == 0; }
+
+template <typename ElementType, size_t preSize>
+bool SmallVector<ElementType, preSize>::contains (const ElementType& target) const
+{
+    for (size_t i = 0; i < numElements; ++i)
+        if (elements[i] == target)
+            return true;
+
+    return false;
+}
 
 template <typename ElementType, size_t preSize>
 bool SmallVector<ElementType, preSize>::operator== (span<value_type> other) const   { return span<value_type> (*this) == other; }
