@@ -296,8 +296,8 @@ private:
         string          = 0x40 + sizeof (uint32_t),
         vector          = 0x50,
         primitiveArray  = 0x60,
-        complexArray    = 0x70,
-        object          = 0x80
+        object          = 0x80, // these two must have the top bit set to make it quick
+        complexArray    = 0x90  // to decide whether the content references a heap object
     };
 
     static constexpr uint32_t maxNumVectorElements = 256;
