@@ -134,7 +134,7 @@ public:
     Type() = default;
     Type (Type&&);
     Type (const Type&);
-    Type (Allocator*, const Type&);  /**< Constructs a copy of another type, using a custom allocator (which may be nullptr). */
+    Type (Allocator*, const Type&);  ///< Constructs a copy of another type, using a custom allocator (which may be nullptr).
     Type& operator= (Type&&);
     Type& operator= (const Type&);
     ~Type() noexcept;
@@ -152,38 +152,35 @@ public:
     bool isString() const noexcept      { return isType (MainType::string); }
     bool isVector() const noexcept      { return isType (MainType::vector); }
     bool isArray() const noexcept       { return isType (MainType::primitiveArray, MainType::complexArray); }
-    bool isUniformArray() const;        /**< A uniform array is one where every element has the same type. */
+    bool isUniformArray() const;        ///< A uniform array is one where every element has the same type.
     bool isArrayOfVectors() const;
     bool isVectorSize1() const;
 
     /// Returns true if the type is the same as the provided template type (which must be a primitive)
     template <typename PrimitiveType> bool isPrimitiveType() const noexcept;
 
-    /** Returns the number of elements in an array, vector or object. Throws an Error if the type is void. */
+    /// Returns the number of elements in an array, vector or object. Throws an Error if the type is void.
     uint32_t getNumElements() const;
 
-    /** If the type is an array or vector with a uniform element type, this returns it; if not, it throws an Error. */
+    /// If the type is an array or vector with a uniform element type, this returns it; if not, it throws an Error.
     Type getElementType() const;
 
-    /** Returns the type of a given element in this type if it's an array. If the type isn't an array or the index is
-        out of bounds, it will throw an Error.
-    */
+    /// Returns the type of a given element in this type if it's an array. If the type isn't an array or the index is
+    /// out of bounds, it will throw an Error.
     Type getArrayElementType (uint32_t index) const;
 
-    /** Returns the name and type of one of the members if this type is an object; if not, or the index is out
-        of range, then this will throw an Error exception.
-    */
+    /// Returns the name and type of one of the members if this type is an object; if not, or the index is out
+    /// of range, then this will throw an Error exception.
     const MemberNameAndType& getObjectMember (uint32_t index) const;
 
-    /** If this is an object, this returns the index of the member with a given name. If the name isn't found, it
-        will return -1, and if the type isn't an object, it will throw an Error exception.
-    */
+    /// If this is an object, this returns the index of the member with a given name. If the name isn't found, it
+    /// will return -1, and if the type isn't an object, it will throw an Error exception.
     int getObjectMemberIndex (std::string_view name) const;
 
-    /** Returns the class-name of this type if it's an object, or throws an Error if it's not. */
+    /// Returns the class-name of this type if it's an object, or throws an Error if it's not.
     std::string_view getObjectClassName() const;
 
-    /** Returns true if this is an object with the given class-name. */
+    /// Returns true if this is an object with the given class-name.
     bool isObjectWithClassName (std::string_view name) const;
 
     bool operator== (const Type&) const;
@@ -197,12 +194,12 @@ public:
     static Type createBool()            { return Type (MainType::boolean); }
     static Type createString()          { return Type (MainType::string); }
 
-    /** Creates a type based on the given template type. */
+    /// Creates a type based on the given template type.
     template <typename PrimitiveType>
     static Type createPrimitive();
 
     //==============================================================================
-    /** Creates a vector type based on the given template type and size. */
+    /// Creates a vector type based on the given template type and size.
     template <typename PrimitiveType>
     static Type createVector (uint32_t numElements);
 
@@ -213,42 +210,40 @@ public:
     static Type createVectorBool    (uint32_t numElements)    { return Type (MainType::boolean, numElements); }
 
     //==============================================================================
-    /** Creates a type representing an empty array. Element types can be appended with addArrayElements(). */
+    /// Creates a type representing an empty array. Element types can be appended with addArrayElements().
     static Type createEmptyArray();
 
-    /** Creates a type representing an array containing a set of elements of a fixed type. */
+    /// Creates a type representing an array containing a set of elements of a fixed type.
     static Type createArray (Type elementType, uint32_t numElements);
 
-    /** Creates a type representing an array of primitives based on the templated type. */
+    /// Creates a type representing an array of primitives based on the templated type.
     template <typename PrimitiveType>
     static Type createArray (uint32_t numArrayElements);
 
-    /** Creates a type representing an array of vectors based on the templated type. */
+    /// Creates a type representing an array of vectors based on the templated type.
     template <typename PrimitiveType>
     static Type createArrayOfVectors (uint32_t numArrayElements, uint32_t numVectorElements);
 
-    /** Appends a group of array elements with the given to this type's definition.
-        This will throw an Error if this isn't possible for various reasons.
-    */
+    /// Appends a group of array elements with the given to this type's definition.
+    /// This will throw an Error if this isn't possible for various reasons.
     void addArrayElements (Type elementType, uint32_t numElements);
 
     //==============================================================================
-    /** Returns a type representing an empty object, with the given class name. */
+    /// Returns a type representing an empty object, with the given class name.
     static Type createObject (std::string_view className, Allocator* allocator = nullptr);
 
-    /** Appends a member to an object type, with the given name and type. This will throw an Error if
-        this isn't possible for some reason.
-    */
+    /// Appends a member to an object type, with the given name and type. This will throw an Error if
+    /// this isn't possible for some reason.
     void addObjectMember (std::string_view memberName, Type memberType);
 
     //==============================================================================
-    /** Returns the size in bytes needed to store a value of this type. */
+    /// Returns the size in bytes needed to store a value of this type.
     size_t getValueDataSize() const;
 
-    /** Returns true if this type, or any of its sub-types are a string. */
+    /// Returns true if this type, or any of its sub-types are a string.
     bool usesStrings() const;
 
-    /** Returns the type and packed-data position of one of this type's sub-elements. */
+    /// Returns the type and packed-data position of one of this type's sub-elements.
     ElementTypeAndOffset getElementTypeAndOffset (uint32_t index) const;
 
     //==============================================================================
@@ -270,17 +265,16 @@ public:
     template <typename OutputStream>
     void serialise (OutputStream&) const;
 
-    /*  Recreates a type from a serialised version that was created by the serialise() method.
-        Any errors while reading the data will cause an Error exception to be thrown.
-        The InputData object will be left pointing to any remaining data after the type has been read.
-        @see serialise
-    */
+    /// Recreates a type from a serialised version that was created by the serialise() method.
+    /// Any errors while reading the data will cause an Error exception to be thrown.
+    /// The InputData object will be left pointing to any remaining data after the type has been read.
+    /// @see serialise
     static Type deserialise (InputData&, Allocator* allocator = nullptr);
 
-    /** Returns a representation of this type in the form of a Value. @see fromValue */
+    /// Returns a representation of this type in the form of a Value. @see fromValue
     Value toValue() const;
 
-    /** Parses a Value which was created by toValue(), converting it back into a Type object. */
+    /// Parses a Value which was created by toValue(), converting it back into a Type object.
     static Type fromValue (const ValueView&);
 
 private:
@@ -392,10 +386,32 @@ public:
         bool operator<  (Handle h) const        { return handle <  h.handle; }
     };
 
-    virtual Handle getHandleForString (std::string_view text) = 0;
+    /// Finds or creates a handle for a string.
+    virtual Handle getHandleForString (std::string_view stringToAdd) = 0;
+
+    /// Fetches the string for a given handle. If the handle isn't found,
+    /// the implementation may throw an error.
     virtual std::string_view getStringForHandle (Handle handle) const = 0;
 };
 
+
+//==============================================================================
+/** A simple implementation of StringDictionary.
+    This should have good performance for typical-sized dictionaries.
+    Adding new strings will require O(n) time where n = dictionary size, but
+    retrieving the string for a handle is fast with O(1).
+*/
+struct SimpleStringDictionary  : public StringDictionary
+{
+    Handle getHandleForString (std::string_view) override;
+    std::string_view getStringForHandle (Handle handle) const override;
+
+    void clear();
+
+private:
+    friend class Value;
+    std::vector<char> strings;
+};
 
 //==============================================================================
 /**
@@ -828,13 +844,6 @@ private:
     void appendData (const void*, size_t);
     void appendValue (ValueView);
     void appendMember (std::string_view, Type&&, const void*, size_t);
-
-    struct SimpleStringDictionary  : public StringDictionary
-    {
-        Handle getHandleForString (std::string_view text) override;
-        std::string_view getStringForHandle (Handle handle) const override;
-        std::vector<char> strings;
-    };
 
     std::vector<uint8_t> packedData;
     SimpleStringDictionary dictionary;
@@ -2440,7 +2449,7 @@ inline Value& Value::operator= (const ValueView& source)
     value.type = source.type;
     value.data = packedData.data();
     memcpy (value.data, source.getRawData(), getRawDataSize());
-    dictionary.strings.clear();
+    dictionary.clear();
 
     if (auto sourceDictionary = source.getDictionary())
     {
@@ -2792,7 +2801,7 @@ inline Type Type::fromValue (const ValueView& value)
 }
 
 //==============================================================================
-inline Value::SimpleStringDictionary::Handle Value::SimpleStringDictionary::getHandleForString (std::string_view text)
+inline SimpleStringDictionary::Handle SimpleStringDictionary::getHandleForString (std::string_view text)
 {
     if (text.empty())
         return {};
@@ -2807,7 +2816,7 @@ inline Value::SimpleStringDictionary::Handle Value::SimpleStringDictionary::getH
         i += sv.length();
     }
 
-    auto result = Value::SimpleStringDictionary::Handle { static_cast<decltype (Handle::handle)> (strings.size() + 1) };
+    auto result = SimpleStringDictionary::Handle { static_cast<decltype (Handle::handle)> (strings.size() + 1) };
     strings.reserve (strings.size() + text.length() + 1);
 
     for (auto& c : text)
@@ -2817,7 +2826,7 @@ inline Value::SimpleStringDictionary::Handle Value::SimpleStringDictionary::getH
     return result;
 }
 
-inline std::string_view Value::SimpleStringDictionary::getStringForHandle (Handle handle) const
+inline std::string_view SimpleStringDictionary::getStringForHandle (Handle handle) const
 {
     if (handle == Handle())
         return {};
@@ -2827,6 +2836,8 @@ inline std::string_view Value::SimpleStringDictionary::getStringForHandle (Handl
 
     return std::string_view (strings.data() + (handle.handle - 1));
 }
+
+inline void SimpleStringDictionary::clear()     { strings.clear(); }
 
 } // namespace choc::value
 
