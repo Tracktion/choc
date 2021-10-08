@@ -491,6 +491,10 @@ public:
     /// provided exactly matches the value's type.
     template <typename PrimitiveType> void set (PrimitiveType newValue);
 
+    /// Resets this value to a 'zero' state. Note that for arrays, this won't change the size
+    /// of the array, it just sets all the existing elements to zero.
+    void setToZero();
+
     //==============================================================================
     /// If this object is a vector, array or object, this returns the number of items it contains; otherwise
     /// it will throw an Error exception.
@@ -2120,6 +2124,12 @@ template <typename PrimitiveType> void ValueView::set (PrimitiveType v)
         check (type.isString(), "Value is not a string");
 
     setUnchecked (v);
+}
+
+inline void ValueView::setToZero()
+{
+    if (data != nullptr)
+        memset (data, 0, type.getValueDataSize());
 }
 
 inline StringDictionary::Handle ValueView::getStringHandle() const
