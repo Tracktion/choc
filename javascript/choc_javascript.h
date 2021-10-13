@@ -209,41 +209,9 @@ namespace choc::javascript
 
 namespace duktape
 {
-#if _MSC_VER
- #pragma warning(push)
- #pragma warning(disable : 4018 4127 4244 4505 4611 4702)
-#elif __clang__
- #pragma clang diagnostic push
- #pragma clang diagnostic ignored "-Wextra-semi"
- #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
- #pragma clang diagnostic ignored "-Wswitch-enum"
- #pragma clang diagnostic ignored "-Wshorten-64-to-32"
- #if __clang_major__ > 10
-  #pragma clang diagnostic ignored "-Wc++98-compat-extra-semi"
-  #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
-  #pragma clang diagnostic ignored "-Wimplicit-float-conversion"
- #else
-  #pragma clang diagnostic ignored "-Wconversion"
- #endif
-#elif __GNUC__
- #pragma GCC diagnostic push
- #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
- #pragma GCC diagnostic ignored "-Wsign-conversion"
- #pragma GCC diagnostic ignored "-Wconversion"
- #pragma GCC diagnostic ignored "-Wswitch-enum"
- #pragma GCC diagnostic ignored "-Wunused-variable"
- #pragma GCC diagnostic ignored "-Wredundant-decls"
-#endif
-
+ #include "../platform/choc_DisableAllWarnings.h"
  #include "duktape/duktape.c"
-
-#if _MSC_VER
- #pragma warning (pop)
-#elif __clang__
- #pragma clang diagnostic pop
-#elif __GNUC__
- #pragma GCC diagnostic pop
-#endif
+ #include "../platform/choc_ReenableAllWarnings.h"
 }
 
 //==============================================================================
