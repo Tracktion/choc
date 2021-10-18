@@ -22,7 +22,7 @@
 #include <fstream>
 #include <functional>
 #include <cwctype>
-#include "../text/choc_StringUtilities.h"
+#include "../text/choc_UTF8.h"
 
 namespace choc::file
 {
