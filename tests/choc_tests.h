@@ -43,6 +43,7 @@
 #include "../containers/choc_PoolAllocator.h"
 #include "../containers/choc_ObjectPointer.h"
 #include "../containers/choc_ObjectReference.h"
+#include "../containers/choc_AlignedMemoryBlock.h"
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
@@ -273,6 +274,20 @@ inline void testContainerUtils (TestProgress& progress)
         CHOC_EXPECT_EQ (choc::memory::bitcast<double> (0x3ff0000000000000ull), 1.0);
         CHOC_EXPECT_EQ (choc::memory::bitcast<uint32_t> (1.0f), 0x3f800000u);
         CHOC_EXPECT_EQ (choc::memory::bitcast<float> (0x3f800000u), 1.0f);
+    }
+
+    {
+        CHOC_TEST (AlignedMemoryBlock)
+
+        choc::AlignedMemoryBlock<32> m (345);
+        CHOC_EXPECT_TRUE (m.data() != nullptr);
+        CHOC_EXPECT_TRUE ((reinterpret_cast<size_t> (m.data()) & 31u) == 0);
+        CHOC_EXPECT_EQ (m.size(), 345u);
+        m.resize (1);
+        CHOC_EXPECT_TRUE ((reinterpret_cast<size_t> (m.data()) & 31u) == 0);
+        CHOC_EXPECT_EQ (m.size(), 1u);
+        m.reset();
+        CHOC_EXPECT_TRUE (m.size() == 0 && m.data() == nullptr);
     }
 }
 
