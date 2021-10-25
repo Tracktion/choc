@@ -705,10 +705,12 @@ inline void testValues (TestProgress& progress)
 
         auto compare = [&] (const choc::value::ValueView& original, const choc::value::ValueView& deserialised)
         {
-            std::ostringstream s1, s2;
-            choc::json::writeAsJSON (s1, original);
-            choc::json::writeAsJSON (s2, deserialised);
-            CHOC_EXPECT_EQ (s1.str(), s2.str());
+            auto s1 = choc::json::toString (original, false);
+            auto s2 = choc::json::toString (deserialised, false);
+            CHOC_EXPECT_EQ (s1, s2);
+            auto s3 = choc::json::toString (original, true);
+            auto s4 = choc::json::toString (deserialised, true);
+            CHOC_EXPECT_EQ (s3, s4);
         };
 
         {

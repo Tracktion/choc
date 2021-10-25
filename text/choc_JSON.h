@@ -54,7 +54,9 @@ value::Value parseValue (std::string_view);
 
 //==============================================================================
 /// Formats a value as a JSON string.
-std::string toString (const value::ValueView&);
+/// If useLineBreaks is true, it'll be formatted as multi-line JSON, if false it'll
+/// just be returned as a single line.
+std::string toString (const value::ValueView&, bool useLineBreaks = false);
 
 /// Writes a version of a string to an output stream, with any illegal or non-ascii
 /// written as their equivalent JSON escape sequences.
@@ -154,11 +156,18 @@ inline std::string doubleToString (double value)
 
 //==============================================================================
 template <typename Stream>
-void writeAsJSON (Stream& output, const value::ValueView& value)
+void writeAsJSON (Stream& output, const value::ValueView& value, bool useMultipleLines)
 {
+    static constexpr const char newLine = '\n';
+
     struct Writer
     {
         Stream& out;
+        uint32_t indentSize, currentIndent = 0;
+
+        std::string getIndent() const         { return std::string (currentIndent, ' '); }
+        void startIndent()                    { currentIndent += indentSize; out << newLine << getIndent(); }
+        void endIndent()                      { currentIndent -= indentSize; out << newLine << getIndent(); }
 
         void dump (const value::ValueView& v)
         {
@@ -174,12 +183,29 @@ void writeAsJSON (Stream& output, const value::ValueView& value)
         void dumpArrayOrVector (const value::ValueView& v)
         {
             out << '[';
-            auto num = v.size();
+            auto numElements = v.size();
 
-            for (uint32_t i = 0; i < num; ++i)
+            if (indentSize != 0 && numElements != 0)
             {
-                if (i != 0) out << ", ";
-                dump (v[i]);
+                startIndent();
+
+                for (uint32_t i = 0; i < numElements; ++i)
+                {
+                    dump (v[i]);
+
+                    if (i != numElements - 1)
+                        out << "," << newLine << getIndent();
+                }
+
+                endIndent();
+            }
+            else
+            {
+                for (uint32_t i = 0; i < numElements; ++i)
+                {
+                    if (i != 0) out << ", ";
+                    dump (v[i]);
+                }
             }
 
             out << ']';
@@ -190,26 +216,45 @@ void writeAsJSON (Stream& output, const value::ValueView& value)
             out << '{';
             auto numMembers = object.size();
 
-            for (uint32_t i = 0; i < numMembers; ++i)
+            if (indentSize != 0 && numMembers != 0)
             {
-                if (i != 0) out << ", ";
+                startIndent();
 
-                auto member = object.getObjectMemberAt (i);
-                out << getEscapedQuotedString (member.name) << ": ";
-                dump (member.value);
+                for (uint32_t i = 0; i < numMembers; ++i)
+                {
+                    auto member = object.getObjectMemberAt (i);
+                    out << getEscapedQuotedString (member.name) << ": ";
+                    dump (member.value);
+
+                    if (i != numMembers - 1)
+                        out << "," << newLine << getIndent();
+                }
+
+                endIndent();
+            }
+            else
+            {
+                for (uint32_t i = 0; i < numMembers; ++i)
+                {
+                    if (i != 0) out << ", ";
+
+                    auto member = object.getObjectMemberAt (i);
+                    out << getEscapedQuotedString (member.name) << ": ";
+                    dump (member.value);
+                }
             }
 
             out << '}';
         }
     };
 
-    Writer { output }.dump (value);
+    Writer { output, useMultipleLines ? 2u : 0u }.dump (value);
 }
 
-inline std::string toString (const value::ValueView& v)
+inline std::string toString (const value::ValueView& v, bool useLineBreaks)
 {
     std::ostringstream out;
-    writeAsJSON (out, v);
+    writeAsJSON (out, v, useLineBreaks);
     return out.str();
 }
 
