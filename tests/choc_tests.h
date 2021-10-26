@@ -691,6 +691,10 @@ inline void testValues (TestProgress& progress)
 
         CHOC_EXPECT_EQ (88ul + 2 * sizeof (choc::value::BoolStorageType), v.getRawDataSize());
 
+        CHOC_EXPECT_EQ (v.getType().getSignature (false), "o12_i32_i64_f32_f64_b_s_s_s_V6_f32_a3_i32_A3_1xi32_1xf64_1xb_o1_i32");
+        CHOC_EXPECT_EQ (v.getType().getSignature (true), "o12_testObject_int32_i32_int64_i64_float32_f32_float64_f64_boolean_b_string1_s_string2_s_string3_s_vector_V6_f32_primitiveArray_a3_i32_complexArray_A3_1xi32_1xf64_1xb_object_o1_object_int32_i32");
+        CHOC_EXPECT_EQ (v.getType().getDescription(), "object \"testObject\" { int32: int32, int64: int64, float32: float32, float64: float64, boolean: bool, string1: string, string2: string, string3: string, vector: vector 6 x float32, primitiveArray: array 3 x int32, complexArray: array (1 x int32, 1 x float64, 1 x bool), object: object \"object\" { int32: int32 } }");
+
         struct Serialiser
         {
             choc::value::InputData getData() const  { return { data.data(), data.data() + data.size() }; }
