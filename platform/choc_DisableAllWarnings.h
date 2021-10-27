@@ -49,6 +49,7 @@
  #pragma GCC diagnostic ignored "-Wredundant-decls"
  #pragma GCC diagnostic ignored "-Wswitch-enum"
  #pragma GCC diagnostic ignored "-Wsubobject-linkage"
+ #pragma GCC diagnostic ignored "-Wredundant-move"
 #else
  #pragma warning (push, 0)
  #pragma warning (disable: 4702)
