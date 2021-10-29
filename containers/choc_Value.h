@@ -711,6 +711,10 @@ public:
     template <typename MemberType, typename... Others>
     void addMember (std::string_view name, MemberType value, Others&&...);
 
+    /// Adds or changes an object member to a new value.
+    template <typename MemberType>
+    void setMember (std::string_view name, MemberType newValue);
+
     //==============================================================================
     bool isVoid() const                         { return value.isVoid(); }
     bool isInt32() const                        { return value.isInt32(); }
@@ -826,6 +830,10 @@ public:
     /// Returns the size of the raw data that stores this value.
     size_t getRawDataSize() const                                       { return packedData.size(); }
 
+    /// Gets a pointer to the string dictionary that the view is using, or nullptr
+    /// if it doesn't have one.
+    StringDictionary* getDictionary() const                             { return value.getDictionary(); }
+
     /// Stores a complete representation of this value and its type in a packed data format.
     /// It can later be reloaded with Value::deserialise() or ValueView::deserialise().
     /// The OutputStream object can be any class which has a method write (const void*, size_t).
@@ -857,6 +865,7 @@ private:
     void appendData (const void*, size_t);
     void appendValue (ValueView);
     void appendMember (std::string_view, Type&&, const void*, size_t);
+    void changeMember (uint32_t, const Type&, void*, StringDictionary*);
 
     std::vector<uint8_t> packedData;
     SimpleStringDictionary dictionary;
@@ -954,13 +963,13 @@ namespace
         if constexpr (std::is_same<const TargetType, const bool>::value)
         {
             BoolStorageType b;
-            memcpy (std::addressof (b), src, sizeof (b));
+            std::memcpy (std::addressof (b), src, sizeof (b));
             return b != 0;
         }
         else
         {
             TargetType v;
-            memcpy (std::addressof (v), src, sizeof (v));
+            std::memcpy (std::addressof (v), src, sizeof (v));
             return v;
         }
     }
@@ -970,11 +979,11 @@ namespace
         if constexpr (std::is_same<const TargetType, const bool>::value)
         {
             BoolStorageType b = src ? 1 : 0;
-            memcpy (dest, std::addressof (b), sizeof (b));
+            std::memcpy (dest, std::addressof (b), sizeof (b));
         }
         else
         {
-            memcpy (dest, std::addressof (src), sizeof (TargetType));
+            std::memcpy (dest, std::addressof (src), sizeof (TargetType));
         }
     }
 
@@ -2250,7 +2259,7 @@ void ValueView::serialise (OutputStream& output) const
         throwError ("Out of local scratch space");
 
     uint8_t localCopy[maximumSize];
-    memcpy (localCopy, data, dataSize);
+    std::memcpy (localCopy, data, dataSize);
 
     static constexpr uint32_t maxStrings = 128;
     uint32_t numStrings = 0, stringDataSize = 0;
@@ -2467,7 +2476,7 @@ inline Value& Value::operator= (const ValueView& source)
     packedData.resize (source.getType().getValueDataSize());
     value.type = source.type;
     value.data = packedData.data();
-    memcpy (value.data, source.getRawData(), getRawDataSize());
+    std::memcpy (value.data, source.getRawData(), getRawDataSize());
     dictionary.clear();
 
     if (auto sourceDictionary = source.getDictionary())
@@ -2593,7 +2602,7 @@ Value create2DArray (const ElementType* sourceData, uint32_t numArrayElements, u
 {
     static_assert (isPrimitiveType<ElementType>(), "The template type needs to be one of the supported primitive types");
     Value v (Type::createArrayOfVectors<ElementType> (numArrayElements, numVectorElements));
-    memcpy (v.getRawData(), sourceData, numArrayElements * numVectorElements * getTypeSize<ElementType>());
+    std::memcpy (v.getRawData(), sourceData, numArrayElements * numVectorElements * getTypeSize<ElementType>());
     return v;
 }
 
@@ -2644,6 +2653,38 @@ inline void Value::appendMember (std::string_view name, Type&& type, const void*
     appendData (data, size);
 }
 
+inline void Value::changeMember (uint32_t index, const Type& newType, void* newData, StringDictionary* newDictionary)
+{
+    auto info = value.type.getElementTypeAndOffset (index);
+
+    if (info.elementType == newType)
+    {
+        auto elementAddress = value.data + info.offset;
+        std::memcpy (elementAddress, newData, newType.getValueDataSize());
+
+        if (newDictionary != nullptr)
+        {
+            // this will force an update of any handles in the newly-copied data
+            ValueView v (newType, elementAddress, newDictionary);
+            v.setDictionary (std::addressof (dictionary));
+        }
+    }
+    else
+    {
+        // changing an existing member type involves re-packing the data..
+        auto newCopy = createObject (getObjectClassName());
+        auto numElements = value.type.getNumElements();
+
+        for (uint32_t i = 0; i < numElements; ++i)
+        {
+            auto member = value.type.getObjectMember (i);
+            newCopy.addMember (member.name, i == index ? ValueView (newType, newData, newDictionary) : value[i]);
+        }
+
+        *this = std::move (newCopy);
+    }
+}
+
 template <typename MemberType, typename... Others>
 void Value::addMember (std::string_view name, MemberType v, Others&&... others)
 {
@@ -2670,6 +2711,35 @@ void Value::addMember (std::string_view name, MemberType v, Others&&... others)
 
     if constexpr (sizeof...(others) != 0)
         addMember (std::forward<Others> (others)...);
+}
+
+template <typename MemberType>
+void Value::setMember (std::string_view name, MemberType v)
+{
+    static_assert (isPrimitiveType<MemberType>() || isStringType<MemberType>() || isValueType<MemberType>(),
+                   "The template type needs to be one of the supported primitive types");
+
+    check (isObject(), "setMember() can only be called on an object");
+
+    auto index = value.type.getObjectMemberIndex (name);
+
+    if (index < 0)
+        return addMember (name, v);
+
+    if constexpr (isValueType<MemberType>())
+    {
+        changeMember (static_cast<uint32_t> (index), v.getType(), v.getRawData(), v.getDictionary());
+    }
+    else if constexpr (isStringType<MemberType>())
+    {
+        auto stringHandle = dictionary.getHandleForString (v);
+        changeMember (static_cast<uint32_t> (index), Type::createString(), std::addressof (stringHandle.handle), std::addressof (dictionary));
+    }
+    else if constexpr (matchesType<MemberType, int32_t>())   { changeMember (static_cast<uint32_t> (index), Type::createInt32(),   std::addressof (v), nullptr); }
+    else if constexpr (matchesType<MemberType, int64_t>())   { changeMember (static_cast<uint32_t> (index), Type::createInt64(),   std::addressof (v), nullptr); }
+    else if constexpr (matchesType<MemberType, float>())     { changeMember (static_cast<uint32_t> (index), Type::createFloat32(), std::addressof (v), nullptr); }
+    else if constexpr (matchesType<MemberType, double>())    { changeMember (static_cast<uint32_t> (index), Type::createFloat64(), std::addressof (v), nullptr); }
+    else if constexpr (matchesType<MemberType, bool>())      { BoolStorageType b = v ? 1 : 0; changeMember (static_cast<uint32_t> (index), Type::createBool(), std::addressof (b), nullptr); }
 }
 
 template <typename TargetType> TargetType Value::get() const                           { return value.get<TargetType>(); }
@@ -2701,7 +2771,7 @@ inline Value Value::deserialise (InputData& input)
     auto valueDataSize = type.getValueDataSize();
     Type::SerialisationHelpers::expect (input.end >= input.start + valueDataSize);
     Value v (std::move (type));
-    memcpy (v.getRawData(), input.start, valueDataSize);
+    std::memcpy (v.getRawData(), input.start, valueDataSize);
     input.start += valueDataSize;
 
     if (input.end > input.start)
@@ -2709,7 +2779,7 @@ inline Value Value::deserialise (InputData& input)
         auto stringDataSize = Type::SerialisationHelpers::readVariableLengthInt (input);
         Type::SerialisationHelpers::expect (stringDataSize <= static_cast<uint32_t> (input.end - input.start));
         v.dictionary.strings.resize (stringDataSize);
-        memcpy (v.dictionary.strings.data(), input.start, stringDataSize);
+        std::memcpy (v.dictionary.strings.data(), input.start, stringDataSize);
         Type::SerialisationHelpers::expect (v.dictionary.strings.back() == 0);
     }
 

@@ -650,8 +650,6 @@ inline void testValues (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (Serialisation)
-
         auto v = choc::value::createObject ("testObject",
                                             "int32", (int32_t) 1,
                                             "int64", (int64_t) 2,
@@ -686,7 +684,7 @@ inline void testValues (TestProgress& progress)
             v.addMember ("complexArray", array);
         }
 
-        v.addMember ("object", choc::value::createObject ("object",
+        v.setMember ("object", choc::value::createObject ("object",
                                                           "int32", choc::value::createPrimitive (1)));
 
         CHOC_EXPECT_EQ (88ul + 2 * sizeof (choc::value::BoolStorageType), v.getRawDataSize());
@@ -695,64 +693,100 @@ inline void testValues (TestProgress& progress)
         CHOC_EXPECT_EQ (v.getType().getSignature (true), "o12_testObject_int32_i32_int64_i64_float32_f32_float64_f64_boolean_b_string1_s_string2_s_string3_s_vector_V6_f32_primitiveArray_a3_i32_complexArray_A3_1xi32_1xf64_1xb_object_o1_object_int32_i32");
         CHOC_EXPECT_EQ (v.getType().getDescription(), "object \"testObject\" { int32: int32, int64: int64, float32: float32, float64: float64, boolean: bool, string1: string, string2: string, string3: string, vector: vector 6 x float32, primitiveArray: array 3 x int32, complexArray: array (1 x int32, 1 x float64, 1 x bool), object: object \"object\" { int32: int32 } }");
 
-        struct Serialiser
         {
-            choc::value::InputData getData() const  { return { data.data(), data.data() + data.size() }; }
+            CHOC_TEST (SetMembers)
 
-            void write (const void* d, size_t num)
+            try
             {
-                data.insert (data.end(), static_cast<const char*> (d), static_cast<const char*> (d) + num);
+                v.addMember ("vector", 1234);
+                CHOC_FAIL ("Failed to fail");
+            }
+            catch (choc::value::Error& e)
+            {
+                CHOC_EXPECT_EQ (e.description, std::string ("This object already contains a member with the given name"));
             }
 
-            std::vector<uint8_t> data;
-        };
+            auto v1 = v;
+            float floatVector[] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 8.0f };
+            auto vector = choc::value::createVector (floatVector, 6);
+            v1.setMember ("vector", vector);
+            CHOC_EXPECT_EQ (v1["vector"][5].get<float>(), 8.0f);
 
-        auto compare = [&] (const choc::value::ValueView& original, const choc::value::ValueView& deserialised)
-        {
-            auto s1 = choc::json::toString (original, false);
-            auto s2 = choc::json::toString (deserialised, false);
-            CHOC_EXPECT_EQ (s1, s2);
-            auto s3 = choc::json::toString (original, true);
-            auto s4 = choc::json::toString (deserialised, true);
-            CHOC_EXPECT_EQ (s3, s4);
-        };
-
-        {
-            Serialiser serialised;
-            v.serialise (serialised);
-            auto data = serialised.getData();
-            auto deserialised = choc::value::Value::deserialise (data);
-            compare (v, deserialised);
-        }
-
-        {
-            Serialiser serialised;
-            v.getView().serialise (serialised);
-            auto data = serialised.getData();
-            auto deserialised = choc::value::Value::deserialise (data);
-            compare (v, deserialised);
-        }
-
-        {
-            Serialiser serialised;
-            v.serialise (serialised);
-            auto data = serialised.getData();
-
-            choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
             {
-                compare (v, deserialised);
-            });
+                auto v2 = v1;
+                v2.setMember ("vector", 12345);
+                CHOC_EXPECT_EQ (v2["vector"].getInt32(), 12345);
+            }
+
+            {
+                auto v2 = v1;
+                v2.setMember ("vector", "modified");
+                CHOC_EXPECT_EQ (v2["vector"].getString(), "modified");
+            }
         }
 
         {
-            Serialiser serialised;
-            v.getView().serialise (serialised);
-            auto data = serialised.getData();
+            CHOC_TEST (Serialisation)
 
-            choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
+            struct Serialiser
             {
+                choc::value::InputData getData() const  { return { data.data(), data.data() + data.size() }; }
+
+                void write (const void* d, size_t num)
+                {
+                    data.insert (data.end(), static_cast<const char*> (d), static_cast<const char*> (d) + num);
+                }
+
+                std::vector<uint8_t> data;
+            };
+
+            auto compare = [&] (const choc::value::ValueView& original, const choc::value::ValueView& deserialised)
+            {
+                auto s1 = choc::json::toString (original, false);
+                auto s2 = choc::json::toString (deserialised, false);
+                CHOC_EXPECT_EQ (s1, s2);
+                auto s3 = choc::json::toString (original, true);
+                auto s4 = choc::json::toString (deserialised, true);
+                CHOC_EXPECT_EQ (s3, s4);
+            };
+
+            {
+                Serialiser serialised;
+                v.serialise (serialised);
+                auto data = serialised.getData();
+                auto deserialised = choc::value::Value::deserialise (data);
                 compare (v, deserialised);
-            });
+            }
+
+            {
+                Serialiser serialised;
+                v.getView().serialise (serialised);
+                auto data = serialised.getData();
+                auto deserialised = choc::value::Value::deserialise (data);
+                compare (v, deserialised);
+            }
+
+            {
+                Serialiser serialised;
+                v.serialise (serialised);
+                auto data = serialised.getData();
+
+                choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
+                {
+                    compare (v, deserialised);
+                });
+            }
+
+            {
+                Serialiser serialised;
+                v.getView().serialise (serialised);
+                auto data = serialised.getData();
+
+                choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
+                {
+                    compare (v, deserialised);
+                });
+            }
         }
     }
 }
