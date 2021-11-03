@@ -22,15 +22,16 @@
 #include <fstream>
 #include <functional>
 #include <cwctype>
+#include <stdexcept>
 #include "../text/choc_UTF8.h"
 
 namespace choc::file
 {
 
 /// A file handling error, thrown by some of the functions in this namespace.
-struct Error
+struct Error  : public std::runtime_error
 {
-    std::string description;
+    Error (const std::string& error) : std::runtime_error (error) {}
 };
 
 /// Attempts to load the contents of the given filename into a string,
@@ -98,7 +99,7 @@ private:
 inline std::string loadFileAsString (const std::string& filename)
 {
     if (filename.empty())
-        throw Error { "Illegal filename" };
+        throw Error ("Illegal filename");
 
     try
     {
@@ -107,12 +108,12 @@ inline std::string loadFileAsString (const std::string& filename)
         stream.open (filename, std::ios::binary | std::ios::ate);
 
         if (! stream.is_open())
-            throw Error { "Failed to open file: " + filename };
+            throw Error ("Failed to open file: " + filename);
 
         auto fileSize = stream.tellg();
 
         if (fileSize < 0)
-            throw Error { "Failed to read from file: " + filename };
+            throw Error ("Failed to read from file: " + filename);
 
         if (fileSize == 0)
             return {};
@@ -124,11 +125,11 @@ inline std::string loadFileAsString (const std::string& filename)
         if (stream.read (content.data(), static_cast<std::streamsize> (fileSize)))
             return content;
 
-        throw Error { "Failed to read from file: " + filename };
+        throw Error ("Failed to read from file: " + filename);
     }
     catch (const std::ios_base::failure& e)
     {
-        throw Error { "Failed to read from file: " + filename + ": " + e.what() };
+        throw Error ("Failed to read from file: " + filename + ": " + e.what());
     }
 
     return {};
@@ -146,10 +147,10 @@ inline void replaceFileWithContent (const std::string& filename, std::string_vie
     }
     catch (const std::ios_base::failure& e)
     {
-        throw Error { "Failed to write to file: " + filename + ": " + e.what() };
+        throw Error ("Failed to write to file: " + filename + ": " + e.what());
     }
 
-    throw Error { "Failed to open file: " + filename };
+    throw Error ("Failed to open file: " + filename);
 }
 
 //==============================================================================

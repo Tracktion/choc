@@ -24,6 +24,7 @@
 #include <cstring>
 #include <algorithm>
 #include <memory>
+#include <exception>
 #include "../platform/choc_Assert.h"
 
 namespace choc::value
@@ -54,14 +55,21 @@ struct ElementTypeAndOffset;
     runtime checks fail.
     @see Type, Value, ValueView
 */
-struct Error { const char* description; };
+struct Error  : public std::exception
+{
+    Error (const char* desc) : description (desc) {}
+
+    const char* what() const noexcept override    { return description; }
+    const char* description;
+};
+
 
 /** Throws an error exception.
     Note that the message string is taken as a raw pointer and not copied, so must be a string literal.
     This is used by the Type, Value and ValueView classes.
     @see Type, Value, ValueView
 */
-[[noreturn]] static void throwError (const char* errorMessage)     { throw Error { errorMessage }; }
+[[noreturn]] static void throwError (const char* errorMessage)     { throw Error (errorMessage); }
 
 /** Throws an Error with the given message if the condition argument is false.
     Note that the message string is taken as a raw pointer and not copied, so must be a string literal.

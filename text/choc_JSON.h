@@ -22,6 +22,7 @@
 #include <limits>
 #include <sstream>
 #include <string_view>
+#include <stdexcept>
 
 #include "choc_UTF8.h"
 #include "choc_FloatToString.h"
@@ -35,9 +36,11 @@ namespace choc::json
 
 //==============================================================================
 /// A parse exception, thrown by choc::json::parse() as needed.
-struct ParseError
+struct ParseError  : public std::runtime_error
 {
-    const char* message;
+    ParseError (const char* message, choc::text::LineAndColumn lc)
+        : std::runtime_error (message), lineAndColumn (lc) {}
+
     choc::text::LineAndColumn lineAndColumn;
 };
 
@@ -261,7 +264,7 @@ inline std::string toString (const value::ValueView& v, bool useLineBreaks)
 //==============================================================================
 [[noreturn]] static inline void throwParseError (const char* error, text::UTF8Pointer source, text::UTF8Pointer errorPos)
 {
-    throw ParseError { error, text::findLineAndColumn (source, errorPos) };
+    throw ParseError (error, text::findLineAndColumn (source, errorPos));
 }
 
 inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)

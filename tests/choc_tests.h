@@ -817,7 +817,7 @@ inline void testJSON (TestProgress& progress)
         }
         catch (choc::json::ParseError& e)
         {
-            CHOC_EXPECT_EQ (e.message, message);
+            CHOC_EXPECT_EQ (e.what(), message);
             CHOC_EXPECT_EQ (e.lineAndColumn.line, line);
             CHOC_EXPECT_EQ (e.lineAndColumn.column, column);
         }
@@ -1727,7 +1727,7 @@ inline void testJavascript (TestProgress& progress)
         }
         catch (const choc::javascript::Error& e)
         {
-            CHOC_EXPECT_EQ ("SyntaxError: parse error (line 1, end of input)", e.message);
+            CHOC_EXPECT_EQ (e.what(), std::string ("SyntaxError: parse error (line 1, end of input)"));
         }
     }
 

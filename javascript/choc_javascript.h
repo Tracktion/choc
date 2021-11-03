@@ -19,6 +19,7 @@
 #ifndef CHOC_JAVASCRIPT_HEADER_INCLUDED
 #define CHOC_JAVASCRIPT_HEADER_INCLUDED
 
+#include <stdexcept>
 #include "../containers/choc_Value.h"
 #include "../text/choc_JSON.h"
 
@@ -28,9 +29,9 @@
 namespace choc::javascript
 {
     /// This is thrown by any javascript functions that need to report an error
-    struct Error
+    struct Error  : public std::runtime_error
     {
-        std::string message;
+        Error (const std::string& error) : std::runtime_error (error) {}
     };
 
     //==============================================================================
@@ -186,9 +187,7 @@ PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
 
             return a->get<PrimitiveType>();
         }
-        catch (choc::value::Error)
-        {}
-        catch (choc::json::ParseError)
+        catch (const std::exception&)
         {}
     }
 
@@ -233,13 +232,13 @@ struct Context::Pimpl
             duk_remove (context, duk_get_top_index (context));
     }
 
-    static void fatalError (void*, const char* message)    { throw Error { message }; }
+    static void fatalError (void*, const char* message)    { throw Error (message); }
 
     void throwError()
     {
         std::string message = duk_safe_to_string (context, -1);
         reset();
-        throw Error { message };
+        throw Error (message);
     }
 
     void evalString (std::string_view code)
@@ -261,7 +260,7 @@ struct Context::Pimpl
         evalString (functionName);
 
         if (! duk_is_function (context, -1))
-            throw Error { "No such function" };
+            throw Error ("No such function");
 
         duk_require_stack_top (context, (duktape::duk_idx_t) numArgs);
     }
