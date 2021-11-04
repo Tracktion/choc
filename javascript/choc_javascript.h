@@ -327,8 +327,12 @@ struct Context::Pimpl
             auto objectIndex = duk_push_object (ctx);
 
             auto className = v.getObjectClassName();
-            duk_push_lstring (ctx, className.data(), className.length());
-            duk_put_prop_string (ctx, objectIndex, objectNameAttribute);
+
+            if (! className.empty())
+            {
+                duk_push_lstring (ctx, className.data(), className.length());
+                duk_put_prop_string (ctx, objectIndex, objectNameAttribute);
+            }
 
             v.visitObjectMembers ([&] (std::string_view name, const choc::value::ValueView& value)
             {
@@ -388,27 +392,29 @@ struct Context::Pimpl
                     return {};
                 }
 
-                // Handle a plain object - supports an object name attribute as the first field
-                choc::value::Value object = choc::value::createObject ("object");
-                bool firstField = true;
+                // Handle an object
+                duk_enum (ctx, index, DUK_ENUM_OWN_PROPERTIES_ONLY);
 
-                for (duk_enum (ctx, index, DUK_ENUM_OWN_PROPERTIES_ONLY);
-                     duk_next (ctx, -1, 1);
-                     duk_pop_2 (ctx))
+                bool anyRemaining = duk_next (ctx, -1, 1);
+                std::string_view name;
+
+                // look for an object name attribute as the first field
+                if (anyRemaining
+                     && duk_get_type (ctx, -2) == static_cast<duktape::duk_int_t> (DUK_TYPE_STRING)
+                     && duk_to_string (ctx, -2) == std::string_view (objectNameAttribute))
                 {
-                    if (firstField)
-                    {
-                        firstField = false;
+                    name = duk_to_string (ctx, -1);
+                    duk_pop_2 (ctx);
+                    anyRemaining = duk_next (ctx, -1, 1);
+                }
 
-                        if ((duk_get_type (ctx, -2) == static_cast<duktape::duk_int_t> (DUK_TYPE_STRING)
-                             && duk_to_string (ctx, -2) == std::string (objectNameAttribute)))
-                        {
-                            object = choc::value::createObject (duk_to_string (ctx, -1));
-                            continue;
-                        }
-                    }
+                auto object = choc::value::createObject (name);
 
+                while (anyRemaining)
+                {
                     object.addMember (duk_to_string (ctx, -2), readValue (ctx, -1));
+                    duk_pop_2 (ctx);
+                    anyRemaining = duk_next (ctx, -1, 1);
                 }
 
                 duk_pop (ctx);
