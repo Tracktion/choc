@@ -96,7 +96,7 @@ inline InterleavedView<SampleType> createInterleavedViewFromValue (const choc::v
     auto sourceData = const_cast<SampleType*> (reinterpret_cast<const SampleType*> (value.getRawData()));
     auto frameType = arrayType.getElementType();
 
-    if (frameType.isVector())
+    if (frameType.isVector() || frameType.isUniformArray())
     {
         CHOC_ASSERT (frameType.getElementType().isPrimitiveType<SampleType>());
         return createInterleavedView (sourceData, frameType.getNumElements(), numFrames);
