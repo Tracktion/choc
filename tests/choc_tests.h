@@ -32,6 +32,7 @@
 #include "../text/choc_TextTable.h"
 #include "../text/choc_Files.h"
 #include "../math/choc_MathHelpers.h"
+#include "../containers/choc_COM.h"
 #include "../containers/choc_DirtyList.h"
 #include "../containers/choc_Span.h"
 #include "../containers/choc_Value.h"
@@ -1783,6 +1784,56 @@ inline void testJavascript (TestProgress& progress)
 }
 
 //==============================================================================
+inline void testCOM (TestProgress& progress)
+{
+    CHOC_CATEGORY (COM);
+
+    {
+        CHOC_TEST (RefCounting)
+
+        static int numObjs = 0;
+
+        struct TestObj final  : public choc::com::ObjectWithAtomicRefCount<choc::com::Object>
+        {
+            TestObj() { ++numObjs; }
+            ~TestObj() { --numObjs; }
+        };
+
+        {
+            auto t1 = choc::com::create<TestObj>();
+            CHOC_EXPECT_EQ (numObjs, 1);
+            auto t2 = choc::com::create<TestObj>();
+            CHOC_EXPECT_EQ (numObjs, 2);
+            auto t3 = t2;
+            t2.reset();
+            CHOC_EXPECT_EQ (numObjs, 2);
+            t3 = t1;
+            CHOC_EXPECT_EQ (numObjs, 1);
+            auto t5 = t1;
+        }
+
+        CHOC_EXPECT_EQ (numObjs, 0);
+    }
+
+    {
+        CHOC_TEST (String)
+
+        auto s1 = choc::com::createString ("abc");
+        auto s2 = choc::com::createString ("def");
+        auto s3 = s1;
+        CHOC_EXPECT_EQ (toString (s1), "abc");
+        s1 = s2;
+        CHOC_EXPECT_EQ (toString (s1), "def");
+        CHOC_EXPECT_EQ (toString (s2), "def");
+        CHOC_EXPECT_EQ (toString (s3), "abc");
+        s1 = choc::com::createString ("zzz");
+        CHOC_EXPECT_EQ (toString (s1), "zzz");
+        s1 = {};
+        CHOC_EXPECT_EQ (toString (s1), "");
+    }
+}
+
+//==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
     testContainerUtils (progress);
@@ -1795,6 +1846,7 @@ inline bool runAllTests (TestProgress& progress)
     testFIFOs (progress);
     testMIDIFiles (progress);
     testJavascript (progress);
+    testCOM (progress);
 
     progress.printReport();
     return progress.numFails == 0;
