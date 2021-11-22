@@ -1031,11 +1031,15 @@ namespace
 
     static inline std::string_view allocateString (Allocator* a, std::string_view s)
     {
-        auto size = s.length();
-        auto data = static_cast<char*> (allocateBytes (a, size + 1));
-        std::memcpy (data, s.data(), size);
-        data[size] = 0;
-        return { data, size };
+        if (auto size = s.length())
+        {
+            auto data = static_cast<char*> (allocateBytes (a, size + 1));
+            std::memcpy (data, s.data(), size);
+            data[size] = 0;
+            return { data, size };
+        }
+
+        return {};
     }
 
     static inline void freeString (Allocator* a, std::string_view s) noexcept
@@ -2077,7 +2081,12 @@ inline bool     ValueView::getBool() const      { check (type.isBool(),    "Valu
 
 template <typename TargetType> TargetType ValueView::get() const
 {
-    if constexpr (isStringType<TargetType>())
+    if constexpr (matchesType<TargetType, const char*>())
+    {
+        auto s = getString();
+        return s.empty() ? "" : s.data();
+    }
+    else if constexpr (isStringType<TargetType>())
     {
         return TargetType (getString());
     }

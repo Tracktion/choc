@@ -954,6 +954,10 @@ inline void testJSON (TestProgress& progress)
         CHOC_EXPECT_EQ (32,        v["tests"][0]["actions"][0]["blockSize"].get<int>());
 
         CHOC_EXPECT_EQ ("test2", v["tests"][1]["name"].get<std::string>());
+        CHOC_EXPECT_TRUE (strcmp ("test2", v["tests"][1]["name"].get<const char*>()) == 0);
+
+        auto s = choc::value::createString ({});
+        CHOC_EXPECT_TRUE (s.get<const char*>()[0] == 0);
     }
 
     {
