@@ -501,7 +501,11 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
 
 inline value::Value parse (const char* text, size_t numbytes, bool parseBareValue)
 {
-    CHOC_ASSERT (text != nullptr);
+    if (text == nullptr)
+    {
+        CHOC_ASSERT (numbytes == 0);
+        text = "";
+    }
 
     if (auto error = text::findInvalidUTF8Data (text, numbytes))
         throwParseError ("Illegal UTF8 data", text::UTF8Pointer (text), text::UTF8Pointer (error));
