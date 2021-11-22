@@ -177,12 +177,31 @@ struct String  : public Object
     std::string_view get() const;
 };
 
-/// Returns a COM-friendly string.
-Ptr<String> createString (std::string);
-
 /// Gets a std::string_view from a Ptr<String>, or returns
 /// an empty view if the Ptr is null.
 std::string_view toString (const Ptr<String>&);
+
+/// This is just a subclass of Ptr<String> which adds some handy casts and getter
+/// methods to make it easy to use the string without calling toString() on it.
+struct StringPtr  : public Ptr<String>
+{
+    StringPtr() = default;
+    StringPtr (const StringPtr&) = default;
+    StringPtr& operator= (const StringPtr&) = default;
+    StringPtr (StringPtr&&) = default;
+    StringPtr& operator= (StringPtr&&) = default;
+
+    StringPtr (Ptr<String> p) : Ptr<String> (p) {}
+
+    std::string_view get() const            { return toString (*this); }
+
+    operator std::string_view() const       { return get(); }
+    operator std::string() const            { return std::string (get()); }
+};
+
+/// Returns a COM-friendly string.
+StringPtr createString (std::string);
+
 
 
 //==============================================================================
@@ -297,7 +316,7 @@ inline std::string_view toString (const Ptr<String>& s)
      return {};
 }
 
-inline Ptr<String> createString (std::string stringToUse)
+inline StringPtr createString (std::string stringToUse)
 {
     struct StringHolder final  : public ObjectWithAtomicRefCount<String>
     {
@@ -309,7 +328,7 @@ inline Ptr<String> createString (std::string stringToUse)
         std::string str;
     };
 
-    return create<StringHolder> (std::move (stringToUse));
+    return StringPtr (create<StringHolder> (std::move (stringToUse)));
 }
 
 } // namespace choc::com
