@@ -496,6 +496,8 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ (2u, choc::text::findLineAndColumn (p, p.find ("ine2")).line);
         CHOC_EXPECT_EQ (3u, choc::text::findLineAndColumn (p, p.find ("ine2")).column);
         CHOC_EXPECT_TRUE (p.find ("ine4").findStartOfLine (p).startsWith ("line4"));
+
+        CHOC_EXPECT_EQ (0x12345u, choc::text::createUnicodeFromHighAndLowSurrogates (choc::text::splitCodePointIntoSurrogatePair (0x12345u)));
     }
 
     {

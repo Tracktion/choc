@@ -95,7 +95,12 @@ std::string doubleToString (double value);
 template <typename OutputStreamType>
 void writeWithEscapeCharacters (OutputStreamType& out, text::UTF8Pointer source)
 {
-    auto hexDigit = [] (auto value) -> char { return "0123456789abcdef"[value & 15]; };
+    auto writeUnicode = [] (OutputStreamType& o, auto digit)
+    {
+        auto hexDigit = [] (auto value) -> char { return "0123456789abcdef"[value & 15]; };
+
+        o << "\\u" << hexDigit (digit >> 12) << hexDigit (digit >> 8) << hexDigit (digit >> 4) << hexDigit (digit);
+    };
 
     for (;;)
     {
@@ -116,10 +121,20 @@ void writeWithEscapeCharacters (OutputStreamType& out, text::UTF8Pointer source)
 
             default:
                 if (c > 31 && c < 127)
+                {
                     out << (char) c;
-                else
-                    out << "\\u" << hexDigit (c >> 12) << hexDigit (c >> 8) << hexDigit (c >> 4) << hexDigit (c);
+                    break;
+                }
 
+                if (c >= 0x10000)
+                {
+                    auto pair = choc::text::splitCodePointIntoSurrogatePair (c);
+                    writeUnicode (out, pair.high);
+                    writeUnicode (out, pair.low);
+                    break;
+                }
+
+                writeUnicode (out, c);
                 break;
         }
 
@@ -485,7 +500,7 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
             if (text::isUnicodeHighSurrogate (result))
             {
                 if (! isLowSurrogate && popIf ("\\u"))
-                    return text::createUnicodeFromHighAndLowSurrogates (result, parseUnicodeCharacterNumber (true));
+                    return text::createUnicodeFromHighAndLowSurrogates ({ result, parseUnicodeCharacterNumber (true) });
 
                 throwError ("Expected a unicode low surrogate codepoint");
             }
