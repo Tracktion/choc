@@ -49,6 +49,7 @@
  #pragma GCC diagnostic ignored "-Wredundant-decls"
  #pragma GCC diagnostic ignored "-Wswitch-enum"
  #pragma GCC diagnostic ignored "-Wsubobject-linkage"
+ #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif
