@@ -38,6 +38,7 @@
 #elif __GNUC__
  #pragma GCC diagnostic push
  #pragma GCC diagnostic ignored "-Wall"
+ #pragma GCC diagnostic ignored "-Wpragmas"
  #pragma GCC diagnostic ignored "-Wextra"
  #pragma GCC diagnostic ignored "-Wshadow"
  #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -50,6 +51,8 @@
  #pragma GCC diagnostic ignored "-Wswitch-enum"
  #pragma GCC diagnostic ignored "-Wsubobject-linkage"
  #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+ #pragma GCC diagnostic ignored "-Wredundant-move"
+ #pragma GCC diagnostic ignored "-Wstrict-aliasing"
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif
