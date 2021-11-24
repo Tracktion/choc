@@ -53,6 +53,8 @@
  #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
  #pragma GCC diagnostic ignored "-Wredundant-move"
  #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+ #pragma GCC diagnostic ignored "-Woverloaded-virtual"
+
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif
