@@ -31,6 +31,7 @@
 #include "../text/choc_UTF8.h"
 #include "../text/choc_TextTable.h"
 #include "../text/choc_Files.h"
+#include "../text/choc_Base64.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_COM.h"
 #include "../containers/choc_DirtyList.h"
@@ -513,6 +514,43 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ (table.getNumRows(), 3u);
         CHOC_EXPECT_EQ (table.getNumColumns(), 4u);
         CHOC_EXPECT_EQ (table.toString ("<", ";", ">"), std::string ("<1   ;234 ;5; ><    ;2345;x;y><2345;    ; ; >"));
+    }
+
+    {
+        CHOC_TEST (Base64)
+
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("")), "");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("f")), "Zg==");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("fo")), "Zm8=");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("foo")), "Zm9v");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("foob")), "Zm9vYg==");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("fooba")), "Zm9vYmE=");
+        CHOC_EXPECT_EQ (choc::base64::encodeToString (std::string_view ("foobar")), "Zm9vYmFy");
+
+        std::vector<uint8_t> data;
+
+        auto testRoundTrip = [&]
+        {
+            auto base64 = choc::base64::encodeToString (data);
+            std::vector<uint8_t> decoded;
+            choc::base64::decodeToContainer (decoded, base64);
+            return decoded == data;
+        };
+
+        CHOC_EXPECT_TRUE (testRoundTrip());
+
+        for (int start = 0; start < 256; ++start)
+        {
+            data.clear();
+            int byte = start;
+
+            for (int i = 0; i < 80; ++i)
+            {
+                data.push_back ((uint8_t) byte);
+                CHOC_EXPECT_TRUE (testRoundTrip());
+                byte = (byte * 7 + 3);
+            }
+        }
     }
 }
 
