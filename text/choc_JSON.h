@@ -336,7 +336,7 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
 
         value::Value parseObject()
         {
-            auto result = value::createObject ("JSON");
+            auto result = value::createObject ({});
             auto objectStart = current;
 
             skipWhitespace();

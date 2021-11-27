@@ -735,6 +735,14 @@ inline void testValues (TestProgress& progress)
         CHOC_EXPECT_EQ (v.getType().getDescription(), "object \"testObject\" { int32: int32, int64: int64, float32: float32, float64: float64, boolean: bool, string1: string, string2: string, string3: string, vector: vector 6 x float32, primitiveArray: array 3 x int32, complexArray: array (1 x int32, 1 x float64, 1 x bool), object: object \"object\" { int32: int32 } }");
 
         {
+            CHOC_TEST (TypeRoundTrip)
+
+            auto typeAsValue = v.getType().toValue();
+            auto roundTripped = choc::value::Type::fromValue (typeAsValue);
+            CHOC_EXPECT_EQ (v.getType().getSignature (true), roundTripped.getSignature (true));
+        }
+
+        {
             CHOC_TEST (SetMembers)
 
             try
