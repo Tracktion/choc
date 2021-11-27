@@ -177,6 +177,10 @@ public:
     /// out of bounds, it will throw an Error.
     Type getArrayElementType (uint32_t index) const;
 
+    /// For a vector or uniform array type, this allows the number of elements to be directly mutated.
+    /// For any other type, this will throw an Error exception.
+    void modifyNumElements (uint32_t newNumElements);
+
     /// Returns the name and type of one of the members if this type is an object; if not, or the index is out
     /// of range, then this will throw an Error exception.
     const MemberNameAndType& getObjectMember (uint32_t index) const;
@@ -464,6 +468,7 @@ public:
 
     //==============================================================================
     const Type& getType() const                 { return type; }
+    Type& getMutableType()                      { return type; }
 
     bool isVoid() const noexcept                { return type.isVoid(); }
     bool isInt32() const noexcept               { return type.isInt32(); }
@@ -1517,6 +1522,16 @@ inline uint32_t Type::getNumElements() const
     if (isPrimitive() || isString())        return 1;
 
     throwError ("This type doesn't have sub-elements");
+}
+
+inline void Type::modifyNumElements (uint32_t newNumElements)
+{
+    if (isVector())
+        content.vector.numElements = newNumElements;
+    else if (isType (MainType::primitiveArray))
+        content.primitiveArray.numElements = newNumElements;
+    else
+        throwError ("This type is not a uniform array or vector");
 }
 
 inline Type Type::getElementType() const
