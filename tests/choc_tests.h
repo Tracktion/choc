@@ -1622,8 +1622,13 @@ inline void testFIFOs (TestProgress& progress)
         // The total available space includes the message headers, so although it looks like we've got space for 1000 bytes,
         // we actually only have space for 1000 - sizeof (MessageHeader)
         CHOC_EXPECT_TRUE (queue.push (&buffer[0], 200));
-        CHOC_EXPECT_TRUE (queue.push (&buffer[0], 200));
-        CHOC_EXPECT_TRUE (queue.push (&buffer[0], 200));
+
+        CHOC_EXPECT_TRUE (queue.push (400, [&] (void* dest)
+        {
+            memcpy (dest, buffer.data(), 200);
+            memcpy (static_cast<char*> (dest) + 200, buffer.data(), 200);
+        }));
+
         CHOC_EXPECT_TRUE (queue.push (&buffer[0], 200));
         CHOC_EXPECT_FALSE (queue.push (&buffer[0], 1001 - 4 * 4));
 
