@@ -104,7 +104,7 @@ bool runAllTests (TestProgress&);
 // macros are supposed to be used.
 
 #define CHOC_CATEGORY(category)          progress.startCategory (#category);
-#define CHOC_TEST(name)                  ScopedTest scopedTest_ ## __LINE__ (progress, #name);
+#define CHOC_TEST(name)                  choc::test::ScopedTest scopedTest_ ## __LINE__ (progress, #name);
 #define CHOC_FAIL(message)               progress.fail (__FILE__, __LINE__, message);
 #define CHOC_EXPECT_TRUE(b)              progress.check (b, __FILE__, __LINE__, "Expected " #b);
 #define CHOC_EXPECT_FALSE(b)             progress.check (! (b), __FILE__, __LINE__, "Expected ! " #b);
