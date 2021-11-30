@@ -711,6 +711,7 @@ public:
     explicit Value (double);
     explicit Value (bool);
     explicit Value (std::string_view);
+    explicit Value (const char*);
 
     //==============================================================================
     /// Appends an element to this object, if it's an array. If not, then this will throw an Error exception.
@@ -875,6 +876,7 @@ public:
 
 private:
     //==============================================================================
+    Value (const void*) = delete;
     void appendData (const void*, size_t);
     void appendValue (ValueView);
     void appendMember (std::string_view, Type&&, const void*, size_t);
@@ -2500,6 +2502,7 @@ inline Value::Value (float n)             : Value (Type::createFloat32(), std::a
 inline Value::Value (double n)            : Value (Type::createFloat64(), std::addressof (n), sizeof (n)) {}
 inline Value::Value (bool n)              : Value (Type::createBool())     { writeUnaligned (value.data, n); }
 inline Value::Value (std::string_view s)  : Value (Type::createString())   { writeUnaligned (value.data, dictionary.getHandleForString (s)); }
+inline Value::Value (const char* s)       : Value (std::string_view (s)) {}
 
 inline Value& Value::operator= (const ValueView& source)
 {
