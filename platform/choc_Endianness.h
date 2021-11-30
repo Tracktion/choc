@@ -19,6 +19,8 @@
 #ifndef CHOC_BITCASTS_HEADER_INCLUDED
 #define CHOC_BITCASTS_HEADER_INCLUDED
 
+#include <cstring>
+
 /*
    This file contains a few endianness and bit-cast functions which
    have been implemented using no platform or compiler-specific tricks
@@ -32,6 +34,13 @@ namespace choc::memory
 /// I wrote this, there still wasn't much compiler support for it).
 template <typename TargetType, typename SourceType>
 TargetType bitcast (SourceType sourceValue);
+
+/// Reads any kind of primitive type from a native-endian
+/// encoded value in memory.
+/// As well as integers, this will also decode float and
+/// double values.
+template <typename Type>
+Type readNativeEndian (const void* encodedValue);
 
 /// Reads any kind of primitive type from a little-endian
 /// encoded value in memory.
@@ -47,6 +56,11 @@ Type readLittleEndian (const void* encodedValue);
 template <typename Type>
 Type readBigEndian (const void* encodedValue);
 
+/// Writes a primitive value into memory, in a native-endian order.
+/// The type can be an integer or float primitive.
+template <typename Type>
+void writeNativeEndian (void* destBuffer, Type valueToWrite);
+
 /// Writes a primitive value into memory, in a little-endian order.
 /// The type can be an integer or float primitive.
 template <typename Type>
@@ -56,6 +70,7 @@ void writeLittleEndian (void* destBuffer, Type valueToWrite);
 /// The type can be an integer or float primitive.
 template <typename Type>
 void writeBigEndian (void* destBuffer, Type valueToWrite);
+
 
 
 //==============================================================================
@@ -76,6 +91,14 @@ inline TargetType bitcast (SourceType source)
                    "Can only bitcast between objects of the same size");
     union { SourceType src; TargetType dst; } u = { source };
     return u.dst;
+}
+
+template <typename Type>
+inline Type readNativeEndian (const void* source)
+{
+    Type t;
+    std::memcpy (std::addressof (t), source, sizeof (Type));
+    return t;
 }
 
 template <typename Type>
@@ -138,6 +161,12 @@ inline Type readBigEndian (const void* source)
         return static_cast<Type> (static_cast<uint16_t> (src[1])
                                | (static_cast<uint16_t> (src[0]) << 8));
     }
+}
+
+template <typename Type>
+inline void writeNativeEndian (void* dest, Type source)
+{
+    std::memcpy (dest, std::addressof (source), sizeof (Type));
 }
 
 template <typename Type>

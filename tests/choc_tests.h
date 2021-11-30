@@ -258,6 +258,9 @@ inline void testContainerUtils (TestProgress& progress)
         auto a = 0x0102030405060708ull;
         uint8_t buffer[16];
 
+        choc::memory::writeNativeEndian (buffer, a);
+        CHOC_EXPECT_EQ (a, choc::memory::readNativeEndian<decltype(a)> (buffer));
+
         choc::memory::writeLittleEndian (buffer, a);
         CHOC_EXPECT_EQ (buffer[0], 8);
         CHOC_EXPECT_EQ (buffer[1], 7);
