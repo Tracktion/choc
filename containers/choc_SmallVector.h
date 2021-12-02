@@ -19,6 +19,7 @@
 #ifndef CHOC_SMALLVECTOR_HEADER_INCLUDED
 #define CHOC_SMALLVECTOR_HEADER_INCLUDED
 
+#include <algorithm>
 #include "choc_Span.h"
 
 namespace choc

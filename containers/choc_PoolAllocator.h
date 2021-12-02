@@ -19,6 +19,7 @@
 #ifndef CHOC_POOL_HEADER_INCLUDED
 #define CHOC_POOL_HEADER_INCLUDED
 
+#include <memory>
 #include <vector>
 #include <array>
 #include <cstdlib>
