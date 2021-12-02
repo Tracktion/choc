@@ -19,7 +19,7 @@
 #ifndef CHOC_SMALLVECTOR_HEADER_INCLUDED
 #define CHOC_SMALLVECTOR_HEADER_INCLUDED
 
-#include "choc_SingleReaderMultipleWriterFIFO.h"
+#include "choc_Span.h"
 
 namespace choc
 {
