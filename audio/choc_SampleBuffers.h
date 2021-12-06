@@ -234,7 +234,7 @@ struct BufferView
     }
 
     /// Sets all samples in the view to zero.
-    void clear() const                                          { data.clear (size); }
+    void clear() const                                          { if (! size.isEmpty()) data.clear (size); }
 
     /// Allows a view of non-const samples to be cast to one of const samples.
     operator BufferView<const Sample, LayoutType>() const       { return { static_cast<LayoutType<const Sample>> (data), size }; }
