@@ -206,6 +206,9 @@ struct StringPtr  : public Ptr<String>
 /// Returns a COM-friendly string.
 StringPtr createString (std::string);
 
+/// Returns a COM-friendly string object as a raw pointer with a ref-count
+/// of 1, ready for use as a return value from a function.
+String* createRawString (std::string);
 
 
 //==============================================================================
@@ -320,7 +323,7 @@ inline std::string_view toString (const Ptr<String>& s)
      return {};
 }
 
-inline StringPtr createString (std::string stringToUse)
+inline String* createRawString (std::string stringToUse)
 {
     struct StringHolder final  : public ObjectWithAtomicRefCount<String>
     {
@@ -332,7 +335,12 @@ inline StringPtr createString (std::string stringToUse)
         std::string str;
     };
 
-    return StringPtr (create<StringHolder> (std::move (stringToUse)));
+    return new StringHolder (std::move (stringToUse));
+}
+
+inline StringPtr createString (std::string stringToUse)
+{
+    return StringPtr (createRawString (std::move (stringToUse)));
 }
 
 } // namespace choc::com
