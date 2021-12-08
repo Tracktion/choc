@@ -114,7 +114,8 @@ struct Ptr
     Ptr (Ptr&&) noexcept;
     Ptr (decltype(nullptr)) noexcept;
 
-    Ptr (Type*, bool incrementRefCount) noexcept;
+    /// Captures a raw pointer: Note that this does NOT increase its reference count!
+    explicit Ptr (Type*) noexcept;
 
     Ptr& operator= (const Ptr&) noexcept;
     Ptr& operator= (Ptr&&) noexcept;
@@ -134,7 +135,7 @@ struct Ptr
 
     /// Allow implicit casting to a base class pointer
     template <typename BaseClass>
-    operator Ptr<BaseClass>() const noexcept                                            { return Ptr<BaseClass> (getWithIncrementedRefCount(), false); }
+    operator Ptr<BaseClass>() const noexcept                                            { return Ptr<BaseClass> (getWithIncrementedRefCount()); }
 
     /// Sets the pointer to null, releasing any object that it was pointing to.
     void reset() noexcept;
@@ -164,7 +165,7 @@ private:
 template <typename ObjectType, typename... Args>
 Ptr<ObjectType> create (Args&&... args)
 {
-    return Ptr<ObjectType> (new ObjectType (std::forward<Args> (args)...), false);
+    return Ptr<ObjectType> (new ObjectType (std::forward<Args> (args)...));
 }
 
 //==============================================================================
@@ -193,7 +194,7 @@ struct StringPtr  : public Ptr<String>
     StringPtr (StringPtr&&) = default;
     StringPtr& operator= (StringPtr&&) = default;
 
-    StringPtr (String* s, bool incrementRefCount) : Ptr<String> (s, incrementRefCount) {}
+    explicit StringPtr (String* s) : Ptr<String> (s) {}
     StringPtr (Ptr<String> p) : Ptr<String> (std::move (p)) {}
 
     std::string_view get() const            { return toString (*this); }
@@ -255,7 +256,7 @@ Ptr<Type>::~Ptr() noexcept
 template <typename Type> Ptr<Type>::Ptr (decltype(nullptr)) noexcept {}
 template <typename Type> Ptr<Type>::Ptr (const Ptr& other) noexcept  : pointer (other.pointer) { inc(); }
 template <typename Type> Ptr<Type>::Ptr (Ptr&& other) noexcept  : pointer (other.pointer) { other.pointer = nullptr; }
-template <typename Type> Ptr<Type>::Ptr (Type* target, bool shouldInc) noexcept  : pointer (target)  { if (shouldInc) inc(); }
+template <typename Type> Ptr<Type>::Ptr (Type* target) noexcept  : pointer (target) {}
 
 template <typename Type>
 Ptr<Type>& Ptr<Type>::operator= (const Ptr& other) noexcept
