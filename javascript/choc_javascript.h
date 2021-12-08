@@ -211,7 +211,7 @@ namespace choc::javascript
 namespace duktape
 {
  #include "../platform/choc_DisableAllWarnings.h"
- #include "duktape/duktape.c"
+ #include "duktape/duktape.c.inc"
  #include "../platform/choc_ReenableAllWarnings.h"
 }
 
