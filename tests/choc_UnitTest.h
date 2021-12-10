@@ -20,6 +20,8 @@
 #define CHOC_UNITTEST_HEADER_INCLUDED
 
 #include <iostream>
+#include <vector>
+#include <string>
 
 /**
     Maybe the world's smallest, simplest unit-test framework :)
