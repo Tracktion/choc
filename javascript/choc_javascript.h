@@ -178,20 +178,7 @@ template <typename PrimitiveType>
 PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
 {
     if (auto a = (*this)[index])
-    {
-        try
-        {
-            if constexpr (! (std::is_same<const PrimitiveType, const std::string>::value
-                              || std::is_same<const PrimitiveType, const std::string_view>::value
-                              || std::is_same<const PrimitiveType, const char* const>::value))
-                if (a->isString())
-                    return choc::json::parseValue (a->getString()).get<PrimitiveType>();
-
-            return a->get<PrimitiveType>();
-        }
-        catch (const std::exception&)
-        {}
-    }
+        return a->getWithDefault<PrimitiveType> (defaultValue);
 
     return defaultValue;
 }

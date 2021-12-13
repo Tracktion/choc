@@ -627,7 +627,7 @@ private:
 
     ValueView (StringDictionary&);
     template <typename TargetType> TargetType readContentAs() const;
-    template <typename TargetType> TargetType readPrimitive (Type::MainType) const;
+    template <typename TargetType> TargetType castToType (TargetType*) const;
     template <typename PrimitiveType> void setUnchecked (PrimitiveType);
 
     ValueView operator[] (const void*) const = delete;
@@ -2068,34 +2068,38 @@ ValueView create2DArrayView (ElementType* sourceData, uint32_t numArrayElements,
 template <typename TargetType>
 TargetType ValueView::readContentAs() const     { return readUnaligned<TargetType> (data); }
 
-template <typename TargetType> TargetType ValueView::readPrimitive (Type::MainType t) const
+template <typename PrimitiveType> static PrimitiveType castString (std::string_view s, PrimitiveType* defaultValue)
 {
-    switch (t)
-    {
-        case Type::MainType::int32:       return static_cast<TargetType> (readContentAs<int32_t>());
-        case Type::MainType::int64:       return static_cast<TargetType> (readContentAs<int64_t>());
-        case Type::MainType::float32:     return static_cast<TargetType> (readContentAs<float>());
-        case Type::MainType::float64:     return static_cast<TargetType> (readContentAs<double>());
-        case Type::MainType::boolean:     return static_cast<TargetType> (readContentAs<bool>());
+    if (s.empty())
+        return defaultValue != nullptr ? *defaultValue : PrimitiveType();
 
-        case Type::MainType::vector:
-        case Type::MainType::string:
-        case Type::MainType::primitiveArray:
-        case Type::MainType::complexArray:
-        case Type::MainType::object:
-        case Type::MainType::void_:
-        default:                          throwError ("Cannot convert this value to a numeric type");
-    }
+    if constexpr (matchesType<PrimitiveType, bool>())
+        if (s == "true")
+            return true;
+
+    auto start = s.data();
+    char* end;
+    PrimitiveType result;
+
+    if constexpr (matchesType<PrimitiveType, int32_t>())  result = static_cast<int32_t> (std::strtol  (start, std::addressof (end), 10));
+    if constexpr (matchesType<PrimitiveType, int64_t>())  result = static_cast<int64_t> (std::strtoll (start, std::addressof (end), 10));
+    if constexpr (matchesType<PrimitiveType, float>())    result = std::strtof (start, std::addressof (end));
+    if constexpr (matchesType<PrimitiveType, double>())   result = std::strtod (start, std::addressof (end));
+    if constexpr (matchesType<PrimitiveType, bool>())     result = std::strtol (start, std::addressof (end), 10) != 0;
+
+    if (end != start)
+        return result;
+
+    if (defaultValue == nullptr)
+        throwError ("Cannot convert this value to a numeric type");
+
+    return *defaultValue;
 }
 
-inline int32_t  ValueView::getInt32() const     { check (type.isInt32(),   "Value is not an int32");   return readContentAs<int32_t>(); }
-inline int64_t  ValueView::getInt64() const     { check (type.isInt64(),   "Value is not an int64");   return readContentAs<int64_t>(); }
-inline float    ValueView::getFloat32() const   { check (type.isFloat32(), "Value is not a float32");  return readContentAs<float>(); }
-inline double   ValueView::getFloat64() const   { check (type.isFloat64(), "Value is not a float64");  return readContentAs<double>(); }
-inline bool     ValueView::getBool() const      { check (type.isBool(),    "Value is not a bool");     return readContentAs<bool>(); }
-
-template <typename TargetType> TargetType ValueView::get() const
+template <typename TargetType> TargetType ValueView::castToType (TargetType* defaultValue) const
 {
+    (void) defaultValue;
+
     if constexpr (matchesType<TargetType, const char*>())
     {
         auto s = getString();
@@ -2107,36 +2111,60 @@ template <typename TargetType> TargetType ValueView::get() const
     }
     else if constexpr (matchesType<TargetType, uint32_t, uint64_t, size_t>())
     {
-        using SignedType = typename std::make_signed<TargetType>::type;
-        auto n = get<SignedType>();
+        if (defaultValue != nullptr)
+        {
+            using SignedType = typename std::make_signed<TargetType>::type;
+            auto signedDefault = static_cast<SignedType> (*defaultValue);
+            auto n = castToType<SignedType> (std::addressof (signedDefault));
+            return n >= 0 ? static_cast<TargetType> (n) : *defaultValue;
+        }
+
+        auto n = castToType<typename std::make_signed<TargetType>::type> (nullptr);
         check (n >= 0, "Value out of range");
         return static_cast<TargetType> (n);
     }
     else
     {
         static_assert (isPrimitiveType<TargetType>(), "The TargetType template argument must be a valid primitive type");
-        return readPrimitive<TargetType> (type.isVectorSize1() ? type.content.vector.elementType
-                                                               : type.mainType);
+
+        switch (type.isVectorSize1() ? type.content.vector.elementType
+                                     : type.mainType)
+        {
+            case Type::MainType::int32:       return static_cast<TargetType> (readContentAs<int32_t>());
+            case Type::MainType::int64:       return static_cast<TargetType> (readContentAs<int64_t>());
+            case Type::MainType::float32:     return static_cast<TargetType> (readContentAs<float>());
+            case Type::MainType::float64:     return static_cast<TargetType> (readContentAs<double>());
+            case Type::MainType::boolean:     return static_cast<TargetType> (readContentAs<bool>());
+            case Type::MainType::string:      return castString<TargetType> (getString(), defaultValue);
+
+            case Type::MainType::vector:
+            case Type::MainType::primitiveArray:
+            case Type::MainType::complexArray:
+            case Type::MainType::object:
+            case Type::MainType::void_:
+            default:
+                if (defaultValue == nullptr)
+                    throwError ("Cannot convert this value to a numeric type");
+
+                return *defaultValue;
+        }
     }
+}
+
+inline int32_t  ValueView::getInt32() const     { check (type.isInt32(),   "Value is not an int32");   return readContentAs<int32_t>(); }
+inline int64_t  ValueView::getInt64() const     { check (type.isInt64(),   "Value is not an int64");   return readContentAs<int64_t>(); }
+inline float    ValueView::getFloat32() const   { check (type.isFloat32(), "Value is not a float32");  return readContentAs<float>(); }
+inline double   ValueView::getFloat64() const   { check (type.isFloat64(), "Value is not a float64");  return readContentAs<double>(); }
+inline bool     ValueView::getBool() const      { check (type.isBool(),    "Value is not a bool");     return readContentAs<bool>(); }
+
+template <typename TargetType> TargetType ValueView::get() const
+{
+    return castToType<TargetType> (nullptr);
 }
 
 template <typename TargetType> TargetType ValueView::getWithDefault (TargetType defaultValue) const
 {
-    if constexpr (isStringType<TargetType>())
-    {
-        if (isString())
-            return TargetType (getString());
-    }
-    else
-    {
-        static_assert (isPrimitiveType<TargetType>() || matchesType<TargetType, uint32_t, uint64_t, size_t>(),
-                       "The TargetType template argument must be a valid primitive type");
-
-        if (type.isPrimitive())     return readPrimitive<TargetType> (type.mainType);
-        if (type.isVectorSize1())   return readPrimitive<TargetType> (type.content.vector.elementType);
-    }
-
-    return defaultValue;
+    return castToType<TargetType> (std::addressof (defaultValue));
 }
 
 template <typename PrimitiveType> void ValueView::setUnchecked (PrimitiveType v)
@@ -2776,7 +2804,7 @@ void Value::setMember (std::string_view name, MemberType v)
 }
 
 template <typename TargetType> TargetType Value::get() const                           { return value.get<TargetType>(); }
-template <typename TargetType> TargetType Value::getWithDefault (TargetType d) const   { return value.getWithDefault<TargetType> (std::forward (d)); }
+template <typename TargetType> TargetType Value::getWithDefault (TargetType d) const   { return value.getWithDefault<TargetType> (std::forward<TargetType> (d)); }
 
 inline ValueView::Iterator Value::begin() const    { return value.begin(); }
 inline ValueView::EndIterator Value::end() const   { return {}; }

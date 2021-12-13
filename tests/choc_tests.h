@@ -644,6 +644,28 @@ inline void testValues (TestProgress& progress)
         }
 
         {
+            CHOC_TEST (Casting)
+            CHOC_EXPECT_EQ (choc::value::createString ("1.2").get<float>(), 1.2f);
+            CHOC_EXPECT_EQ (choc::value::createString ("1.2").get<double>(), 1.2);
+            CHOC_EXPECT_EQ (choc::value::createString ("1234567").get<int32_t>(), 1234567);
+            CHOC_EXPECT_EQ (choc::value::createString ("1234567").get<uint32_t>(), 1234567u);
+            CHOC_EXPECT_EQ (choc::value::createString ("123456789012345").get<int64_t>(), 123456789012345ll);
+            CHOC_EXPECT_EQ (choc::value::createString ("123456789012345").get<uint64_t>(), 123456789012345ull);
+            CHOC_EXPECT_EQ (choc::value::createString ("1").get<bool>(), true);
+            CHOC_EXPECT_EQ (choc::value::createString ("0").get<bool>(), false);
+            CHOC_EXPECT_EQ (choc::value::createString ("true").get<bool>(), true);
+
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<float> (1.2f), 1.2f);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<double> (1.2), 1.2);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<int32_t> (123), 123);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<uint32_t> (123u), 123u);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<int64_t> (123ll), 123ll);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<uint64_t> (123ull), 123ull);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<bool> (true), true);
+            CHOC_EXPECT_EQ (choc::value::createString ("x").getWithDefault<bool> (false), false);
+        }
+
+        {
             CHOC_TEST (Serialisation)
 
             struct Serialiser
