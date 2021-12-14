@@ -2102,12 +2102,20 @@ template <typename TargetType> TargetType ValueView::castToType (TargetType* def
 
     if constexpr (matchesType<TargetType, const char*>())
     {
-        auto s = getString();
-        return s.empty() ? "" : s.data();
+        if (defaultValue == nullptr || isString())
+        {
+            auto s = getString();
+            return s.empty() ? "" : s.data();
+        }
+
+        return *defaultValue;
     }
     else if constexpr (isStringType<TargetType>())
     {
-        return TargetType (getString());
+        if (defaultValue == nullptr || isString())
+            return TargetType (getString());
+
+        return *defaultValue;
     }
     else if constexpr (matchesType<TargetType, uint32_t, uint64_t, size_t>())
     {
