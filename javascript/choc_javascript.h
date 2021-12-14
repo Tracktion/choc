@@ -376,10 +376,7 @@ struct Context::Pimpl
                 }
 
                 if (duk_is_function (ctx, index) || duk_is_lightfunc (ctx, index))
-                {
-                    CHOC_ASSERT (false); // we don't currently handle function objects
-                    return {};
-                }
+                    throw Error ("Cannot handle 'function' object type");
 
                 // Handle an object
                 duk_enum (ctx, index, DUK_ENUM_OWN_PROPERTIES_ONLY);
