@@ -19,6 +19,7 @@
 #ifndef CHOC_SINC_INTERPOLATE_HEADER_INCLUDED
 #define CHOC_SINC_INTERPOLATE_HEADER_INCLUDED
 
+#include <cmath>
 #include "choc_SampleBuffers.h"
 
 namespace choc::interpolation
