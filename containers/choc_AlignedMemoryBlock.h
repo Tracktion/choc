@@ -35,7 +35,12 @@ struct AlignedMemoryBlock
 {
     AlignedMemoryBlock() = default;
     AlignedMemoryBlock (size_t initialSize);
+    AlignedMemoryBlock (const AlignedMemoryBlock&);
+    AlignedMemoryBlock (AlignedMemoryBlock&&) noexcept;
     ~AlignedMemoryBlock();
+
+    AlignedMemoryBlock& operator= (const AlignedMemoryBlock&);
+    AlignedMemoryBlock& operator= (AlignedMemoryBlock&&) noexcept;
 
     /// Returns the aligned memory address, or nullptr if the block's size hasn't been set.
     void* data() noexcept               { return alignedPointer; }
@@ -72,13 +77,50 @@ private:
 //==============================================================================
 
 template <size_t alignmentBytes>
-inline AlignedMemoryBlock<alignmentBytes>::AlignedMemoryBlock (size_t initialSize)
+AlignedMemoryBlock<alignmentBytes>::AlignedMemoryBlock (size_t initialSize)
 {
     resize (initialSize);
 }
 
 template <size_t alignmentBytes>
-inline AlignedMemoryBlock<alignmentBytes>::~AlignedMemoryBlock()
+AlignedMemoryBlock<alignmentBytes>::AlignedMemoryBlock (const AlignedMemoryBlock& other)
+{
+    resize (other.availableSize);
+    memcpy (alignedPointer, other.alignedPointer, availableSize);
+}
+
+template <size_t alignmentBytes>
+AlignedMemoryBlock<alignmentBytes>::AlignedMemoryBlock (AlignedMemoryBlock&& other) noexcept
+   : alignedPointer (other.alignedPointer), allocatedData (other.allocatedData),
+     availableSize (other.availableSize)
+{
+    other.alignedPointer = nullptr;
+    other.allocatedData = nullptr;
+    other.availableSize = 0;
+}
+
+template <size_t alignmentBytes>
+AlignedMemoryBlock<alignmentBytes>& AlignedMemoryBlock<alignmentBytes>::operator= (const AlignedMemoryBlock& other)
+{
+    resize (other.availableSize);
+    memcpy (alignedPointer, other.alignedPointer, availableSize);
+    return *this;
+}
+
+template <size_t alignmentBytes>
+AlignedMemoryBlock<alignmentBytes>& AlignedMemoryBlock<alignmentBytes>::operator= (AlignedMemoryBlock&& other) noexcept
+{
+    alignedPointer = other.alignedPointer;
+    allocatedData = other.allocatedData;
+    availableSize = other.availableSize;
+    other.alignedPointer = nullptr;
+    other.allocatedData = nullptr;
+    other.availableSize = 0;
+    return *this;
+}
+
+template <size_t alignmentBytes>
+AlignedMemoryBlock<alignmentBytes>::~AlignedMemoryBlock()
 {
     static_assert (alignmentBytes > 0 && (alignmentBytes & (alignmentBytes - 1)) == 0,
                    "choc::AlignedMemoryBlock requires the alignment value to be a power of 2");
@@ -87,7 +129,7 @@ inline AlignedMemoryBlock<alignmentBytes>::~AlignedMemoryBlock()
 }
 
 template <size_t alignmentBytes>
-inline void AlignedMemoryBlock<alignmentBytes>::reset()
+void AlignedMemoryBlock<alignmentBytes>::reset()
 {
     delete[] allocatedData;
     allocatedData = nullptr;
@@ -96,7 +138,7 @@ inline void AlignedMemoryBlock<alignmentBytes>::reset()
 }
 
 template <size_t alignmentBytes>
-inline void AlignedMemoryBlock<alignmentBytes>::resize (size_t newSize)
+void AlignedMemoryBlock<alignmentBytes>::resize (size_t newSize)
 {
     if (newSize != size())
     {
@@ -114,7 +156,7 @@ inline void AlignedMemoryBlock<alignmentBytes>::resize (size_t newSize)
 }
 
 template <size_t alignmentBytes>
-inline void AlignedMemoryBlock<alignmentBytes>::clear() noexcept
+void AlignedMemoryBlock<alignmentBytes>::clear() noexcept
 {
     if (size() != 0)
         std::memset (data(), 0, size());
