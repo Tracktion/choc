@@ -23,6 +23,10 @@
 #include <functional>
 #include <cwctype>
 #include <stdexcept>
+#include <random>
+#ifndef __MINGW32__
+ #include <filesystem>
+#endif
 #include "../text/choc_UTF8.h"
 
 namespace choc::file
@@ -44,7 +48,50 @@ std::string loadFileAsString (const std::string& filename);
 void replaceFileWithContent (const std::string& filename,
                              std::string_view newContent);
 
+//==============================================================================
+#ifndef __MINGW32__ // sorry, MINGW doesn't seem to have std::filesystem support yet
 
+/// A self-deleting temp file or folder.
+struct TempFile
+{
+    TempFile();
+    TempFile (TempFile&&) = default;
+    TempFile& operator= (TempFile&&) = default;
+    TempFile (const TempFile&) = delete;
+    TempFile& operator= (const TempFile&) = delete;
+    ~TempFile();
+
+    /// Creates a temporary folder with the given name, which will be recursively deleted
+    /// when this object is destroyed.
+    TempFile (std::string_view subFolderName);
+
+    /// Creates the specified folder in the system temporary directory, and sets the
+    /// TempFile::file member to point to the given filename within it.
+    /// The file (but not the folder) will be deleted when this object is destroyed.
+    TempFile (std::string_view subFolderName, std::string_view filename);
+
+    /// Creates the specified folder in the system temporary directory, and sets the
+    /// TempFile::file member to be a randomly chosen filename within it, based on the
+    /// supplied file root and suffix.
+    /// The file (but not the folder) will be deleted when this object is destroyed.
+    /// So for example TempFile ("foo", "bar", "txt") may create a file with a name such
+    /// as "/tmp/foo/bar_12345.txt".
+    TempFile (std::string_view subFolderName,
+              std::string_view filenameRoot,
+              std::string_view filenameSuffix);
+
+    /// Creates a filename by adding a random integer suffix to a prefix string, and
+    /// appending a file type suffix. E.g. createRandomFilename ("foo", "txt") may
+    /// return something like "foo_12345.txt"
+    static std::string createRandomFilename (std::string_view filenameRoot,
+                                             std::string_view filenameSuffix);
+
+    /// The temp file that has been selected. When the TempFile is destroyed, this
+    /// file will be deleted (recursively if it is a folder).
+    std::filesystem::path file;
+};
+
+#endif
 
 //==============================================================================
 //        _        _           _  _
@@ -114,6 +161,51 @@ inline void replaceFileWithContent (const std::string& filename, std::string_vie
     throw Error ("Failed to open file: " + filename);
 }
 
+//==============================================================================
+#ifndef __MINGW32__ // sorry, MINGW doesn't seem to have std::filesystem support yet
+
+inline TempFile::TempFile() = default;
+
+inline TempFile::TempFile (std::string_view folder)
+{
+    file = std::filesystem::temp_directory_path();
+
+    if (! folder.empty())
+    {
+        file = file / folder;
+        create_directories (file);
+    }
+}
+
+inline TempFile::TempFile (std::string_view folder, std::string_view filename)
+  : TempFile (folder)
+{
+    file = file / filename;
+}
+
+inline TempFile::TempFile (std::string_view folder, std::string_view root, std::string_view suffix)
+  : TempFile (folder, createRandomFilename (root, suffix))
+{
+}
+
+inline std::string TempFile::createRandomFilename (std::string_view root, std::string_view suffix)
+{
+    if (! suffix.empty() && suffix[0] == '.')
+        return createRandomFilename (root, suffix.substr (1));
+
+    std::random_device seed;
+    std::mt19937 rng (seed());
+    std::uniform_int_distribution<> dist (1, 99999999);
+    auto randomID = std::to_string (static_cast<uint32_t> (dist (rng)));
+    return std::string (root) + "_" + randomID + "." + std::string (suffix);
+}
+
+inline TempFile::~TempFile()
+{
+    remove_all (file);
+}
+
+#endif
 
 } // namespace choc::file
 
