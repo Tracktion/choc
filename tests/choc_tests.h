@@ -31,6 +31,7 @@
 #include "../text/choc_UTF8.h"
 #include "../text/choc_TextTable.h"
 #include "../text/choc_Files.h"
+#include "../text/choc_Wildcard.h"
 #include "../text/choc_Base64.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_COM.h"
@@ -430,7 +431,7 @@ inline void testFileUtilities (TestProgress& progress)
     {
         CHOC_TEST (WildcardPattern)
 
-        choc::file::WildcardPattern p1 ("*.xyz;*.foo", false), p2 ("*", false), p3, p4 ("abc?.x", true);
+        choc::text::WildcardPattern p1 ("*.xyz;*.foo", false), p2 ("*", false), p3, p4 ("abc?.x", true);
 
         CHOC_EXPECT_TRUE (p1.matches ("sdf.xyz") && p1.matches ("sdf.XyZ") && p1.matches (".xyz") && p1.matches ("dfg.foo"));
         CHOC_EXPECT_FALSE (p1.matches ("sdf.xxyz") || p1.matches ("") || p1.matches ("abc.xy") || p1.matches (".xyzz"));
