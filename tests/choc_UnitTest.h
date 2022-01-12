@@ -22,6 +22,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <functional>
 
 /**
     Maybe the world's smallest, simplest unit-test framework :)
