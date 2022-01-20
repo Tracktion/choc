@@ -878,7 +878,7 @@ private:
     //==============================================================================
     Value (const void*) = delete;
     void appendData (const void*, size_t);
-    void appendValue (ValueView);
+    void appendValue (const ValueView&);
     void appendMember (std::string_view, Type&&, const void*, size_t);
     void changeMember (uint32_t, const Type&, void*, StringDictionary*);
 
@@ -2565,7 +2565,7 @@ inline void Value::appendData (const void* source, size_t size)
     value.data = packedData.data();
 }
 
-inline void Value::appendValue (ValueView newValue)
+inline void Value::appendValue (const ValueView& newValue)
 {
     auto oldSize = packedData.size();
     appendData (newValue.getRawData(), newValue.getType().getValueDataSize());
@@ -2573,8 +2573,9 @@ inline void Value::appendValue (ValueView newValue)
     if (newValue.stringDictionary != nullptr)
     {
         // this will force an update of any handles in the new data
-        newValue.setRawData (packedData.data() + oldSize);
-        newValue.setDictionary (std::addressof (dictionary));
+        ValueView v (newValue);
+        v.setRawData (packedData.data() + oldSize);
+        v.setDictionary (std::addressof (dictionary));
     }
 }
 
