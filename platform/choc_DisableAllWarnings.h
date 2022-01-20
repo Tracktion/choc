@@ -54,6 +54,7 @@
  #pragma GCC diagnostic ignored "-Wredundant-move"
  #pragma GCC diagnostic ignored "-Wstrict-aliasing"
  #pragma GCC diagnostic ignored "-Woverloaded-virtual"
+ #pragma GCC diagnostic ignored "-Wc99-extensions"
 
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
