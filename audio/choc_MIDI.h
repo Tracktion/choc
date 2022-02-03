@@ -266,16 +266,19 @@ inline ShortMessage::ShortMessage (const void* sourceData, size_t numBytes)
 
 inline uint8_t ShortMessage::length() const
 {
-    constexpr uint8_t groupLengths[] = { 3, 3, 3, 3, 2, 2, 3 };
-    constexpr uint8_t lastGroupLengths[] = { 1, 2, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    constexpr uint32_t mainGroupLengths = (3u << 0) | (3u << 2) | (3u << 4) | (3u << 6)
+                                        | (2u << 8) | (2u << 10) | (3u << 12);
+
+    constexpr uint32_t lastGroupLengths = (1u <<  0) | (2u <<  2) | (3u <<  4) | (2u <<  6)
+                                        | (1u <<  8) | (1u << 10) | (1u << 12) | (1u << 14)
+                                        | (1u << 16) | (1u << 18) | (1u << 20) | (1u << 22)
+                                        | (1u << 24) | (1u << 26) | (1u << 28) | (1u << 30);
 
     auto firstByte = data[0];
-    auto group = (firstByte >> 4) & 7;
+    auto group = static_cast<uint8_t> ((firstByte >> 4) & 7);
 
-    if (group < 7)    return groupLengths[group];
-    if (group == 7)   return lastGroupLengths[firstByte & 0xf];
-
-    return 0;
+    return static_cast<uint8_t> ((group != 7u ? (mainGroupLengths >> (2u * group))
+                                              : (lastGroupLengths >> (2u * (firstByte & 15u)))) & 3u);
 }
 
 inline uint8_t ShortMessage::size() const   { return length(); }
