@@ -396,28 +396,23 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
         value::Value parseNumber (bool negate)
         {
             auto startPos = current;
-            bool isDouble = false;
+            bool hadDot = false, hadExponent = false;
 
             for (;;)
             {
                 auto lastPos = current;
                 auto c = pop();
 
-                if (c >= '0' && c <= '9')
-                    continue;
-
-                if (! isDouble && (c == 'e' || c == 'E' || c == '.'))
-                {
-                    isDouble = true;
-                    continue;
-                }
+                if (c >= '0' && c <= '9')                        continue;
+                if (c == '.' && ! hadDot)                        { hadDot = true; continue; }
+                if (! hadExponent && (c == 'e' || c == 'E'))     { hadDot = true; hadExponent = true; continue; }
 
                 if (isWhitespace (c) || c == ',' || c == '}' || c == ']' || c == 0)
                 {
                     current = lastPos;
                     char* endOfParsedNumber = nullptr;
 
-                    if (! isDouble)
+                    if (! (hadDot || hadExponent))
                     {
                         auto v = std::strtoll (startPos.data(), &endOfParsedNumber, 10);
 
