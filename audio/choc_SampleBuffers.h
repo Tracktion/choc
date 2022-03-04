@@ -20,6 +20,7 @@
 #define CHOC_SAMPLE_BUFFERS_HEADER_INCLUDED
 
 #include <memory>
+#include <algorithm>
 #include "../platform/choc_Assert.h"
 
 /**
