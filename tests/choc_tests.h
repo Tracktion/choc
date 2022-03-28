@@ -33,6 +33,7 @@
 #include "../text/choc_Files.h"
 #include "../text/choc_Wildcard.h"
 #include "../text/choc_Base64.h"
+#include "../text/choc_xxHash.h"
 #include "../math/choc_MathHelpers.h"
 #include "../containers/choc_COM.h"
 #include "../containers/choc_DirtyList.h"
@@ -420,6 +421,81 @@ inline void testStringUtilities (TestProgress& progress)
                 CHOC_EXPECT_TRUE (testRoundTrip());
                 byte = (byte * 7 + 3);
             }
+        }
+    }
+
+    {
+        CHOC_TEST (xxHash)
+
+        struct Test
+        {
+            std::string_view input;
+            uint32_t seed;
+            uint32_t hash32;
+            uint64_t hash64;
+        };
+
+        constexpr Test tests[] = {
+            { "", 0, 0x2cc5d05u, 0xef46db3751d8e999u },
+            { "C", 1, 0xdfbce743u, 0xbb9cff53b7445da8u },
+            { "EK", 2, 0x956c6231u, 0x2057a2db0cbfa023u },
+            { "KIO", 3, 0x8269d336u, 0x878204a3ab2b0cbdu },
+            { "IKUW", 4, 0x43388fd5u, 0x99f454dbf4f8d5e9u },
+            { "KUWQS", 5, 0x5c2d65bu, 0xbdc87b641d37787cu },
+            { "USQ_][", 6, 0x3b5a98eeu, 0xa47f857228b0fc74u },
+            { "SQ_][Yg", 7, 0xf68b9027u, 0xb99cd3405c695045u },
+            { "QSUWikmo", 8, 0x6da56924u, 0x85fa50a6adfb0378u },
+            { "SUWikmoac", 9, 0xf79c62f5u, 0x19b8a3ab91ee1344u },
+            { "UkiomcageI", 10, 0xd498b3eau, 0xd6ebe7ba5c03e1d8u },
+            { "kiomcageIGM", 11, 0x87739234u, 0xb58219f701ed8e8au },
+            { "ikegacKMGICE", 12, 0xc74af22fu, 0xc16a0d06b5705ad0u },
+            { "kegacKMGICEqA", 13, 0x31a02c0cu, 0xe334f0db41934ce9u },
+            { "ecaMKIGECAq][Y", 14, 0xf8ccea89u, 0x724918b9b637bf89u },
+            { "caMKIGECAq][YWU", 15, 0x5443abd7u, 0xdd6386ed9cb516du },
+            { "acegikmo_acegikm", 16, 0x84ffaa2du, 0x9a67ab4327b988e7u },
+            { "ekioma_ecigmkQOUSY", 18, 0x10d40da9u, 0x50224b0a592395f0u },
+            { "kioma_ecigmkQOUSYW]", 19, 0x34494b81u, 0x85e378fea54379b7u },
+            { "kce_akmgiSUOQ[]WYQSMO", 21, 0xd33b77a2u, 0x28fb408b710db96eu },
+            { "ca_mkigUSQO][YWSQOM[YW", 22, 0x588fe96au, 0x6318fc8a76594d7bu },
+            { "_aceWY[]OQSUUWY[MOQSEGIK", 24, 0x4eb5e87u, 0x670d63f8b5a60384u },
+            { "aceWY[]OQSUUWY[MOQSEGIKoq", 25, 0x727bfaeau, 0xe1f5af9d6511b6dfu },
+            { "YW][QOUSWU[YOMSQGEKIqoCAECI", 27, 0x7abed4e7u, 0x6664317746e019fau },
+            { "WYSUOQY[UWQSMOIKEGACoqGICEqA", 28, 0xa4c7f508u, 0xdb11256faac2467cu },
+            { "QO[YWUSQOMKIGECAqoIGECAqomkigec", 31, 0x5d5e2778u, 0x41424284e2253e86u },
+            { "OQSUWY[]_acegikmKMOQSUWY[]_acegi", 32, 0x8cf29158u, 0x1f9a864d4c2ef30eu },
+            { "QSUWY[]_acegikmKMOQSUWY[]_acegi]_", 33, 0x8dfda7e5u, 0x5fd725e54d9d5608u },
+            { "YW][a_ecigmkMKQOUSYW][a_ecig_]cagek", 35, 0x842c29f5u, 0x2929a36df1365d1fu },
+            { "WYce_akmgiOQKMWYSU_a[]giceac]_ikegqA", 36, 0x4b3d4fbau, 0x975dcc8958c35dd9u },
+            { "ca_mkigQOMKYWUSa_][igecca_]kigeAqomIGE", 38, 0xac870e96u, 0xd6893eeacf4cf3edu },
+            { "a_mkigQOMKYWUSa_][igecca_]kigeAqomIGEC_", 39, 0xec9bab74u, 0xd5f77f507395788u },
+            { "aceSUWYKMOQcegi[]_aegik]_acCEGImoqAacegY[", 41, 0xd07660fau, 0x9ecdfb63c489228u },
+            { "cUSYWMKQOecig][a_geki_]caECIGomAqcage[Y_]A", 42, 0xeab316f2u, 0xd38549656406504du },
+            { "USYWMKQOecig][a_geki_]caECIGomAqcage[Y_]AqE", 43, 0x9c95496du, 0xaa7aa3068f97dab8u },
+            { "MKigeca_][kigeca_]IGECAqomgeca_][YECAqomkiGECAq", 47, 0xf7176037u, 0x1cbd705f76c815e9u },
+            { "KMOQSUWYmoqACEGI]_acegikikmoqACEY[]_acegIKMOQSUW", 48, 0x4bb111deu, 0xdb5ad15a8c64851eu },
+            { "MOQSUWYmoqACEGI]_acegikikmoqACEY[]_acegIKMOQSUWkm", 49, 0x354d9f5u, 0x778add70ef71bd44u },
+            { "OUSYWomAqECIG_]cagekikiomAqEC[Y_]cageKIOMSQWUmkqoC", 50, 0x2588e2d2u, 0xf9341494a5e0e8dcu },
+            { "UqAmoGICEac]_ikegmoikCEqA]_Y[egacMOIKUWQSoqkmEGACIKEG", 53, 0x4a2a2ec3u, 0xa4fc2925334eb991u },
+            { "omIGECca_]kigeomkiECAq_][YgecaOMKIWUSQqomkGECAKIGESQOMm", 55, 0x15e3bc0cu, 0x1983a0fd074d4547u },
+            { "qgeki_]caAqECkiomcage[Y_]SQWUKIOMCAGEmkqoOMSQGEKIqoCAigmka", 58, 0x8fe33c30u, 0x226cac49fa9e3291u },
+            { "gac]_CEqAmoikegac]_Y[UWQSMOIKEGACoqkmQSMOIKEGACoqkmgice_a[]WY", 61, 0xf36eac3du, 0x9f39b71c967657f5u },
+            { "]_acegikmoqACEGIKMOQSUWY[]_acegiUWY[]_acegikmoqACEGIKMOQSUWY[]_a", 64, 0xb1cca1fu, 0x6a1b54e459c4f910u },
+            { "_acegikmoqACEGIKMOQSUWY[]_acegiUWY[]_acegikmoqACEGIKMOQSUWY[]_aGI", 65, 0x1954b8d2u, 0xa7bc3d9bb019ff88u },
+            { "gekiomAqECIGMKQOUSYW][a_ecigWU[Y_]cagekiomAqECIGMKQOUSYW][a_IGMKQOU", 67, 0x1b6c90c9u, 0xe4e33001a3a5ce1au },
+            { "qomIGECQOMKYWUSa_][igec[YWUca_]kigeAqomIGECQOMKYWUSa_][MKIGUSQO][YWeca", 70, 0xba086ea7u, 0x8826868d435e6f08u },
+            { "omIGECQOMKYWUSa_][igec[YWUca_]kigeAqomIGECQOMKYWUSa_][MKIGUSQO][YWeca_m", 71, 0xbaba8050u, 0x4a74507e42327b09u },
+            { "qUSYWMKQOecig][a__]caWU[YomAqgekiMKQOECIG][a_USYWQOUSIGMKa_ecYW][qoCAigmkO", 74, 0x3334060bu, 0xef9a38af81f74e2du },
+        };
+
+        for (auto t : tests)
+        {
+            choc::hash::xxHash32 h32 (t.seed);
+            h32.addInput (t.input.data(), t.input.length());
+            CHOC_EXPECT_EQ (t.hash32, h32.getHash());
+
+            choc::hash::xxHash64 h64 (t.seed);
+            h64.addInput (t.input.data(), t.input.length());
+            CHOC_EXPECT_EQ (t.hash64, h64.getHash());
         }
     }
 }
