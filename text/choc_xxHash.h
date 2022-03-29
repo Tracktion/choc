@@ -41,12 +41,18 @@ public:
     /// hash value.
     explicit xxHash32 (uint32_t seed = 0);
 
+    xxHash32 (const xxHash32&) = default;
+    xxHash32& operator= (const xxHash32&) = default;
+
     /// Performs a hash on a single chunk of memory and returns the result with
     /// one function call.
     static uint32_t hash (const void* inputData, size_t numBytes, uint32_t seed = 0);
 
     /// Feeds a chunk of data into the hash state.
     void addInput (const void* inputData, size_t numBytes) noexcept;
+
+    /// Adds a string to the hash state.
+    void addInput (std::string_view) noexcept;
 
     /// Returns the finished hash value.
     uint32_t getHash() const;
@@ -88,12 +94,18 @@ public:
     /// hash value.
     explicit xxHash64 (uint64_t seed = 0);
 
+    xxHash64 (const xxHash64&) = default;
+    xxHash64& operator= (const xxHash64&) = default;
+
     /// Performs a hash on a single chunk of memory and returns the result with
     /// one function call.
     static uint64_t hash (const void* inputData, size_t numBytes, uint64_t seed = 0);
 
     /// Feeds a chunk of data into the hash state.
     void addInput (const void* inputData, size_t numBytes) noexcept;
+
+    /// Adds a string to the hash state.
+    void addInput (std::string_view) noexcept;
 
     /// Returns the finished hash value.
     uint64_t getHash() const;
@@ -137,14 +149,14 @@ static inline uint64_t rotl (uint64_t value, uint32_t numBits) noexcept  { retur
 
 inline xxHash32::xxHash32 (uint32_t seed)  : state (seed) {}
 
-uint32_t xxHash32::hash (const void* inputData, size_t numBytes, uint32_t seed)
+inline uint32_t xxHash32::hash (const void* inputData, size_t numBytes, uint32_t seed)
 {
     xxHash32 h (seed);
     h.addInput (inputData, numBytes);
     return h.getHash();
 }
 
-void xxHash32::addInput (const void* inputData, size_t numBytes) noexcept
+inline void xxHash32::addInput (const void* inputData, size_t numBytes) noexcept
 {
     if (inputData == nullptr || numBytes == 0)
         return;
@@ -182,7 +194,9 @@ void xxHash32::addInput (const void* inputData, size_t numBytes) noexcept
     memcpy (currentBlock, input, currentBlockSize);
 }
 
-uint32_t xxHash32::getHash() const
+inline void xxHash32::addInput (std::string_view s) noexcept   { addInput (s.data(), s.length()); }
+
+inline uint32_t xxHash32::getHash() const
 {
     auto hash = static_cast<uint32_t> (totalLength);
 
@@ -231,14 +245,14 @@ inline void xxHash32::State::process (const void* block) noexcept
 //==============================================================================
 inline xxHash64::xxHash64 (uint64_t seed)  : state (seed) {}
 
-uint64_t xxHash64::hash (const void* inputData, size_t numBytes, uint64_t seed)
+inline uint64_t xxHash64::hash (const void* inputData, size_t numBytes, uint64_t seed)
 {
     xxHash64 h (seed);
     h.addInput (inputData, numBytes);
     return h.getHash();
 }
 
-void xxHash64::addInput (const void* inputData, size_t numBytes) noexcept
+inline void xxHash64::addInput (const void* inputData, size_t numBytes) noexcept
 {
     if (inputData == nullptr || numBytes == 0)
         return;
@@ -276,7 +290,9 @@ void xxHash64::addInput (const void* inputData, size_t numBytes) noexcept
     memcpy (currentBlock, input, currentBlockSize);
 }
 
-uint64_t xxHash64::getHash() const
+inline void xxHash64::addInput (std::string_view s) noexcept   { addInput (s.data(), s.length()); }
+
+inline uint64_t xxHash64::getHash() const
 {
     uint64_t hash;
 
