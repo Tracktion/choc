@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../platform/choc_DetectDebugger.h"
 #include "../platform/choc_Platform.h"
 #include "../platform/choc_SpinLock.h"
 #include "../platform/choc_DynamicLibrary.h"
@@ -78,6 +79,45 @@ namespace choc::test
 bool runAllTests (TestProgress&);
 
 
+inline void testPlatform (TestProgress& progress)
+{
+    CHOC_CATEGORY (Platform);
+
+    {
+        CHOC_TEST (DetectDebugger)
+        CHOC_EXPECT_FALSE (choc::isDebuggerActive());
+    }
+
+    {
+        CHOC_TEST (Endianness)
+
+        auto a = 0x0102030405060708ull;
+        uint8_t buffer[16];
+
+        choc::memory::writeNativeEndian (buffer, a);
+        CHOC_EXPECT_EQ (a, choc::memory::readNativeEndian<decltype(a)> (buffer));
+
+        choc::memory::writeLittleEndian (buffer, a);
+        CHOC_EXPECT_EQ (buffer[0], 8);
+        CHOC_EXPECT_EQ (buffer[1], 7);
+        CHOC_EXPECT_EQ (buffer[6], 2);
+        CHOC_EXPECT_EQ (buffer[7], 1);
+        CHOC_EXPECT_EQ (choc::memory::readLittleEndian<decltype(a)> (buffer), a);
+
+        choc::memory::writeBigEndian (buffer, a);
+        CHOC_EXPECT_EQ (buffer[0], 1);
+        CHOC_EXPECT_EQ (buffer[1], 2);
+        CHOC_EXPECT_EQ (buffer[6], 7);
+        CHOC_EXPECT_EQ (buffer[7], 8);
+        CHOC_EXPECT_EQ (choc::memory::readBigEndian<decltype(a)> (buffer), a);
+
+        CHOC_EXPECT_EQ (choc::memory::bitcast<uint64_t> (1.0), 0x3ff0000000000000ull);
+        CHOC_EXPECT_EQ (choc::memory::bitcast<double> (0x3ff0000000000000ull), 1.0);
+        CHOC_EXPECT_EQ (choc::memory::bitcast<uint32_t> (1.0f), 0x3f800000u);
+        CHOC_EXPECT_EQ (choc::memory::bitcast<float> (0x3f800000u), 1.0f);
+    }
+}
+
 //==============================================================================
 inline void testContainerUtils (TestProgress& progress)
 {
@@ -118,35 +158,6 @@ inline void testContainerUtils (TestProgress& progress)
         CHOC_EXPECT_TRUE (c == f1);
         c = f2;
         CHOC_EXPECT_TRUE (c == f2);
-    }
-
-    {
-        CHOC_TEST (Endianness)
-
-        auto a = 0x0102030405060708ull;
-        uint8_t buffer[16];
-
-        choc::memory::writeNativeEndian (buffer, a);
-        CHOC_EXPECT_EQ (a, choc::memory::readNativeEndian<decltype(a)> (buffer));
-
-        choc::memory::writeLittleEndian (buffer, a);
-        CHOC_EXPECT_EQ (buffer[0], 8);
-        CHOC_EXPECT_EQ (buffer[1], 7);
-        CHOC_EXPECT_EQ (buffer[6], 2);
-        CHOC_EXPECT_EQ (buffer[7], 1);
-        CHOC_EXPECT_EQ (choc::memory::readLittleEndian<decltype(a)> (buffer), a);
-
-        choc::memory::writeBigEndian (buffer, a);
-        CHOC_EXPECT_EQ (buffer[0], 1);
-        CHOC_EXPECT_EQ (buffer[1], 2);
-        CHOC_EXPECT_EQ (buffer[6], 7);
-        CHOC_EXPECT_EQ (buffer[7], 8);
-        CHOC_EXPECT_EQ (choc::memory::readBigEndian<decltype(a)> (buffer), a);
-
-        CHOC_EXPECT_EQ (choc::memory::bitcast<uint64_t> (1.0), 0x3ff0000000000000ull);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<double> (0x3ff0000000000000ull), 1.0);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<uint32_t> (1.0f), 0x3f800000u);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<float> (0x3f800000u), 1.0f);
     }
 
     {
@@ -1863,6 +1874,7 @@ inline void testCOM (TestProgress& progress)
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
+    testPlatform (progress);
     testContainerUtils (progress);
     testStringUtilities (progress);
     testFileUtilities (progress);
