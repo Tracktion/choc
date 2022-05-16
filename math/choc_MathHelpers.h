@@ -24,11 +24,10 @@
 #ifdef _MSC_VER
  #include <intrin.h>
  #pragma intrinsic (_umul128)
+ #pragma intrinsic (_BitScanReverse)
 
  #ifdef _WIN64
   #pragma intrinsic (_BitScanReverse64)
- #else
-  #pragma intrinsic (_BitScanReverse)
  #endif
 #endif
 
@@ -40,7 +39,21 @@ namespace choc::math
 template <typename Integer>
 constexpr bool isPowerOf2 (Integer n)       { return n > 0 && (n & (n - 1)) == 0; }
 
-/// Returns the number of contiguously-clear upper bits in a 64-bit value
+// Returns the number of contiguously-clear upper bits in a 32-bit value
+/// Note this operation is undefined for value == 0!
+inline uint32_t countUpperClearBits (uint32_t value)
+{
+   #ifdef _MSC_VER
+    unsigned long result = 0;
+    _BitScanReverse (&result, static_cast<unsigned long> (value));
+    return static_cast<uint32_t> (31u - result);
+   #else
+    return static_cast<uint32_t> (__builtin_clz (value));
+   #endif
+}
+
+/// Returns the number of contiguously-clear upper bits in a 64-bit value.
+/// Note this operation is undefined for value == 0!
 inline uint32_t countUpperClearBits (uint64_t value)
 {
    #ifdef _MSC_VER

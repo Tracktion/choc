@@ -116,6 +116,19 @@ inline void testPlatform (TestProgress& progress)
         CHOC_EXPECT_EQ (choc::memory::bitcast<uint32_t> (1.0f), 0x3f800000u);
         CHOC_EXPECT_EQ (choc::memory::bitcast<float> (0x3f800000u), 1.0f);
     }
+
+    {
+        CHOC_TEST (ClearBitCount)
+
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint32_t) 1), 31u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 1), 63u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint32_t) 0x700000), 9u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint32_t) 0xffffffff), 0u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0x700000), 32u + 9u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0xffffffffull), 32u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0x70000000000000ull), 9u);
+        CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0xffffffff00000000ull), 0u);
+    }
 }
 
 //==============================================================================
