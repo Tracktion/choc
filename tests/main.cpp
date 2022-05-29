@@ -17,9 +17,81 @@
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "choc_tests.h"
+#include "../gui/choc_WebView.h"
 
-int main()
+
+static void testWebView()
 {
+    choc::webview::WebView w;
+
+    w.setWindowTitle ("Hello");
+
+    w.setResizable (true);
+    w.setMinimumSize (300, 300);
+    w.setMaximumSize (1000, 1000);
+    w.centreWithSize (800, 600);
+
+    w.bind ("eventCallbackFn", [] (const choc::value::ValueView& args) -> choc::value::Value
+    {
+        auto message = "eventCallbackFn() called with args: " + choc::json::toString (args);
+
+        // This just shows how to invoke an async callback
+        choc::messageloop::postMessage ([message]
+        {
+            std::cout << "WebView callback message: " << message << std::endl;
+        });
+
+        return choc::value::createString (message);
+    });
+
+    w.bind ("loadCHOCWebsite", [&w] (const choc::value::ValueView&) -> choc::value::Value
+    {
+        w.navigate ("https://github.com/Tracktion/choc");
+        return {};
+    });
+
+    w.setHTML (R"xxx(
+      <!DOCTYPE html> <html>
+        <head> <title>Page Title</title> </head>
+        <script>
+          var eventCounter = 0;
+
+          // invokes a call to eventCallbackFn() and displays the return value
+          function sendEvent()
+          {
+            // When you invoke a function, it returns a Promise object
+            eventCallbackFn({ counter: ++eventCounter }, "Hello World")
+              .then ((result) => { document.getElementById ("eventResultDisplay").innerText = result; });
+          }
+        </script>
+
+        <body>
+          <h1>CHOC WebView Demo</h1>
+          <p>This is a demo of a choc::webview::WebView window</p>
+          <p><button onclick="sendEvent()">Click to invoke an event callback</button></p>
+          <p><button onclick="loadCHOCWebsite()">Click to visit the CHOC github repo</button></p>
+          <p id="eventResultDisplay"></p>
+        </body>
+      </html>
+    )xxx");
+
+    w.windowClosed = [] { choc::messageloop::stop(); };
+
+    w.toFront();
+    choc::messageloop::run();
+}
+
+int main (int argc, const char** argv)
+{
+    for (int i = 0; i < argc; ++i)
+    {
+        if (std::string_view (argv[i]) == "webview")
+        {
+            testWebView();
+            return 0;
+        }
+    }
+
     choc::test::TestProgress progress;
     return choc::test::runAllTests (progress) ? 0 : 1;
 }

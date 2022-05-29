@@ -21,7 +21,7 @@ Basically CHOC is aimed at people (like me) who just want to use some decent lib
 
 The library is getting quite big now. Some of its many delights include:
 
-##### Miscellaneous
+#### Miscellaneous
 
 - A tiny [platform-detection](./platform/choc_Platform.h) header.
 - A fast, round-trip-accurate [float/double to string converter](./text/choc_FloatToString.h).
@@ -33,7 +33,7 @@ The library is getting quite big now. Some of its many delights include:
 - Various maths and bit-twiddling [bits and bobs](./math/choc_MathHelpers.h).
 - A system for easily adding and collecting all the [open-source licenses](./text/choc_OpenSourceLicenseList.h) that your project uses into a single string for displaying to a user (for license compliance).
 
-##### Text and Files
+#### Text and Files
 
 - [Utterly basic string stuff](./text/choc_StringUtilities.h) like trimming, splitting, joining, comparisons, etc. For god's sake, I shouldn't need to write my own library just to trim a string...
 - Some [more esoteric](./text/choc_StringUtilities.h) string utilities like pretty-printing durations and sizes, URI encoding, etc.
@@ -47,7 +47,7 @@ The library is getting quite big now. Some of its many delights include:
 - Some [integer compression and zigzag encoding](./platform/choc_VariableLengthEncoding.h) functions.
 - An implementation of the [xxHash](./text/choc_xxHash.h) very-fast-but-pretty-secure hash algorithm.
 
-##### Containers
+#### Containers
 
 - A [span](./containers/choc_Span.h) class to fill the gap until we can finally use `std::span`.
 - Some [type and value](./containers/choc_Value.h) classes which can represent typed values, but also build them dynamically, serialise them to a compact binary format (or as JSON).
@@ -57,12 +57,21 @@ The library is getting quite big now. Some of its many delights include:
 - A range of atomic FIFOs, and a handy [variable size object FIFO](./containers/choc_VariableSizeFIFO.h) for handling queues of heterogenous objects without locking.
 - A lock-free [dirty list](./containers/choc_DirtyList.h) for efficiently queueing up objects that need some attention.
 
-##### Scripting and JSON
+#### GUI
+
+- Some bare-bones [message loop](./gui/choc_MessageLoop.h) control functions.
+- The world's most hassle-free single-header [WebView](./gui/choc_WebView.h) class!
+
+  This lets you create an embedded browser view (either as a desktop window or added to an existing window), and interact with it by invoking javascript code and binding callback C++ functions to be called by javascript. Something that makes this particularly special compared to other web-view libraries is that on Windows, it provides the modern Edge browser without you needing to install extra SDKs to compile it, and without any need to link or redistribute the Microsoft loader DLLs - it's literally a *dependency-free single-header Edge implementation*. (Internally, some absolutely hideous shenanegans are involved to make this possible!)
+
+  To try it out, if you compile the choc/tests project and run it with the command-line arg "webview", it pops up an example page and shows how to do some event-handling.
+
+#### Scripting and JSON
 
 - A [JSON](./text/choc_JSON.h) parser that uses choc::value::Value objects.
 - A [Javascript](./javascript/choc_javascript.h) interpreter (which is a header-only encapsulation of the duktape library).
 
-##### Audio
+#### Audio
 
 - Some [audio buffer classes](./audio/choc_SampleBuffers.h) for managing blocks of multi-channel sample data. These can flexibly handle both owned buffers and non-owned views in either packed/interleaved or separate-channel formats.
 - Utility classes for handling [MIDI messages](./audio/choc_MIDI.h), [MIDI sequences](./audio/choc_MIDISequence.h) and [MIDI files](./.audio/choc_MIDIFile.h).
@@ -74,7 +83,7 @@ The library is getting quite big now. Some of its many delights include:
 
 -----------------------------------------------------------------------
 
-Hopefully some of you will find some of these things useful! If you like it, please tell your friends! If you think you're up to contributing, that's great, but be aware that anything other than an utterly immaculate pull request will be given short shrift :)
+Hopefully some people will find some of these things useful! If you like it, please tell your friends! If you think you're up to contributing, that's great, but be aware that anything other than an utterly immaculate pull request will be given short shrift :)
 
 -- Jules
 

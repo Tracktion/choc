@@ -59,6 +59,19 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     target_compile_features(choc_tests PRIVATE cxx_std_20)
 endif()
 
+# On OSX, need to add the WebKit framework for WebView functionality
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_link_libraries(choc_tests "-framework WebKit")
+endif ()
+
+# This is an example of how to link the packages required for WebView on Linux
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules (gtk3 REQUIRED gtk+-3.0 IMPORTED_TARGET)
+    pkg_check_modules (webkit2 REQUIRED webkit2gtk-4.0 IMPORTED_TARGET)
+    target_link_libraries (choc_tests PUBLIC PkgConfig::gtk3 PkgConfig::webkit2)
+endif ()
+
 install(TARGETS choc_tests)
 
 enable_testing()
