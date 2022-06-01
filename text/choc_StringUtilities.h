@@ -26,6 +26,7 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
+#include <cwctype>
 #include "../platform/choc_Assert.h"
 
 namespace choc::text
