@@ -92,6 +92,19 @@ inline void testPlatform (TestProgress& progress)
     {
         CHOC_TEST (Endianness)
 
+        {
+            union { uint32_t i; char c[4]; } n;
+            n.i = 0x01020304;
+
+           #if CHOC_LITTLE_ENDIAN
+            CHOC_EXPECT_EQ (n.c[0], 4);
+           #endif
+
+           #if CHOC_BIG_ENDIAN
+            CHOC_EXPECT_EQ (n.c[0], 1);
+           #endif
+        }
+
         auto a = 0x0102030405060708ull;
         uint8_t buffer[16];
 

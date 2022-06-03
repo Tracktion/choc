@@ -71,7 +71,16 @@ void writeLittleEndian (void* destBuffer, Type valueToWrite);
 template <typename Type>
 void writeBigEndian (void* destBuffer, Type valueToWrite);
 
-
+//==============================================================================
+// This will define some macros CHOC_BIG_ENDIAN and CHOC_LITTLE_ENDIAN that
+// should be pretty reliable on most platforms
+#if (defined (__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || __BIG_ENDIAN__
+ #define CHOC_LITTLE_ENDIAN 0
+ #define CHOC_BIG_ENDIAN    1
+#else
+ #define CHOC_LITTLE_ENDIAN 1
+ #define CHOC_BIG_ENDIAN    0
+#endif
 
 //==============================================================================
 //        _        _           _  _
@@ -104,62 +113,76 @@ inline Type readNativeEndian (const void* source)
 template <typename Type>
 inline Type readLittleEndian (const void* source)
 {
-    auto src = static_cast<const uint8_t*> (source);
-
-    if constexpr (sizeof (Type) == 8)
+    if constexpr (CHOC_LITTLE_ENDIAN)
     {
-        return bitcast<Type> (static_cast<uint64_t> (src[0])
-                           | (static_cast<uint64_t> (src[1]) << 8)
-                           | (static_cast<uint64_t> (src[2]) << 16)
-                           | (static_cast<uint64_t> (src[3]) << 24)
-                           | (static_cast<uint64_t> (src[4]) << 32)
-                           | (static_cast<uint64_t> (src[5]) << 40)
-                           | (static_cast<uint64_t> (src[6]) << 48)
-                           | (static_cast<uint64_t> (src[7]) << 56));
-    }
-    else if constexpr (sizeof (Type) == 4)
-    {
-        return bitcast<Type> (static_cast<uint32_t> (src[0])
-                           | (static_cast<uint32_t> (src[1]) << 8)
-                           | (static_cast<uint32_t> (src[2]) << 16)
-                           | (static_cast<uint32_t> (src[3]) << 24));
+        return readNativeEndian<Type> (source);
     }
     else
     {
-        static_assert (sizeof (Type) == 2, "unsupported size");
-        return static_cast<Type> (static_cast<uint16_t> (src[0])
-                               | (static_cast<uint16_t> (src[1]) << 8));
+        auto src = static_cast<const uint8_t*> (source);
+
+        if constexpr (sizeof (Type) == 8)
+        {
+            return bitcast<Type> (static_cast<uint64_t> (src[0])
+                            | (static_cast<uint64_t> (src[1]) << 8)
+                            | (static_cast<uint64_t> (src[2]) << 16)
+                            | (static_cast<uint64_t> (src[3]) << 24)
+                            | (static_cast<uint64_t> (src[4]) << 32)
+                            | (static_cast<uint64_t> (src[5]) << 40)
+                            | (static_cast<uint64_t> (src[6]) << 48)
+                            | (static_cast<uint64_t> (src[7]) << 56));
+        }
+        else if constexpr (sizeof (Type) == 4)
+        {
+            return bitcast<Type> (static_cast<uint32_t> (src[0])
+                            | (static_cast<uint32_t> (src[1]) << 8)
+                            | (static_cast<uint32_t> (src[2]) << 16)
+                            | (static_cast<uint32_t> (src[3]) << 24));
+        }
+        else
+        {
+            static_assert (sizeof (Type) == 2, "unsupported size");
+            return static_cast<Type> (static_cast<uint16_t> (src[0])
+                                | (static_cast<uint16_t> (src[1]) << 8));
+        }
     }
 }
 
 template <typename Type>
 inline Type readBigEndian (const void* source)
 {
-    auto src = static_cast<const uint8_t*> (source);
-
-    if constexpr (sizeof (Type) == 8)
+    if constexpr (CHOC_BIG_ENDIAN)
     {
-        return bitcast<Type> (static_cast<uint64_t> (src[7])
-                           | (static_cast<uint64_t> (src[6]) << 8)
-                           | (static_cast<uint64_t> (src[5]) << 16)
-                           | (static_cast<uint64_t> (src[4]) << 24)
-                           | (static_cast<uint64_t> (src[3]) << 32)
-                           | (static_cast<uint64_t> (src[2]) << 40)
-                           | (static_cast<uint64_t> (src[1]) << 48)
-                           | (static_cast<uint64_t> (src[0]) << 56));
-    }
-    else if constexpr (sizeof (Type) == 4)
-    {
-        return bitcast<Type> (static_cast<uint32_t> (src[3])
-                           | (static_cast<uint32_t> (src[2]) << 8)
-                           | (static_cast<uint32_t> (src[1]) << 16)
-                           | (static_cast<uint32_t> (src[0]) << 24));
+        return readNativeEndian<Type> (source);
     }
     else
     {
-        static_assert (sizeof (Type) == 2, "unsupported size");
-        return static_cast<Type> (static_cast<uint16_t> (src[1])
-                               | (static_cast<uint16_t> (src[0]) << 8));
+        auto src = static_cast<const uint8_t*> (source);
+
+        if constexpr (sizeof (Type) == 8)
+        {
+            return bitcast<Type> (static_cast<uint64_t> (src[7])
+                            | (static_cast<uint64_t> (src[6]) << 8)
+                            | (static_cast<uint64_t> (src[5]) << 16)
+                            | (static_cast<uint64_t> (src[4]) << 24)
+                            | (static_cast<uint64_t> (src[3]) << 32)
+                            | (static_cast<uint64_t> (src[2]) << 40)
+                            | (static_cast<uint64_t> (src[1]) << 48)
+                            | (static_cast<uint64_t> (src[0]) << 56));
+        }
+        else if constexpr (sizeof (Type) == 4)
+        {
+            return bitcast<Type> (static_cast<uint32_t> (src[3])
+                            | (static_cast<uint32_t> (src[2]) << 8)
+                            | (static_cast<uint32_t> (src[1]) << 16)
+                            | (static_cast<uint32_t> (src[0]) << 24));
+        }
+        else
+        {
+            static_assert (sizeof (Type) == 2, "unsupported size");
+            return static_cast<Type> (static_cast<uint16_t> (src[1])
+                                | (static_cast<uint16_t> (src[0]) << 8));
+        }
     }
 }
 
@@ -172,74 +195,88 @@ inline void writeNativeEndian (void* dest, Type source)
 template <typename Type>
 inline void writeLittleEndian (void* dest, Type source)
 {
-    auto dst = static_cast<uint8_t*> (dest);
-
-    if constexpr (sizeof (Type) == 8)
+    if constexpr (CHOC_LITTLE_ENDIAN)
     {
-        auto n = bitcast<uint64_t> (source);
-
-        dst[0] = static_cast<uint8_t> (n);
-        dst[1] = static_cast<uint8_t> (n >> 8);
-        dst[2] = static_cast<uint8_t> (n >> 16);
-        dst[3] = static_cast<uint8_t> (n >> 24);
-        dst[4] = static_cast<uint8_t> (n >> 32);
-        dst[5] = static_cast<uint8_t> (n >> 40);
-        dst[6] = static_cast<uint8_t> (n >> 48);
-        dst[7] = static_cast<uint8_t> (n >> 56);
-    }
-    else if constexpr (sizeof (Type) == 4)
-    {
-        auto n = bitcast<uint32_t> (source);
-
-        dst[0] = static_cast<uint8_t> (n);
-        dst[1] = static_cast<uint8_t> (n >> 8);
-        dst[2] = static_cast<uint8_t> (n >> 16);
-        dst[3] = static_cast<uint8_t> (n >> 24);
+        return writeNativeEndian<Type> (dest, source);
     }
     else
     {
-        static_assert (sizeof (Type) == 2, "unsupported size");
-        auto n = static_cast<uint16_t> (source);
+        auto dst = static_cast<uint8_t*> (dest);
 
-        dst[0] = static_cast<uint8_t> (n);
-        dst[1] = static_cast<uint8_t> (n >> 8);
+        if constexpr (sizeof (Type) == 8)
+        {
+            auto n = bitcast<uint64_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n);
+            dst[1] = static_cast<uint8_t> (n >> 8);
+            dst[2] = static_cast<uint8_t> (n >> 16);
+            dst[3] = static_cast<uint8_t> (n >> 24);
+            dst[4] = static_cast<uint8_t> (n >> 32);
+            dst[5] = static_cast<uint8_t> (n >> 40);
+            dst[6] = static_cast<uint8_t> (n >> 48);
+            dst[7] = static_cast<uint8_t> (n >> 56);
+        }
+        else if constexpr (sizeof (Type) == 4)
+        {
+            auto n = bitcast<uint32_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n);
+            dst[1] = static_cast<uint8_t> (n >> 8);
+            dst[2] = static_cast<uint8_t> (n >> 16);
+            dst[3] = static_cast<uint8_t> (n >> 24);
+        }
+        else
+        {
+            static_assert (sizeof (Type) == 2, "unsupported size");
+            auto n = static_cast<uint16_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n);
+            dst[1] = static_cast<uint8_t> (n >> 8);
+        }
     }
 }
 
 template <typename Type>
 inline void writeBigEndian (void* dest, Type source)
 {
-    auto dst = static_cast<uint8_t*> (dest);
-
-    if constexpr (sizeof (Type) == 8)
+    if constexpr (CHOC_BIG_ENDIAN)
     {
-        auto n = bitcast<uint64_t> (source);
-
-        dst[0] = static_cast<uint8_t> (n >> 56);
-        dst[1] = static_cast<uint8_t> (n >> 48);
-        dst[2] = static_cast<uint8_t> (n >> 40);
-        dst[3] = static_cast<uint8_t> (n >> 32);
-        dst[4] = static_cast<uint8_t> (n >> 24);
-        dst[5] = static_cast<uint8_t> (n >> 16);
-        dst[6] = static_cast<uint8_t> (n >> 8);
-        dst[7] = static_cast<uint8_t> (n);
-    }
-    else if constexpr (sizeof (Type) == 4)
-    {
-        auto n = bitcast<uint32_t> (source);
-
-        dst[0] = static_cast<uint8_t> (n >> 24);
-        dst[1] = static_cast<uint8_t> (n >> 16);
-        dst[2] = static_cast<uint8_t> (n >> 8);
-        dst[3] = static_cast<uint8_t> (n);
+        return writeNativeEndian<Type> (dest, source);
     }
     else
     {
-        static_assert (sizeof (Type) == 2, "unsupported size");
-        auto n = static_cast<uint16_t> (source);
+        auto dst = static_cast<uint8_t*> (dest);
 
-        dst[0] = static_cast<uint8_t> (n >> 8);
-        dst[1] = static_cast<uint8_t> (n);
+        if constexpr (sizeof (Type) == 8)
+        {
+            auto n = bitcast<uint64_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n >> 56);
+            dst[1] = static_cast<uint8_t> (n >> 48);
+            dst[2] = static_cast<uint8_t> (n >> 40);
+            dst[3] = static_cast<uint8_t> (n >> 32);
+            dst[4] = static_cast<uint8_t> (n >> 24);
+            dst[5] = static_cast<uint8_t> (n >> 16);
+            dst[6] = static_cast<uint8_t> (n >> 8);
+            dst[7] = static_cast<uint8_t> (n);
+        }
+        else if constexpr (sizeof (Type) == 4)
+        {
+            auto n = bitcast<uint32_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n >> 24);
+            dst[1] = static_cast<uint8_t> (n >> 16);
+            dst[2] = static_cast<uint8_t> (n >> 8);
+            dst[3] = static_cast<uint8_t> (n);
+        }
+        else
+        {
+            static_assert (sizeof (Type) == 2, "unsupported size");
+            auto n = static_cast<uint16_t> (source);
+
+            dst[0] = static_cast<uint8_t> (n >> 8);
+            dst[1] = static_cast<uint8_t> (n);
+        }
     }
 }
 
