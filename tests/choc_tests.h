@@ -143,6 +143,30 @@ inline void testPlatform (TestProgress& progress)
         CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0x70000000000000ull), 9u);
         CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0xffffffff00000000ull), 0u);
     }
+
+    {
+        CHOC_TEST (DynamicLibrary)
+
+       #if CHOC_WINDOWS
+        if (auto kernel = choc::file::DynamicLibrary ("Kernel32.dll"))
+        {
+            CHOC_EXPECT_TRUE (kernel);
+            auto k2 = std::move (kernel);
+            CHOC_EXPECT_TRUE (k2.findFunction ("GetSystemTime") != nullptr);
+            CHOC_EXPECT_TRUE (k2.findFunction ("XYZ") == nullptr);
+        }
+        else
+        {
+            CHOC_FAIL ("Failed to load kernel32");
+        }
+       #endif
+
+       #if ! CHOC_LINUX // (can't seem to get this to link in github actions)
+        choc::file::DynamicLibrary nope ("foo123487654");
+        CHOC_EXPECT_TRUE (! nope);
+        CHOC_EXPECT_TRUE (nope.findFunction ("xyz") == nullptr);
+       #endif
+    }
 }
 
 //==============================================================================
