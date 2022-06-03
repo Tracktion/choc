@@ -463,6 +463,11 @@ inline void testStringUtilities (TestProgress& progress)
     }
 
     {
+        CHOC_TEST (URIEncoding)
+        CHOC_EXPECT_EQ (choc::text::percentEncodeURI ("ABC://``\\123-abc~-xyz"), "ABC%3a%2f%2f%60%60%5c123-abc~-xyz");
+    }
+
+    {
         CHOC_TEST (xxHash)
 
         struct Test
