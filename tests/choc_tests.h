@@ -52,6 +52,7 @@
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
 #include "../audio/choc_SampleBuffers.h"
+#include "../audio/choc_AudioSampleData.h"
 #include "../audio/choc_SincInterpolator.h"
 #include "../audio/choc_SampleBufferUtilities.h"
 #include "../audio/choc_AudioMIDIBlockDispatcher.h"
@@ -1571,6 +1572,75 @@ inline void testChannelSets (TestProgress& progress)
     }
 }
 
+
+//==============================================================================
+template <typename Format, typename Buffer>
+inline void testIntToFloatBuffer (TestProgress& progress, Buffer& buffer, uint32_t sampleStride)
+{
+    std::vector<uint8_t> data;
+    data.resize (buffer.getNumChannels() * buffer.getNumFrames() * sampleStride);
+    auto b2 = buffer;
+    auto b3 = buffer;
+
+    choc::audio::sampledata::copyToInterleavedIntData<Format> (data.data(), sampleStride, buffer);
+    choc::audio::sampledata::copyFromInterleavedIntData<Format> (b2, data.data(), sampleStride);
+    choc::audio::sampledata::copyToInterleavedIntData<Format> (data.data(), sampleStride, b2);
+    choc::audio::sampledata::copyFromInterleavedIntData<Format> (b3, data.data(), sampleStride);
+
+    CHOC_EXPECT_EQ (true, contentMatches (b2, b3));
+}
+
+template <typename Format>
+inline void testIntToFloatFormat (TestProgress& progress)
+{
+    std::array testValues { 10.0f, 1.1f, 1.0f, 0.99f, 0.8f, 0.6f, 0.5f, 0.3f, 0.2f, 0.01f, 0.0f };
+    char data[8];
+
+    for (auto f1 : testValues)
+    {
+        {
+            Format::write (data, f1);
+            auto f2 = Format::template read<float> (data);
+            Format::write (data, f2);
+            auto f3 = Format::template read<float> (data);
+            CHOC_EXPECT_EQ (f2, f3);
+        }
+
+        {
+            Format::write (data, -f1);
+            auto f2 = Format::template read<float> (data);
+            Format::write (data, f2);
+            auto f3 = Format::template read<float> (data);
+            CHOC_EXPECT_EQ (f2, f3);
+        }
+    }
+
+    for (uint32_t numChans = 1; numChans < 4; ++numChans)
+    {
+        const uint32_t numFrames = 32;
+        size_t testIndex = 0;
+
+        auto source = choc::buffer::createChannelArrayBuffer (numChans, numFrames, [&]
+        {
+            ++testIndex;
+            return testValues[testIndex % testValues.size()] * ((testIndex & 1) ? -1.0f : 1.0f);
+        });
+
+        testIntToFloatBuffer<Format> (progress, source, Format::sizeInBytes);
+    }
+}
+
+inline void testIntToFloat (TestProgress& progress)
+{
+    { CHOC_TEST(Int8);               testIntToFloatFormat<choc::audio::sampledata::Int8> (progress); }
+    { CHOC_TEST(Int16LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int16LittleEndian> (progress); }
+    { CHOC_TEST(Int16BigEndian);     testIntToFloatFormat<choc::audio::sampledata::Int16BigEndian> (progress); }
+    { CHOC_TEST(Int24LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int24LittleEndian> (progress); }
+    { CHOC_TEST(Int24BigEndian);     testIntToFloatFormat<choc::audio::sampledata::Int24BigEndian> (progress); }
+    { CHOC_TEST(Int32LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int32LittleEndian> (progress); }
+    { CHOC_TEST(Int32BigEndian);     testIntToFloatFormat<choc::audio::sampledata::Int32BigEndian> (progress); }
+}
+
 //==============================================================================
 inline void testFIFOs (TestProgress& progress)
 {
@@ -1895,6 +1965,7 @@ inline bool runAllTests (TestProgress& progress)
     testJSON (progress);
     testMIDI (progress);
     testChannelSets (progress);
+    testIntToFloat (progress);
     testFIFOs (progress);
     testMIDIFiles (progress);
     testJavascript (progress);
