@@ -20,14 +20,18 @@
 #define CHOC_MATH_HELPERS_HEADER_INCLUDED
 
 #include <cstdlib>
+#include <cstdint>
 
 #ifdef _MSC_VER
  #include <intrin.h>
- #pragma intrinsic (_umul128)
  #pragma intrinsic (_BitScanReverse)
 
  #ifdef _WIN64
   #pragma intrinsic (_BitScanReverse64)
+ #endif
+
+ #ifndef _M_ARM
+  #pragma intrinsic (_umul128)
  #endif
 #endif
 
@@ -91,7 +95,7 @@ struct Int128
 /// A cross-platform function to multiply two 64-bit numbers and return a 128-bit result
 inline Int128 multiply128 (uint64_t a, uint64_t b)
 {
-   #ifdef _MSC_VER
+   #if defined (_MSC_VER) && ! defined (_M_ARM)
     Int128 result;
     result.low = _umul128 (a, b, &result.high);
     return result;

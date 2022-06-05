@@ -119,9 +119,12 @@ inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
 
 //==============================================================================
 #ifndef _WINDOWS_ // only use these local definitions if windows.h isn't already included
- extern "C" __declspec(dllimport)  void* __stdcall LoadLibraryA (const char*);
- extern "C" __declspec(dllimport)  int   __stdcall FreeLibrary (void*);
- extern "C" __declspec(dllimport)  void* __stdcall GetProcAddress (void*, const char*);
+ namespace
+ {
+    extern "C" __declspec(dllimport)  void* __stdcall LoadLibraryA (const char*);
+    extern "C" __declspec(dllimport)  int __stdcall FreeLibrary (void*);
+    extern "C" __declspec(dllimport)  void* GetProcAddress (void*, const char*);
+ }
  using CHOC_HMODULE = void*;
 #else
  using CHOC_HMODULE = HMODULE;
