@@ -30,8 +30,9 @@
   #pragma intrinsic (_BitScanReverse64)
  #endif
 
- #ifndef _M_ARM
+ #if ! (defined (_M_ARM) || defined (_M_ARM64))
   #pragma intrinsic (_umul128)
+  #define CHOC_HAS_UMUL128 1
  #endif
 #endif
 
@@ -95,7 +96,7 @@ struct Int128
 /// A cross-platform function to multiply two 64-bit numbers and return a 128-bit result
 inline Int128 multiply128 (uint64_t a, uint64_t b)
 {
-   #if defined (_MSC_VER) && ! defined (_M_ARM)
+   #if CHOC_HAS_UMUL128
     Int128 result;
     result.low = _umul128 (a, b, &result.high);
     return result;

@@ -119,7 +119,7 @@ inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
 
 //==============================================================================
 #ifndef _WINDOWS_ // only use these local definitions if windows.h isn't already included
- namespace
+ namespace choc_win32_library_fns
  {
     extern "C" __declspec(dllimport)  void* __stdcall LoadLibraryA (const char*);
     extern "C" __declspec(dllimport)  int __stdcall FreeLibrary (void*);
@@ -132,14 +132,14 @@ inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
 
 inline choc::file::DynamicLibrary::DynamicLibrary (std::string_view library)
 {
-    handle = ::LoadLibraryA (std::string (library).c_str());
+    handle = choc_win32_library_fns::LoadLibraryA (std::string (library).c_str());
 }
 
 inline void choc::file::DynamicLibrary::close()
 {
     if (handle != nullptr)
     {
-        ::FreeLibrary ((CHOC_HMODULE) handle);
+        choc_win32_library_fns::FreeLibrary ((CHOC_HMODULE) handle);
         handle = nullptr;
     }
 }
@@ -147,7 +147,7 @@ inline void choc::file::DynamicLibrary::close()
 inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
 {
     if (handle != nullptr)
-        return ::GetProcAddress ((CHOC_HMODULE) handle, std::string (name).c_str());
+        return choc_win32_library_fns::GetProcAddress ((CHOC_HMODULE) handle, std::string (name).c_str());
 
     return {};
 }

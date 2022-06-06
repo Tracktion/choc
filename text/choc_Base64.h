@@ -53,11 +53,11 @@ template <typename HandleOutputByteFn>
 bool decode (std::string_view base64,
              HandleOutputByteFn&& handleOutputByte);
 
-
 /// Attempts to decode a base64 string, writing the results to a container such
 /// as a std::vector.
 /// The container passed in must have reserve() and a push_back() method that
 /// will be called with a uint8_t argument.
+/// Returns a bool to indicate success - it'll fail if the data wasn't valid base64
 template <typename OutputContainer>
 bool decodeToContainer (OutputContainer& outputContainer,
                         std::string_view base64);
@@ -134,7 +134,8 @@ inline std::string encodeToString (const void* inputBinaryData, size_t numInputB
 template <typename Container>
 std::string encodeToString (const Container& c)
 {
-    return encodeToString (std::addressof (c[0]), c.size());
+    auto size = c.size();
+    return encodeToString (size == 0 ? nullptr : std::addressof (c[0]), size);
 }
 
 template <typename HandleOutputByteFn>
