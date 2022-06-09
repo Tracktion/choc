@@ -192,6 +192,8 @@ PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
 /// macro to 1 in one of your compile units
 #if CHOC_JAVASCRIPT_IMPLEMENTATION
 
+#include "../platform/choc_Platform.h"
+
 #if CHOC_WINDOWS
  #include <windows.h>
 #else
@@ -206,7 +208,7 @@ PrimitiveType ArgumentList::get (size_t index, PrimitiveType defaultValue) const
 
 #include <csetjmp>
 
-#if CHOC_LINUX
+#if CHOC_LINUX || CHOC_OSX
  #include <sys/time.h>
 #endif
 
