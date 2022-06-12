@@ -71,6 +71,15 @@ void writeLittleEndian (void* destBuffer, Type valueToWrite);
 template <typename Type>
 void writeBigEndian (void* destBuffer, Type valueToWrite);
 
+/// Returns a version of this integer with the byte-order reversed
+uint16_t swapByteOrder (uint16_t valueToSwap) noexcept;
+
+/// Returns a version of this integer with the byte-order reversed
+uint32_t swapByteOrder (uint32_t valueToSwap) noexcept;
+
+/// Returns a version of this integer with the byte-order reversed
+uint64_t swapByteOrder (uint64_t valueToSwap) noexcept;
+
 //==============================================================================
 // This will define some macros CHOC_BIG_ENDIAN and CHOC_LITTLE_ENDIAN that
 // should be pretty reliable on most platforms
@@ -278,6 +287,40 @@ inline void writeBigEndian (void* dest, Type source)
             dst[1] = static_cast<uint8_t> (n);
         }
     }
+}
+
+inline uint16_t swapByteOrder (uint16_t n) noexcept
+{
+   #if defined(__llvm__) || (defined(__GNUC__) && ! defined (__ICC))
+    return __builtin_bswap16 (n);
+   #elif defined (_MSC_VER)
+    return _byteswap_ushort (n);
+   #else
+    return (n >> 8) | (n << 8);
+   #endif
+}
+
+inline uint32_t swapByteOrder (uint32_t n) noexcept
+{
+   #if defined(__llvm__) || (defined(__GNUC__) && ! defined (__ICC))
+    return __builtin_bswap32 (n);
+   #elif defined (_MSC_VER)
+    return _byteswap_ulong (n);
+   #else
+    return (n >> 24) | (n << 24) | ((n << 8) & 0xff0000) | ((n >> 8) & 0xff00);
+   #endif
+}
+
+inline uint64_t swapByteOrder (uint64_t n) noexcept
+{
+   #if defined(__llvm__) || (defined(__GNUC__) && ! defined (__ICC))
+    return __builtin_bswap64 (n);
+   #elif defined (_MSC_VER)
+    return _byteswap_uint64 (n);
+   #else
+    return swapByteOrder (static_cast<uint32_t> (n >> 32))
+            | (static_cast<uint64_t> (swapByteOrder (static_cast<uint32_t> (n))) << 32);
+   #endif
 }
 
 } // namespace choc::bitcast

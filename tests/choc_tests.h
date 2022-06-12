@@ -108,6 +108,10 @@ inline void testPlatform (TestProgress& progress)
         auto a = 0x0102030405060708ull;
         uint8_t buffer[16];
 
+        CHOC_EXPECT_EQ (choc::memory::swapByteOrder ((uint16_t) 0x1122u), 0x2211u);
+        CHOC_EXPECT_EQ (choc::memory::swapByteOrder ((uint32_t) 0x11223344u), 0x44332211u);
+        CHOC_EXPECT_EQ (choc::memory::swapByteOrder ((uint64_t) 0x1122334455667788ull), 0x8877665544332211ull);
+
         choc::memory::writeNativeEndian (buffer, a);
         CHOC_EXPECT_EQ (a, choc::memory::readNativeEndian<decltype(a)> (buffer));
 
