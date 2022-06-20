@@ -1679,6 +1679,7 @@ inline void testIntToFloatFormat (TestProgress& progress)
 inline void testIntToFloat (TestProgress& progress)
 {
     { CHOC_TEST(Int8);               testIntToFloatFormat<choc::audio::sampledata::Int8> (progress); }
+    { CHOC_TEST(UInt8);              testIntToFloatFormat<choc::audio::sampledata::UInt8> (progress); }
     { CHOC_TEST(Int16LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int16LittleEndian> (progress); }
     { CHOC_TEST(Int16BigEndian);     testIntToFloatFormat<choc::audio::sampledata::Int16BigEndian> (progress); }
     { CHOC_TEST(Int24LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int24LittleEndian> (progress); }

@@ -43,6 +43,18 @@ struct Int8
     static constexpr size_t sizeInBytes = 1;
 };
 
+/// Reads and writes 8-bit unsigned samples, where the origin = 128.
+struct UInt8
+{
+    /// Reads an integer in this format from the given raw memory location, and scales it to the range -1.0f to 1.0f
+    template <typename FloatType> static FloatType read (const void* source) noexcept;
+    /// Clamps the given floating point value (in the range -1.0 to 1.0f) to this integer range and writes it to the given raw memory
+    template <typename FloatType> static void write (void* dest, FloatType v) noexcept;
+
+    /// The size of the packed raw data for this format
+    static constexpr size_t sizeInBytes = 1;
+};
+
 /// Reads and writes 16-bit signed big-endian samples.
 struct Int16BigEndian
 {
@@ -168,6 +180,16 @@ template <typename FloatType> FloatType Int8::read (const void* source) noexcept
 template <typename FloatType> void Int8::write (void* dest, FloatType v) noexcept
 {
     *static_cast<int8_t*> (dest) = convertToInt<int8_t, 0x7f> (v);
+}
+
+template <typename FloatType> FloatType UInt8::read (const void* source) noexcept
+{
+    return convertToFloat<FloatType, 0x7f> (*static_cast<const uint8_t*> (source) - (uint8_t) 128);
+}
+
+template <typename FloatType> void UInt8::write (void* dest, FloatType v) noexcept
+{
+    *static_cast<uint8_t*> (dest) = static_cast<uint8_t> (convertToInt<int32_t, 0x7f> (v) + 128);
 }
 
 template <typename FloatType> FloatType Int16BigEndian::read (const void* source) noexcept
