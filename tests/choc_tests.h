@@ -1838,7 +1838,7 @@ inline void testMIDIFiles (TestProgress& progress)
                               });
 
             for (auto& e : mf.toSequence())
-                output2 += choc::text::floatToString (e.timeInSeconds, 3) + " " + e.message.toHexString() + "\n";
+                output2 += choc::text::floatToString (e.timeStamp, 3) + " " + e.message.toHexString() + "\n";
 
             // This is just a simple regression test to see whether anything changes. Update the hash number if it does.
             CHOC_EXPECT_EQ (5294939095423848520ull, simpleHash (output1));

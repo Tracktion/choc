@@ -31,10 +31,13 @@ struct Sequence
     /// A time-stamped MIDI event
     struct Event
     {
-        double timeInSeconds;
+        /// The units for this time-stamp are unspecified, so you can use it for seconds,
+        /// frames, ticks, etc. as appropriate.
+        double timeStamp;
+
         Message message;
 
-        bool operator< (const Event& other) const    { return timeInSeconds < other.timeInSeconds; }
+        bool operator< (const Event& other) const    { return timeStamp < other.timeStamp; }
     };
 
     /// The raw events in the sequence. Although this vector is public to allow access,
@@ -98,17 +101,17 @@ inline void Sequence::sortEvents()  { std::stable_sort (events.begin(), events.e
 
 inline Sequence::Iterator::Iterator (const Sequence& s) : owner (s) {}
 
-inline void Sequence::Iterator::setTime (double newTime)
+inline void Sequence::Iterator::setTime (double newTimeStamp)
 {
     auto eventData = owner.events.data();
 
-    while (nextIndex != 0 && eventData[nextIndex - 1].timeInSeconds >= newTime)
+    while (nextIndex != 0 && eventData[nextIndex - 1].timeStamp >= newTimeStamp)
         --nextIndex;
 
-    while (nextIndex < owner.events.size() && eventData[nextIndex].timeInSeconds < newTime)
+    while (nextIndex < owner.events.size() && eventData[nextIndex].timeStamp < newTimeStamp)
         ++nextIndex;
 
-    currentTime = newTime;
+    currentTime = newTimeStamp;
 }
 
 inline choc::span<const Sequence::Event> Sequence::Iterator::readNextEvents (double duration)
@@ -120,7 +123,7 @@ inline choc::span<const Sequence::Event> Sequence::Iterator::readNextEvents (dou
     auto endTime = currentTime + duration;
     currentTime = endTime;
 
-    while (end < total && eventData[end].timeInSeconds < endTime)
+    while (end < total && eventData[end].timeStamp < endTime)
         ++end;
 
     nextIndex = end;
