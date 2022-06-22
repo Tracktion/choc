@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../containers/choc_NonAllocatingStableSort.h"
 #include "../platform/choc_DetectDebugger.h"
 #include "../platform/choc_Platform.h"
 #include "../platform/choc_SpinLock.h"
@@ -2001,6 +2002,49 @@ inline void testCOM (TestProgress& progress)
     }
 }
 
+inline void testStableSort (TestProgress& progress)
+{
+    CHOC_CATEGORY (StableSort);
+
+    {
+        CHOC_TEST (StableSort)
+
+        for (int len = 0; len < 500; ++len)
+        {
+            std::vector<int> v;
+
+            for (int i = 0; i < len; ++i)
+                v.push_back (rand() & 63);
+
+            {
+                auto comp = [] (int a, int b) { return a / 2 < b / 2; };
+
+                auto v2 = v;
+                std::stable_sort (v2.begin(), v2.end(), comp);
+
+                auto v3 = v;
+                choc::sorting::stable_sort (v3.begin(), v3.end(), comp);
+                CHOC_EXPECT_TRUE (v2 == v3);
+
+                auto v4 = v;
+                choc::sorting::stable_sort (v4.data(), v4.data() + v4.size(), comp);
+                CHOC_EXPECT_TRUE (v2 == v4);
+            }
+
+            auto v2 = v;
+            std::stable_sort (v2.begin(), v2.end());
+
+            auto v3 = v;
+            choc::sorting::stable_sort (v3.begin(), v3.end());
+            CHOC_EXPECT_TRUE (v2 == v3);
+
+            auto v4 = v;
+            choc::sorting::stable_sort (v4.data(), v4.data() + v4.size());
+            CHOC_EXPECT_TRUE (v2 == v4);
+        }
+    }
+}
+
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
@@ -2017,6 +2061,7 @@ inline bool runAllTests (TestProgress& progress)
     testMIDIFiles (progress);
     testJavascript (progress);
     testCOM (progress);
+    testStableSort (progress);
 
     progress.printReport();
     return progress.numFails == 0;

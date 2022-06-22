@@ -21,6 +21,7 @@
 
 #include "choc_MIDI.h"
 #include "../containers/choc_Span.h"
+#include "../containers/choc_NonAllocatingStableSort.h"
 
 namespace choc::midi
 {
@@ -97,7 +98,7 @@ struct Sequence
 //
 //==============================================================================
 
-inline void Sequence::sortEvents()  { std::stable_sort (events.begin(), events.end()); }
+inline void Sequence::sortEvents()  { choc::sorting::stable_sort (events.begin(), events.end()); }
 
 inline Sequence::Iterator::Iterator (const Sequence& s) : owner (s) {}
 
