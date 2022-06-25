@@ -53,7 +53,7 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
 endif()
 
-add_executable(choc_tests main.cpp)
+add_executable(choc_tests main.cpp main2.cpp)
 
 install(TARGETS choc_tests)
 
