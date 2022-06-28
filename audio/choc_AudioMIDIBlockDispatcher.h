@@ -80,7 +80,7 @@ struct AudioMIDIBlockDispatcher
         choc::buffer::ChannelArrayView<const float> audioInput;
         choc::buffer::ChannelArrayView<float> audioOutput;
         choc::span<choc::midi::ShortMessage> midiMessages;
-        std::function<void(uint32_t frame, choc::midi::ShortMessage)>& onMidiOutputMessage;
+        const std::function<void(uint32_t frame, choc::midi::ShortMessage)>& onMidiOutputMessage;
     };
 
     /// After calling setAudioBuffers() to provide the audio channel data, call this
