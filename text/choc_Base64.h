@@ -196,7 +196,7 @@ template <typename OutputContainer>
 bool decodeToContainer (OutputContainer& outputContainer, std::string_view base64)
 {
     outputContainer.reserve ((base64.length() / 4u) * 3u + 4u);
-    return decode (base64, [&] (uint8_t b) { outputContainer.push_back (b); });
+    return decode (base64, [&] (uint8_t b) { outputContainer.push_back (static_cast<typename OutputContainer::value_type> (b)); });
 }
 
 
