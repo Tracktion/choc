@@ -42,6 +42,7 @@ The library is getting quite big now. Some of its many delights include:
 - A [text table generator](./text/choc_TextTable.h), which can take an array of strings and tabulate it to align the columns nicely.
 - A [file wildcard](./text/choc_Wildcard.h) matcher. I claim this is the cleanest possible implementation of this algorithm - I challenge you to prove me wrong!
 - A [base64](./text/choc_Base64.h) encoder/decoder.
+- Some [integer compression and zigzag encoding](./platform/choc_VariableLengthEncoding.h) functions.
 - An implementation of the [xxHash](./text/choc_xxHash.h) very-fast-but-pretty-secure hash algorithm.
 
 ##### Containers

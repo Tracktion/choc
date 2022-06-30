@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../platform/choc_VariableLengthEncoding.h"
 #include "../containers/choc_NonAllocatingStableSort.h"
 #include "../platform/choc_DetectDebugger.h"
 #include "../platform/choc_Platform.h"
@@ -147,6 +148,43 @@ inline void testPlatform (TestProgress& progress)
         CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0xffffffffull), 32u);
         CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0x70000000000000ull), 9u);
         CHOC_EXPECT_EQ (choc::math::countUpperClearBits ((uint64_t) 0xffffffff00000000ull), 0u);
+    }
+
+    {
+        CHOC_TEST (VariableLengthIntEncoding)
+        using namespace choc::integer_encoding;
+        CHOC_EXPECT_EQ (3, zigzagEncode (-2));
+
+        for (int64_t i : { (int64_t) 0, (int64_t) 1, (int64_t) -1, (int64_t) 3, (int64_t) -3, (int64_t) 65535, (int64_t) -65535, (int64_t) (1ll << 31), (int64_t) 0x8000000000000000ull })
+            CHOC_EXPECT_EQ (i, zigzagDecode (zigzagEncode (i));)
+
+        for (int32_t i : { (int32_t) 0, (int32_t) 1, (int32_t) -1, (int32_t) 3, (int32_t) -3, (int32_t) 65535, (int32_t) -65535, (int32_t) (1 << 31), (int32_t) 0x80000000u })
+            CHOC_EXPECT_EQ (i, zigzagDecode (zigzagEncode (i));)
+
+
+        {
+            char buffer[16];
+            CHOC_EXPECT_EQ (1u, encodeVariableLengthInt (buffer, zigzagEncode (-1)));
+        }
+
+        for (int64_t i : { (int64_t) 0, (int64_t) 1, (int64_t) -1, (int64_t) 3, (int64_t) -3, (int64_t) 65535, (int64_t) -65535, (int64_t) (1ll << 31), (int64_t) 0x8000000000000000ull })
+        {
+            char buffer[16];
+
+            {
+                auto encodedSize = encodeVariableLengthInt (buffer, i);
+                size_t bytesUsed;
+                CHOC_EXPECT_EQ (i, decodeVariableLengthInt<decltype(i)> (buffer, encodedSize, bytesUsed))
+                CHOC_EXPECT_EQ (bytesUsed, encodedSize);
+            }
+
+            {
+                auto encodedSize = encodeVariableLengthInt (buffer, zigzagEncode (i));
+                size_t bytesUsed;
+                CHOC_EXPECT_EQ (i, zigzagDecode (decodeVariableLengthInt<decltype(i)> (buffer, encodedSize, bytesUsed)))
+                CHOC_EXPECT_EQ (bytesUsed, encodedSize);
+            }
+        }
     }
 
     {
