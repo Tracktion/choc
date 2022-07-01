@@ -126,20 +126,22 @@ inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
     extern "C" __declspec(dllimport)  void* GetProcAddress (void*, const char*);
  }
  using CHOC_HMODULE = void*;
+ #define CHOC_DLL_FUNCTION_NAMESPACE choc_win32_library_fns
 #else
  using CHOC_HMODULE = HMODULE;
+ #define CHOC_DLL_FUNCTION_NAMESPACE
 #endif
 
 inline choc::file::DynamicLibrary::DynamicLibrary (std::string_view library)
 {
-    handle = choc_win32_library_fns::LoadLibraryA (std::string (library).c_str());
+    handle = (void*) CHOC_DLL_FUNCTION_NAMESPACE::LoadLibraryA (std::string (library).c_str());
 }
 
 inline void choc::file::DynamicLibrary::close()
 {
     if (handle != nullptr)
     {
-        choc_win32_library_fns::FreeLibrary ((CHOC_HMODULE) handle);
+        CHOC_DLL_FUNCTION_NAMESPACE::FreeLibrary ((CHOC_HMODULE) handle);
         handle = nullptr;
     }
 }
@@ -147,7 +149,7 @@ inline void choc::file::DynamicLibrary::close()
 inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
 {
     if (handle != nullptr)
-        return choc_win32_library_fns::GetProcAddress ((CHOC_HMODULE) handle, std::string (name).c_str());
+        return (void*) CHOC_DLL_FUNCTION_NAMESPACE::GetProcAddress ((CHOC_HMODULE) handle, std::string (name).c_str());
 
     return {};
 }

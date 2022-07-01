@@ -16,6 +16,13 @@
 //   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+// On Windows, we'll include windows.h before the headers, in contrast to what
+// happens in main.cpp
+#if defined (_WIN32) || defined (_WIN64)
+ #include <windows.h>
+#endif
+
+
 #include "choc_tests.h"
 
 // This empty-ish file is here so that we test the inclusion of all the
