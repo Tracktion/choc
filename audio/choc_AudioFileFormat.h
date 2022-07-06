@@ -214,6 +214,19 @@ public:
 
 
 //==============================================================================
+/// Copies a given number of frames of audio data from an AudioFormatReader to
+/// an AudioFormatWriter.
+/// If maxNumFramesToCopy == 0, it will copy as many frames as the reader can
+/// supply.
+/// Returns the number of frames successfully copied.
+///
+uint64_t copyAudioData (AudioFileWriter& destWriter,
+                        AudioFileReader& sourceReader,
+                        uint64_t maxNumFramesToCopy = 0);
+
+
+
+//==============================================================================
 //        _        _           _  _
 //     __| |  ___ | |_   __ _ (_)| | ___
 //    / _` | / _ \| __| / _` || || |/ __|
@@ -388,6 +401,32 @@ choc::buffer::ChannelArrayBuffer<SampleType> AudioFileReader::readEntireStream()
     }
 
     return {};
+}
+
+inline uint64_t copyAudioData (AudioFileWriter& dest, AudioFileReader& source, uint64_t maxNumFramesToCopy)
+{
+    constexpr uint32_t bufferSize = 2048;
+
+    auto& readerProperties = source.getProperties();
+    auto framesToDo = maxNumFramesToCopy != 0 ? std::min (maxNumFramesToCopy, readerProperties.numFrames) : readerProperties.numFrames;
+    auto tempBuffer = choc::buffer::ChannelArrayBuffer<double> (readerProperties.numChannels, bufferSize);
+    uint64_t readIndex = 0;
+
+    while (framesToDo != 0)
+    {
+        auto blockSize = static_cast<uint32_t> (std::min (static_cast<uint64_t> (bufferSize), framesToDo));
+        auto block = tempBuffer.getStart (blockSize);
+
+        if (! source.readFrames (readIndex, block))
+            break;
+
+        dest.appendFrames (block);
+
+        readIndex += blockSize;
+        framesToDo -= blockSize;
+    }
+
+    return readIndex;
 }
 
 
