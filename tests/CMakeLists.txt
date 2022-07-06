@@ -7,7 +7,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
 
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
     set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DDEBUG")
-    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -std=c++17 -Werror -Wall -Wextra -Wshadow -Wno-missing-field-initializers -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wreorder -Wsign-conversion -Wno-ignored-qualifiers -Wunreachable-code")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wshadow -Wno-missing-field-initializers -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wreorder -Wsign-conversion -Wno-ignored-qualifiers -Wunreachable-code")
     set(CMAKE_C_FLAGS           "${CMAKE_C_FLAGS} -Wno-unused-result")
 
     if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -48,12 +48,14 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /W4 /WX /wd4068 /wd4996 /std:c++17 -DWIN32 /bigobj -DNOMINMAX")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /W4 /WX /wd4068 /wd4996 -DWIN32 /bigobj -DNOMINMAX")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4996 /wd4267 /wd5281 /wd5293 /wd5313 /wd4305 /wd4018")
 
 endif()
 
 add_executable(choc_tests main.cpp main2.cpp)
+
+target_compile_features(choc_tests PRIVATE cxx_std_17)
 
 install(TARGETS choc_tests)
 

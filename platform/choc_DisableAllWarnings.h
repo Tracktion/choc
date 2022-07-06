@@ -44,6 +44,8 @@
  #pragma GCC diagnostic ignored "-Wunused-parameter"
  #pragma GCC diagnostic ignored "-Wconversion"
  #pragma GCC diagnostic ignored "-Wsign-conversion"
+ #pragma GCC diagnostic ignored "-Wsign-compare"
+ #pragma GCC diagnostic ignored "-Wfloat-conversion"
  #pragma GCC diagnostic ignored "-Wswitch-enum"
  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
  #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -55,6 +57,8 @@
  #pragma GCC diagnostic ignored "-Wstrict-aliasing"
  #pragma GCC diagnostic ignored "-Woverloaded-virtual"
  #pragma GCC diagnostic ignored "-Wc99-extensions"
+ #pragma GCC diagnostic ignored "-Wmisleading-indentation"
+ #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
@@ -62,4 +66,5 @@
 #else
  #pragma warning (push, 0)
  #pragma warning (disable: 4702)
+ #pragma warning (disable: 4706)
 #endif

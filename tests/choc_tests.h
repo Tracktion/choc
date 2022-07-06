@@ -19,6 +19,8 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../audio/choc_AudioFileFormat_Ogg.h"
+#include "../audio/choc_AudioFileFormat_WAV.h"
 #include "../platform/choc_VariableLengthEncoding.h"
 #include "../containers/choc_NonAllocatingStableSort.h"
 #include "../platform/choc_DetectDebugger.h"
@@ -53,6 +55,7 @@
 #include "../containers/choc_AlignedMemoryBlock.h"
 #include "../audio/choc_MIDI.h"
 #include "../audio/choc_MIDIFile.h"
+#include "../audio/choc_Oscillators.h"
 #include "../audio/choc_SampleBuffers.h"
 #include "../audio/choc_AudioSampleData.h"
 #include "../audio/choc_SincInterpolator.h"
@@ -98,13 +101,11 @@ inline void testPlatform (TestProgress& progress)
             union { uint32_t i; char c[4]; } n;
             n.i = 0x01020304;
 
-           #if CHOC_LITTLE_ENDIAN
+           if constexpr (CHOC_LITTLE_ENDIAN)
             CHOC_EXPECT_EQ (n.c[0], 4);
-           #endif
 
-           #if CHOC_BIG_ENDIAN
+           if constexpr (CHOC_BIG_ENDIAN)
             CHOC_EXPECT_EQ (n.c[0], 1);
-           #endif
         }
 
         auto a = 0x0102030405060708ull;
@@ -1164,9 +1165,9 @@ inline void testMIDI (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testChannelSets (TestProgress& progress)
+inline void testAudioBuffers (TestProgress& progress)
 {
-    CHOC_CATEGORY (ChannelSets);
+    CHOC_CATEGORY (AudioBuffers);
 
     auto findMaxDiff = [] (auto buffer1, auto buffer2)
     {
@@ -1180,7 +1181,7 @@ inline void testChannelSets (TestProgress& progress)
     };
 
     {
-        CHOC_TEST (InterleavedChannelSetApplyClear)
+        CHOC_TEST (InterleavedApplyClear)
 
         choc::buffer::InterleavedBuffer<float> channels (2, 20);
         CHOC_ASSERT (channels.getNumChannels() == 2);
@@ -1211,7 +1212,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (InterleavedChannelSetFrame)
+        CHOC_TEST (InterleavedFrame)
 
         choc::buffer::InterleavedBuffer<uint32_t> channels (3, 10);
         CHOC_ASSERT (channels.getNumChannels() == 3);
@@ -1237,7 +1238,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (InterleavedChannelSetSlice)
+        CHOC_TEST (InterleavedSlice)
 
         choc::buffer::InterleavedBuffer<double> channels (2, 20);
         CHOC_ASSERT (channels.getNumChannels() == 2);
@@ -1267,7 +1268,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (InterleavedChannelSetChannelSet)
+        CHOC_TEST (InterleavedRange)
 
         choc::buffer::InterleavedBuffer<uint32_t> channels (5, 10);
         CHOC_ASSERT (channels.getNumChannels() == 5);
@@ -1309,7 +1310,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (InterleavedChannelSetPackedInterleavedData)
+        CHOC_TEST (InterleavedPacked)
 
         choc::buffer::InterleavedBuffer<uint32_t> channels (3, 10);
         CHOC_ASSERT (channels.getNumChannels() == 3);
@@ -1336,7 +1337,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (DiscreteChannelSetApplyClear)
+        CHOC_TEST (DiscreteApplyClear)
 
         choc::buffer::ChannelArrayBuffer<float> channels (2, 20);
         CHOC_ASSERT (channels.getNumChannels() == 2);
@@ -1368,7 +1369,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (DiscreteChannelSetFrame)
+        CHOC_TEST (DiscreteFrame)
 
         choc::buffer::ChannelArrayBuffer<uint32_t> channels (3, 10);
         CHOC_EXPECT_EQ (channels.getNumChannels(), 3UL);
@@ -1396,7 +1397,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (DiscreteChannelSetSlice)
+        CHOC_TEST (DiscreteSlice)
 
         choc::buffer::ChannelArrayBuffer<double> channels (2, 20);
         CHOC_ASSERT (channels.getNumChannels() == 2);
@@ -1428,7 +1429,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (DiscreteChannelSetChannelSet)
+        CHOC_TEST (DiscreteRange)
 
         choc::buffer::ChannelArrayBuffer<uint32_t> channels (5, 10);
         CHOC_ASSERT (channels.getNumChannels() == 5);
@@ -1489,7 +1490,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (CopyChannelSet)
+        CHOC_TEST (Copy)
 
         choc::buffer::ChannelArrayBuffer<float> source (5, 10);
 
@@ -1521,7 +1522,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (CopyChannelSetToFit)
+        CHOC_TEST (CopyToFit)
 
         choc::buffer::ChannelArrayBuffer<float> source1 (1, 10),
                                                 source2 (2, 10);
@@ -1575,7 +1576,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (CopyChannelSetAllZero)
+        CHOC_TEST (CopyAllZero)
 
         choc::buffer::ChannelArrayBuffer<float> source (5, 10);
         source.clear();
@@ -1585,7 +1586,7 @@ inline void testChannelSets (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (ChannelSetContentIsIdentical)
+        CHOC_TEST (ContentIsIdentical)
 
         choc::buffer::ChannelArrayBuffer<float> source (2, 10);
 
@@ -1717,6 +1718,8 @@ inline void testIntToFloatFormat (TestProgress& progress)
 
 inline void testIntToFloat (TestProgress& progress)
 {
+    CHOC_CATEGORY (AudioSampleConversion);
+
     { CHOC_TEST(Int8);               testIntToFloatFormat<choc::audio::sampledata::Int8> (progress); }
     { CHOC_TEST(UInt8);              testIntToFloatFormat<choc::audio::sampledata::UInt8> (progress); }
     { CHOC_TEST(Int16LittleEndian);  testIntToFloatFormat<choc::audio::sampledata::Int16LittleEndian> (progress); }
@@ -2084,6 +2087,151 @@ inline void testStableSort (TestProgress& progress)
 }
 
 //==============================================================================
+template <typename FileFormat, typename BufferSampleType>
+inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDepth bitDepth,
+                                    double sampleRate, uint32_t numChannels, uint32_t length,
+                                    std::string quality, BufferSampleType maxDiff)
+{
+    auto compareBuffers = [&] (const auto& buffer1, const auto& buffer2)
+    {
+        if (maxDiff == 0)
+        {
+            maxDiff = 1.0f / 1000000.0f;
+            if (bitDepth == choc::audio::BitDepth::int8)  maxDiff = 1.0f / 127.0f;
+            if (bitDepth == choc::audio::BitDepth::int16) maxDiff = 1.0f / 32767.0f;
+        }
+
+        auto size = buffer1.getSize();
+        CHOC_EXPECT_EQ (size.numFrames, buffer2.getSize().numFrames);
+        CHOC_EXPECT_EQ (size.numChannels, buffer2.getSize().numChannels);
+
+        if (size.numFrames != 0)
+        {
+            BufferSampleType biggestDiff = 0;
+
+            for (decltype (size.numChannels) chan = 0; chan < size.numChannels; ++chan)
+            {
+                auto d1 = buffer1.getIterator (chan);
+                auto d2 = buffer2.getIterator (chan);
+
+                for (decltype (size.numFrames) i = 0; i < size.numFrames; ++i)
+                    biggestDiff = std::max (biggestDiff, std::abs (*d1++ - *d2++));
+            }
+
+            CHOC_EXPECT_TRUE (biggestDiff < maxDiff);
+        }
+    };
+
+    auto source = choc::buffer::ChannelArrayBuffer<BufferSampleType> (numChannels, length);
+
+    for (uint32_t i = 0; i < numChannels; ++i)
+        oscillator::render<choc::oscillator::Sine<BufferSampleType>> (source.getChannel (i), 4000.0 + 1000.0 * i, sampleRate);
+
+    FileFormat format;
+    std::string file1;
+
+    {
+        auto out = std::make_shared<std::ostringstream>();
+        CHOC_EXPECT_FALSE (out->fail());
+
+        choc::audio::AudioFileProperties props;
+        props.bitDepth = bitDepth;
+        props.sampleRate = sampleRate;
+        props.numChannels = numChannels;
+        props.quality = quality;
+
+        auto writer = format.createWriter (out, props);
+        CHOC_EXPECT_TRUE (writer != nullptr);
+
+        auto s = source;
+
+        for (;;)
+        {
+            auto numToDo = std::min (301u, s.getNumFrames());
+            CHOC_EXPECT_TRUE (writer->appendFrames (s.getStart (numToDo)));
+
+            if (numToDo == s.getNumFrames())
+                break;
+
+            s = s.fromFrame (numToDo);
+            CHOC_EXPECT_TRUE (writer->flush());
+        }
+
+        writer.reset();
+        file1 = out->str();
+    }
+
+    {
+        auto in = std::make_shared<std::istringstream> (file1);
+        auto reader = format.createReader (in);
+        CHOC_EXPECT_TRUE (reader != nullptr);
+
+        auto& p = reader->getProperties();
+        CHOC_EXPECT_EQ (p.sampleRate, sampleRate);
+        CHOC_EXPECT_EQ (p.numFrames, length);
+        CHOC_EXPECT_EQ (p.numChannels, numChannels);
+        CHOC_EXPECT_EQ ((int) p.bitDepth, (int) bitDepth);
+
+        auto reloaded = reader->template readEntireStream<BufferSampleType>();
+
+        compareBuffers (reloaded, source);
+    }
+}
+
+inline void testAudioFileFormat (TestProgress& progress)
+{
+    CHOC_CATEGORY (AudioFileFormat);
+
+    {
+        CHOC_TEST (WAV)
+
+        bool useDouble = false;
+
+        for (auto bitDepth : choc::audio::WAVAudioFileFormat<true>().getSupportedBitDepths())
+        {
+            for (double sampleRate : { 22050.0, 44100.0, 48000.0 })
+            {
+                for (auto length : { 1, 2, 3, 4, 7, 15, 127, 256, 1024, 2049 })
+                {
+                    for (auto channels : { 1, 2, 3, 4, 6, 8 })
+                    {
+                        if (useDouble)
+                            testAudioFileRoundTrip<choc::audio::WAVAudioFileFormat<true>, double> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, {}, 0);
+                        else
+                            testAudioFileRoundTrip<choc::audio::WAVAudioFileFormat<true>, float> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, {}, 0);
+
+                        useDouble = ! useDouble;
+                    }
+                }
+            }
+        }
+    }
+
+    {
+        CHOC_TEST (OggVorbis)
+
+        bool useDouble = false;
+        auto bitDepth = choc::audio::OggAudioFileFormat<true>().getSupportedBitDepths().front();
+
+        for (double sampleRate : { 22050.0, 44100.0, 48000.0 })
+        {
+            for (auto length : { 1, 2, 3, 4, 7, 15, 127, 256, 1024, 2049 })
+            {
+                for (auto channels : { 1, 2, 3, 4 })
+                {
+                    if (useDouble)
+                        testAudioFileRoundTrip<choc::audio::OggAudioFileFormat<true>, double> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "8", 0.07);
+                    else
+                        testAudioFileRoundTrip<choc::audio::OggAudioFileFormat<true>, float> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "10", 0.05f);
+
+                    useDouble = ! useDouble;
+                }
+            }
+        }
+    }
+}
+
+//==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
     testPlatform (progress);
@@ -2093,13 +2241,14 @@ inline bool runAllTests (TestProgress& progress)
     testValues (progress);
     testJSON (progress);
     testMIDI (progress);
-    testChannelSets (progress);
+    testAudioBuffers (progress);
     testIntToFloat (progress);
     testFIFOs (progress);
     testMIDIFiles (progress);
     testJavascript (progress);
     testCOM (progress);
     testStableSort (progress);
+    testAudioFileFormat (progress);
 
     progress.printReport();
     return progress.numFails == 0;
