@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../audio/choc_AudioFileFormat_FLAC.h"
 #include "../audio/choc_AudioFileFormat_Ogg.h"
 #include "../audio/choc_AudioFileFormat_WAV.h"
 #include "../platform/choc_VariableLengthEncoding.h"
@@ -2187,7 +2188,7 @@ inline void testAudioFileFormat (TestProgress& progress)
 
         bool useDouble = false;
 
-        for (auto bitDepth : choc::audio::WAVAudioFileFormat<true>().getSupportedBitDepths())
+        for (auto bitDepth : choc::audio::FLACAudioFileFormat<true>().getSupportedBitDepths())
         {
             for (double sampleRate : { 22050.0, 44100.0, 48000.0 })
             {
@@ -2223,6 +2224,29 @@ inline void testAudioFileFormat (TestProgress& progress)
                         testAudioFileRoundTrip<choc::audio::OggAudioFileFormat<true>, double> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "8", 0.07);
                     else
                         testAudioFileRoundTrip<choc::audio::OggAudioFileFormat<true>, float> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "10", 0.05f);
+
+                    useDouble = ! useDouble;
+                }
+            }
+        }
+    }
+
+    {
+        CHOC_TEST (FLAC)
+
+        bool useDouble = false;
+        auto bitDepth = choc::audio::OggAudioFileFormat<true>().getSupportedBitDepths().front();
+
+        for (double sampleRate : { 22050.0, 44100.0, 48000.0 })
+        {
+            for (auto length : { 1, 2, 3, 4, 7, 15, 127, 256, 1024, 2049 })
+            {
+                for (auto channels : { 1, 2, 3, 4 })
+                {
+                    if (useDouble)
+                        testAudioFileRoundTrip<choc::audio::FLACAudioFileFormat<true>, double> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "", 0);
+                    else
+                        testAudioFileRoundTrip<choc::audio::FLACAudioFileFormat<true>, float> (progress, bitDepth, sampleRate, (uint32_t) channels, (uint32_t) length, "8", 0);
 
                     useDouble = ! useDouble;
                 }

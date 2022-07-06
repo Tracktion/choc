@@ -59,6 +59,7 @@
  #pragma GCC diagnostic ignored "-Wc99-extensions"
  #pragma GCC diagnostic ignored "-Wmisleading-indentation"
  #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+ #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
