@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../audio/choc_AudioFileFormat_MP3.h"
 #include "../audio/choc_AudioFileFormat_FLAC.h"
 #include "../audio/choc_AudioFileFormat_Ogg.h"
 #include "../audio/choc_AudioFileFormat_WAV.h"
