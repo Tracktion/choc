@@ -2514,18 +2514,21 @@ struct MP3AudioFileFormat::Implementation
         {
             stream->exceptions (std::istream::failbit);
 
-            if (minimp3::mp3dec_ex_open_cb (std::addressof (decoder), std::addressof (io), minimp3::MP3D_SEEK_TO_SAMPLE) != 0)
+            if (minimp3::mp3dec_ex_open_cb (std::addressof (decoder), std::addressof (io),
+                                            minimp3::MP3D_SEEK_TO_SAMPLE) != 0)
+                return false;
+
+            if (! fillCache (0))
+                return false;
+
+            if (frame.bitrate_kbps == 0 || frame.channels == 0 || frame.hz == 0)
                 return false;
 
             properties.formatName  = "MP3";
-
-            fillCache (0);
-
             properties.numChannels = static_cast<uint32_t> (frame.channels);
             properties.numFrames   = decoder.samples / properties.numChannels;
             properties.sampleRate  = static_cast<double> (frame.hz);
             properties.bitDepth    = BitDepth::int16;
-
             return true;
         }
 
@@ -2610,10 +2613,10 @@ struct MP3AudioFileFormat::Implementation
                                                              std::addressof (framesOut),
                                                              std::addressof (frame),
                                                              1024);
-            if (numSamples == 0)
+            if (numSamples == 0 || frame.channels <= 0)
                 return false;
 
-            auto numFrames = numSamples / properties.numChannels;
+            auto numFrames = numSamples / static_cast<uint32_t> (frame.channels);
             cacheFrames = choc::buffer::createInterleavedView (framesOut, frame.channels, numFrames);
             cacheStart = frameIndex;
             nextReadPosition = frameIndex + numFrames;

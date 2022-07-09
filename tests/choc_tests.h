@@ -2165,7 +2165,14 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
 
     {
         auto in = std::make_shared<std::istringstream> (file1);
-        auto reader = format.createReader (in);
+
+        choc::audio::AudioFileFormatList formats;
+        formats.addFormat<choc::audio::OggAudioFileFormat<false>>();
+        formats.addFormat<choc::audio::MP3AudioFileFormat>();
+        formats.addFormat<choc::audio::FLACAudioFileFormat<false>>();
+        formats.addFormat<choc::audio::WAVAudioFileFormat<false>>();
+
+        auto reader = formats.createReader (in);
         CHOC_EXPECT_TRUE (reader != nullptr);
 
         auto& p = reader->getProperties();

@@ -224,7 +224,32 @@ uint64_t copyAudioData (AudioFileWriter& destWriter,
                         AudioFileReader& sourceReader,
                         uint64_t maxNumFramesToCopy = 0);
 
+//==============================================================================
+/// Holds a list of audio formats, and can try each one in turn when to find
+/// one that'll open a stream.
+struct AudioFileFormatList
+{
+    AudioFileFormatList() = default;
+    ~AudioFileFormatList() = default;
 
+    /// Adds an instance of a format
+    void addFormat (std::unique_ptr<AudioFileFormat> formatToAdd);
+
+    /// Adds an instance of the format that's named by the template
+    template <typename AudioFormatType>
+    void addFormat();
+
+    /// Searches for the first format in this list that can load the
+    /// given stream. If none of them can read it, returns nullptr.
+    std::unique_ptr<AudioFileReader> createReader (std::shared_ptr<std::istream>);
+
+    /// Searches for the first format in this list that can load a file
+    /// from the given filename. If none of them can read it, returns nullptr.
+    std::unique_ptr<AudioFileReader> createReader (const std::string& filePath);
+
+    /// The list of registered formats
+    std::vector<std::unique_ptr<AudioFileFormat>> formats;
+};
 
 //==============================================================================
 //        _        _           _  _
@@ -429,6 +454,38 @@ inline uint64_t copyAudioData (AudioFileWriter& dest, AudioFileReader& source, u
     return readIndex;
 }
 
+//==============================================================================
+template <typename AudioFormatType>
+void AudioFileFormatList::addFormat()   { addFormat (std::make_unique<AudioFormatType>()); }
+
+inline void AudioFileFormatList::addFormat (std::unique_ptr<AudioFileFormat> formatToAdd)
+{
+    formats.push_back (std::move (formatToAdd));
+}
+
+inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (std::shared_ptr<std::istream> stream)
+{
+    try
+    {
+        auto originalStreamPos = stream->tellg();
+
+        for (auto& f : formats)
+        {
+            if (auto r = f->createReader (stream))
+                return r;
+
+            stream->seekg (originalStreamPos);
+        }
+    }
+    catch (...) {}
+
+    return {};
+}
+
+inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (const std::string& p)
+{
+    return createReader (std::make_shared<std::ifstream> (p, std::ios::binary | std::ios::in));
+}
 
 } // namespace choc::audio
 

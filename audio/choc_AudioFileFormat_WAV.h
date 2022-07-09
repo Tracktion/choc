@@ -55,151 +55,6 @@ public:
     using AudioFileFormat::createReader;
     using AudioFileFormat::createWriter;
 
-    // //==============================================================================
-    // struct MetadataChunkBase  : public AudioFileMetadata
-    // {
-    //     std::string chunkType;
-    // };
-
-    // //==============================================================================
-    // struct UnknownChunk  : public MetadataChunkBase
-    // {
-    //     std::vector<char> data;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<UnknownChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct BWAVChunk  : public MetadataChunkBase
-    // {
-    //     std::string description, originator, originatorRef,
-    //                 originationDate, originationTime, codingHistory;
-    //     uint64_t timeRef = 0;
-    //     uint16_t version = 0;
-    //     uint8_t umid[64] = {};
-    //     uint16_t loudnessValue = 0;
-    //     uint16_t loudnessRange = 0;
-    //     uint16_t maxTruePeakLevel = 0;
-    //     uint16_t maxMomentaryLoudness = 0;
-    //     uint16_t maxShortTermLoudness = 0;
-
-    //     void setOriginationTimeAndDate (uint16_t year, uint8_t month, uint8_t day,
-    //                                     uint8_t hours, uint8_t minutes, uint8_t seconds);
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<BWAVChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct SMPLChunk  : public MetadataChunkBase
-    // {
-    //     uint32_t manufacturerCode = 0,   // MMA manufacturer ID code
-    //              productID = 0,
-    //              samplePeriod = 0,       // Period of one sample, in nanoseconds
-    //              midiUnityNote = 0,      // The MIDI note at which this sample plays back at its original pitch
-    //              midiPitchFraction = 0,  // A fraction of a semitone to add to the specified midiUnityNote. A value of 0x80000000 = 50 cents
-    //              smpteFormat = 0,        // The SMPTE timecode format used by smpteOffset: can be 0, 24, 25, 29, 30.
-    //              smpteOffset = 0;        // A time offset for the sample if it is to be syncronized or calibrated according to a start time other than 0.
-    //                                      // The format of this value is 0xhhmmssff. hh is a signed hours value [-23..23], mm is unsigned Minutes [0..59].
-    //                                      // ss is unsigned Seconds [0..59]. ff is unsigned num frames.
-
-    //     struct Loop
-    //     {
-    //         uint32_t ID = 0,
-    //                  loopType = 0,         // 0 = forward (normal), 1 = alternating forward/backward, 2 = backward
-    //                  playCount = 0,        // number of times to play
-    //                  startByte = 0,        // Loop start pos in bytes
-    //                  endByte = 0,          // Loop end pos in bytes
-    //                  fractionalOffset = 0; // Fractional offset in samples where 0x80000000 = 1/2 sample
-    //     };
-
-    //     std::vector<Loop> loops;
-    //     std::vector<char> samplerData;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<SMPLChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct INSTChunk  : public MetadataChunkBase
-    // {
-    //     uint8_t baseNote = 0;
-    //     int8_t  fineTuning = 0;   // -50 to 50
-    //     int8_t  gainDecibels = 0;
-    //     uint8_t lowNote = 0;      // lowest usable MIDI note 0-127
-    //     uint8_t highNote = 0;     // highest usable MIDI note 0-127
-    //     uint8_t lowVelocity = 0;  // lowest usable MIDI velocity 0-127
-    //     uint8_t highVelocity = 0; // highest usable MIDI velocity 0-127
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<INSTChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct CueChunk  : public MetadataChunkBase
-    // {
-    //     struct Cue
-    //     {
-    //         uint32_t ID = 0,
-    //                  position = 0,
-    //                  dataChunkID = 0,
-    //                  chunkStart = 0,
-    //                  blockStart = 0,
-    //                  sampleStart = 0;
-    //     };
-
-    //     std::vector<Cue> cues;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<CueChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct LISTChunk  : public MetadataChunkBase
-    // {
-    //     std::string subChunkType;
-
-    //     struct ListInfoItem
-    //     {
-    //         std::string ID, content;
-    //     };
-
-    //     std::vector<ListInfoItem> listInfoItems;
-    //     std::vector<char> unknownSubChunkData;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<LISTChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct ACIDChunk  : public MetadataChunkBase
-    // {
-    //     bool isOneShot = false;
-    //     bool isRootNoteSet = false;
-    //     bool isStretchOn = false;
-    //     bool isDiskBased = false;
-    //     bool acidizerFlag = false;
-    //     uint32_t flags = 0;
-    //     uint16_t rootNote = 0;
-    //     uint32_t numBeats = 0;
-    //     uint16_t meterDenominator = 0;
-    //     uint16_t meterNumerator = 0;
-    //     float tempo = 0;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<ACIDChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct TrknChunk  : public MetadataChunkBase
-    // {
-    //     std::string value;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<TrknChunk> (*this); }
-    // };
-
-    // //==============================================================================
-    // struct AXMLChunk  : public MetadataChunkBase
-    // {
-    //     std::string xml;
-
-    //     std::unique_ptr<AudioFileMetadata> clone() override  { return std::make_unique<AXMLChunk> (*this); }
-    // };
-
 private:
     struct Implementation;
 };
@@ -234,7 +89,6 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
         {
             properties.formatName = "WAV";
             stream->exceptions (std::istream::failbit);
-            auto streamStartPos = getPosition();
 
             try
             {
@@ -242,12 +96,6 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
                 if (chunk == "RIFF") { readMainChunk (readChunkRange(), false); return true; }
                 if (chunk == "RF64") { readMainChunk (readChunkRange(), true);  return true; }
-            }
-            catch (...) {}
-
-            try
-            {
-                seek (streamStartPos);
             }
             catch (...) {}
 

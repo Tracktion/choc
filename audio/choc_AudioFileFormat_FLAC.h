@@ -19,23 +19,6 @@
 #ifndef CHOC_AUDIOFILEFORMAT_FLAC_HEADER_INCLUDED
 #define CHOC_AUDIOFILEFORMAT_FLAC_HEADER_INCLUDED
 
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <stddef.h>
-
-#if (defined (_WIN32) || defined (_WIN64)) && (defined (_M_X64) || defined(__x86_64__))
- #include <intrin.h>
-#endif
-
-#ifdef __linux__
- #include <signal.h>
-#endif
-
-#ifdef __APPLE__
- #include <sys/sysctl.h>
-#endif
-
 #include "../platform/choc_Assert.h"
 #include "choc_AudioFileFormat.h"
 #include "choc_AudioSampleData.h"
@@ -87,6 +70,28 @@ private:
 //   Code beyond this point is implementation detail...
 //
 //==============================================================================
+
+} // namespace choc::audio
+
+#include <stdlib.h>
+#include <limits.h>
+#include <string.h>
+#include <stddef.h>
+
+#if (defined (_WIN32) || defined (_WIN64)) && (defined (_M_X64) || defined(__x86_64__))
+ #include <intrin.h>
+#endif
+
+#ifdef __linux__
+ #include <signal.h>
+#endif
+
+#ifdef __APPLE__
+ #include <sys/sysctl.h>
+#endif
+
+namespace choc::audio
+{
 
 #include "../platform/choc_DisableAllWarnings.h"
 
@@ -17419,9 +17424,10 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
                                                         this) != flac::FLAC__STREAM_DECODER_INIT_STATUS_OK)
                 return false;
 
-            flac::FLAC__stream_decoder_process_until_end_of_metadata (decoder);
+            if (! flac::FLAC__stream_decoder_process_until_end_of_metadata (decoder))
+                return false;
 
-            if (properties.sampleRate <= 0)
+            if (errorOccurred || properties.sampleRate <= 0)
                 return false;
 
             if (properties.numFrames == 0)
@@ -17568,6 +17574,9 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
 
         static flac::FLAC__StreamDecoderReadStatus readCallback (const flac::FLAC__StreamDecoder*, flac::FLAC__byte* dest, size_t* bytes, void* context)
         {
+            if (static_cast<FLACReader*> (context)->errorOccurred)
+                return flac::FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+
             auto& s = *static_cast<FLACReader*> (context)->stream;
 
             try
@@ -17588,6 +17597,9 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
 
         static flac::FLAC__StreamDecoderSeekStatus seekCallback (const flac::FLAC__StreamDecoder*, flac::FLAC__uint64 absolute_byte_offset, void* context)
         {
+            if (static_cast<FLACReader*> (context)->errorOccurred)
+                return flac::FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
+
             auto& s = *static_cast<FLACReader*> (context)->stream;
 
             try
@@ -17643,8 +17655,9 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
             static_cast<FLACReader*> (context)->handleStreamInfo (metadata->data.stream_info);
         }
 
-        static void errorCallback (const flac::FLAC__StreamDecoder*, flac::FLAC__StreamDecoderErrorStatus, void*)
+        static void errorCallback (const flac::FLAC__StreamDecoder*, flac::FLAC__StreamDecoderErrorStatus, void* context)
         {
+            static_cast<FLACReader*> (context)->errorOccurred = true;
         }
 
         void setCacheSize (uint32_t numFrames)
@@ -17660,6 +17673,7 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
 
         flac::FLAC__StreamDecoder* decoder = {};
         bool isDummyLengthScan = false;
+        bool errorOccurred = false;
         double intToFloatScaleFactor = 0;
 
         std::vector<int32_t> cache;

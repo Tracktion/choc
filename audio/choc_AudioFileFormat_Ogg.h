@@ -19,15 +19,6 @@
 #ifndef CHOC_AUDIOFILEFORMAT_OGG_HEADER_INCLUDED
 #define CHOC_AUDIOFILEFORMAT_OGG_HEADER_INCLUDED
 
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <stddef.h>
-
-#if (defined (_WIN32) || defined (_WIN64)) && (defined (_M_X64) || defined(__x86_64__))
- #include <intrin.h>
-#endif
-
 #include "../platform/choc_Assert.h"
 #include "choc_AudioFileFormat.h"
 #include "choc_AudioSampleData.h"
@@ -79,6 +70,20 @@ private:
 //   Code beyond this point is implementation detail...
 //
 //==============================================================================
+
+} // namespace choc::audio
+
+#include <stdlib.h>
+#include <limits.h>
+#include <string.h>
+#include <stddef.h>
+
+#if (defined (_WIN32) || defined (_WIN64)) && (defined (_M_X64) || defined(__x86_64__))
+ #include <intrin.h>
+#endif
+
+namespace choc::audio
+{
 
 #include "../platform/choc_DisableAllWarnings.h"
 
