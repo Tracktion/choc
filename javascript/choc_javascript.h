@@ -25,6 +25,10 @@
 
 /**
     A simple javascript engine (currently using duktape internally)
+
+    Note! In order to avoid pulling in the whole of the dependencies, you should set
+    the macro CHOC_JAVASCRIPT_IMPLEMENTATION=1 in one (but not more than one!) of your
+    compile units!
 */
 namespace choc::javascript
 {
