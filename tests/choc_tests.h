@@ -518,10 +518,10 @@ inline void testStringUtilities (TestProgress& progress)
 
         CHOC_EXPECT_TRUE (testRoundTrip());
 
-        for (int start = 0; start < 256; ++start)
+        for (uint32_t start = 0; start < 256; ++start)
         {
             data.clear();
-            int byte = start;
+            uint32_t byte = start;
 
             for (int i = 0; i < 80; ++i)
             {

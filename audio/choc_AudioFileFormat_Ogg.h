@@ -119,6 +119,9 @@ namespace oggvorbis
  static constexpr double M_PI = 3.141592653589793238;
 #endif
 
+static int signedLeftShift (int n, int bits)  { return static_cast<int> (static_cast<unsigned int> (n) << bits); }
+static long signedLeftShift (long n, int bits)  { return static_cast<long> (static_cast<unsigned long> (n) << bits); }
+
 #define _ogg_malloc  malloc
 #define _ogg_calloc  calloc
 #define _ogg_realloc realloc
@@ -3031,7 +3034,7 @@ inline long oggpack_read(oggpack_buffer *b,int bits){
       if(bits>24){
         ret|=b->ptr[3]<<(24-b->endbit);
         if(bits>32 && b->endbit){
-          ret|=b->ptr[4]<<(32-b->endbit);
+          ret|=static_cast<long> (b->ptr[4]) << (32-b->endbit);
         }
       }
     }
@@ -4636,7 +4639,7 @@ typedef struct vorbis_info_psy{
   int   noisewindowlomin;
   int   noisewindowhimin;
   int   noisewindowfixed;
-  float noiseoff[P_NOISECURVES][P_BANDS];
+  float noiseoff[P_NOISECURVES][P_BANDS + 1];
   float noisecompand[NOISE_COMPAND_LEVELS];
 
   float max_curve_dB;
@@ -7965,7 +7968,7 @@ inline int floor1_encode(oggpack_buffer *opb,vorbis_block *vb,
           if(val<-headroom)
             val=headroom-val-1;
           else
-            val=-1-(val<<1);
+            val =- 1 - signedLeftShift (val, 1);
         else
           if(val>=headroom)
             val= val+headroom;
@@ -11416,7 +11419,7 @@ inline void _vp_psy_init(vorbis_look_psy *p,vorbis_info_psy *vi,
     for(;hi<=n && (hi<i+vi->noisewindowhimin ||
           toBARK(rate/(2*n)*hi)<(bark+vi->noisewindowhi));hi++);
 
-    p->bark[i]=((lo-1)<<16)+(hi-1);
+    p->bark[i]=signedLeftShift((lo-1), 16)+(hi-1);
 
   }
 

@@ -130,8 +130,9 @@ IntegerType decodeVariableLengthInt (const void* encodedData, size_t availableSi
 template <typename IntegerType>
 IntegerType zigzagEncode (IntegerType n)
 {
+    auto un = static_cast<typename std::make_unsigned<IntegerType>::type> (n);
     auto sn = static_cast<typename std::make_signed<IntegerType>::type> (n);
-    return static_cast<IntegerType> ((sn >> (sizeof (IntegerType) * 8 - 1)) ^ (sn << 1));
+    return static_cast<IntegerType> ((sn >> (sizeof (IntegerType) * 8 - 1)) ^ static_cast<IntegerType> (un << 1));
 }
 
 template <typename IntegerType>

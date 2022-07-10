@@ -215,8 +215,8 @@ template <typename FloatType> void Int16LittleEndian::write (void* dest, FloatTy
 template <typename FloatType> FloatType Int24BigEndian::read (const void* source) noexcept
 {
     auto s = static_cast<const uint8_t*> (source);
-    auto i = (static_cast<int32_t> (static_cast<int8_t> (s[0])) << 16) | static_cast<int32_t> (s[1] << 8) | static_cast<int32_t> (s[1]);
-    return convertToFloat<FloatType, 0x7fffff> (i);
+    auto i = (static_cast<uint32_t> (static_cast<int32_t> (static_cast<int8_t> (s[0]))) << 16) | static_cast<uint32_t> (s[1] << 8) | static_cast<uint32_t> (s[1]);
+    return convertToFloat<FloatType, 0x7fffff> (static_cast<int32_t> (i));
 }
 
 template <typename FloatType> void Int24BigEndian::write (void* dest, FloatType v) noexcept
@@ -231,8 +231,8 @@ template <typename FloatType> void Int24BigEndian::write (void* dest, FloatType 
 template <typename FloatType> FloatType Int24LittleEndian::read (const void* source) noexcept
 {
     auto s = static_cast<const uint8_t*> (source);
-    auto i = (static_cast<int32_t> (static_cast<int8_t> (s[2])) << 16) | static_cast<int32_t> (s[1] << 8) | static_cast<int32_t> (s[0]);
-    return convertToFloat<FloatType, 0x7fffff> (i);
+    auto i = (static_cast<uint32_t> (static_cast<int32_t> (static_cast<int8_t> (s[2]))) << 16) | static_cast<uint32_t> (s[1] << 8) | static_cast<uint32_t> (s[0]);
+    return convertToFloat<FloatType, 0x7fffff> (static_cast<int32_t> (i));
 }
 
 template <typename FloatType> void Int24LittleEndian::write (void* dest, FloatType v) noexcept

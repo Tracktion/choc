@@ -167,6 +167,8 @@ typedef FLAC__uint8 FLAC__byte;
 #undef false
 #endif
 
+static int32_t signedLeftShift (int32_t n, int bits)  { return static_cast<int32_t> (static_cast<uint32_t> (n) << bits); }
+
 /** The largest legal metadata type code. */
 static constexpr uint32_t FLAC__MAX_METADATA_TYPE_CODE = (126u);
 
@@ -6076,7 +6078,7 @@ inline FLAC__bool FLAC__bitwriter_write_rice_signed_block(FLAC__BitWriter *bw, c
 
     while(nvals) {
         /* fold signed to unsigned; actual formula is: negative(v)? -2v-1 : 2v */
-        uval = (*vals<<1) ^ (*vals>>31);
+        uval = signedLeftShift (*vals, 1) ^ (*vals>>31);
 
         msbits = uval >> parameter;
 
@@ -6842,11 +6844,11 @@ inline void FLAC__fixed_compute_residual(const FLAC__int32 data[], unsigned data
             break;
         case 3:
             for(i = 0; i < idata_len; i++)
-                residual[i] = data[i] - (((data[i-1]-data[i-2])<<1) + (data[i-1]-data[i-2])) - data[i-3];
+                residual[i] = data[i] - (signedLeftShift ((data[i-1]-data[i-2]), 1) + (data[i-1]-data[i-2])) - data[i-3];
             break;
         case 4:
             for(i = 0; i < idata_len; i++)
-                residual[i] = data[i] - ((data[i-1]+data[i-3])<<2) + ((data[i-2]<<2) + (data[i-2]<<1)) + data[i-4];
+                residual[i] = data[i] - signedLeftShift ((data[i-1]+data[i-3]), 2) + (signedLeftShift (data[i-2], 2) + signedLeftShift (data[i-2], 1)) + data[i-4];
             break;
         default:
             FLAC__ASSERT(0);
@@ -6876,7 +6878,7 @@ inline void FLAC__fixed_restore_signal(const FLAC__int32 residual[], unsigned da
             break;
         case 4:
             for(i = 0; i < idata_len; i++)
-                data[i] = residual[i] + ((data[i-1]+data[i-3])<<2) - ((data[i-2]<<2) + (data[i-2]<<1)) - data[i-4];
+                data[i] = residual[i] + signedLeftShift ((data[i-1]+data[i-3]), 2) - (signedLeftShift (data[i-2], 2) + signedLeftShift (data[i-2], 1)) - data[i-4];
             break;
         default:
             FLAC__ASSERT(0);
@@ -11674,7 +11676,7 @@ FLAC__bool read_subframe_(FLAC__StreamDecoder *decoder, unsigned channel, unsign
     if(wasted_bits && do_full_decode) {
         x = decoder->private_->frame.subframes[channel].wasted_bits;
         for(i = 0; i < decoder->private_->frame.header.blocksize; i++)
-            decoder->private_->output[channel][i] <<= x;
+            decoder->private_->output[channel][i] = signedLeftShift (decoder->private_->output[channel][i], x);
     }
 
     return true;
