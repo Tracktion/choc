@@ -96,8 +96,7 @@ int main (int argc, const char** argv)
 }
 
 //==============================================================================
-// include this after all the tests to make sure they don't rely on
-// anything that isn't included by the header.
-#undef CHOC_JAVASCRIPT_IMPLEMENTATION
-#define CHOC_JAVASCRIPT_IMPLEMENTATION 1
-#include "../javascript/choc_javascript.h"
+// include this last to make sure the tests don't rely on any of the garbage
+// that gets dragged in..
+#include "../javascript/choc_javascript_Duktape.h"
+#include "../javascript/choc_javascript_QuickJS.h"

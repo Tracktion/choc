@@ -67,10 +67,10 @@ The library is getting quite big now. Some of its many delights include:
 
   To try it out, if you compile the choc/tests project and run it with the command-line arg "webview", it pops up an example page and shows how to do some event-handling.
 
-#### Scripting and JSON
+#### Javascript and JSON
 
+- A cross-engine [Javascript](./javascript/choc_javascript.h) API with implementations for both QuickJS and Duktape! Both QuickJS and Duktape have been squashed into single-file header-only implementations, and you can choose to add either one (or both at once!) to your project by simply including a header file for the one you want. Since both engines provide the same `choc::javascript::Context` base-class, you can switch the javascript engine that your project uses without breaking any of your own code.
 - A [JSON](./text/choc_JSON.h) parser that uses choc::value::Value objects.
-- A [Javascript](./javascript/choc_javascript.h) interpreter (which is a header-only encapsulation of the duktape library).
 
 #### Audio
 

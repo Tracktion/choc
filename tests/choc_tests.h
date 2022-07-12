@@ -1909,16 +1909,14 @@ inline void testMIDIFiles (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testJavascript (TestProgress& progress)
+inline void testJavascript (TestProgress& progress, std::function<choc::javascript::Context()> createContext)
 {
-    CHOC_CATEGORY (Javascript);
-
     {
         CHOC_TEST (Basics)
 
         try
         {
-            choc::javascript::Context context;
+            auto context = createContext();
 
             CHOC_EXPECT_EQ (3, context.evaluate ("1 + 2").get<int>());
             CHOC_EXPECT_EQ (3.5, context.evaluate ("1 + 2.5").get<double>());
@@ -1941,13 +1939,14 @@ inline void testJavascript (TestProgress& progress)
 
         try
         {
-            choc::javascript::Context context;
+            auto context = createContext();
             context.evaluate ("function foo() { dfgdfsg> }");
             CHOC_FAIL ("Expected an error");
         }
         catch (const choc::javascript::Error& e)
         {
-            CHOC_EXPECT_EQ (e.what(), std::string ("SyntaxError: parse error (line 1, end of input)"));
+            CHOC_EXPECT_TRUE (choc::text::contains (e.what(), "unexpected token in expression:")
+                                || choc::text::contains (e.what(), "SyntaxError: parse error"));
         }
     }
 
@@ -1956,7 +1955,7 @@ inline void testJavascript (TestProgress& progress)
 
         try
         {
-            choc::javascript::Context context;
+            auto context = createContext();
 
             context.registerFunction ("addUp", [] (choc::javascript::ArgumentList args) -> choc::value::Value
                                                    {
@@ -2001,6 +2000,16 @@ inline void testJavascript (TestProgress& progress)
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
 }
+
+inline void testJavascript (TestProgress& progress)
+{
+    CHOC_CATEGORY (Javascript_Duktape);
+    testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); });
+
+    CHOC_CATEGORY (Javascript_QuickJS);
+    testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); });
+}
+
 
 //==============================================================================
 inline void testCOM (TestProgress& progress)
