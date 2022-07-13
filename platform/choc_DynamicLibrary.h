@@ -123,7 +123,7 @@ inline void* choc::file::DynamicLibrary::findFunction (std::string_view name)
  {
     extern "C" __declspec(dllimport)  void* __stdcall LoadLibraryA (const char*);
     extern "C" __declspec(dllimport)  int __stdcall FreeLibrary (void*);
-    extern "C" __declspec(dllimport)  void* GetProcAddress (void*, const char*);
+    extern "C" __declspec(dllimport)  void* __stdcall GetProcAddress (void*, const char*);
  }
  using CHOC_HMODULE = void*;
  #define CHOC_DLL_FUNCTION_NAMESPACE choc_win32_library_fns

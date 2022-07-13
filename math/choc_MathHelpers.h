@@ -30,7 +30,7 @@
   #pragma intrinsic (_BitScanReverse64)
  #endif
 
- #if ! (defined (_M_ARM) || defined (_M_ARM64))
+ #ifdef _M_X64
   #pragma intrinsic (_umul128)
   #define CHOC_HAS_UMUL128 1
  #endif

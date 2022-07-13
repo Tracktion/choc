@@ -90,6 +90,10 @@ private:
  #include <sys/sysctl.h>
 #endif
 
+#if _MSC_VER
+ #include <excpt.h>
+#endif
+
 namespace choc::audio
 {
 
@@ -6484,7 +6488,7 @@ inline void FLAC__cpu_info(FLAC__CPUInfo *info)
             }
         }
         __except(EXCEPTION_EXECUTE_HANDLER) {
-            if (_exception_code() == STATUS_ILLEGAL_INSTRUCTION)
+            if (_exception_code() == 0xC000001D /*STATUS_ILLEGAL_INSTRUCTION*/)
                 disable_sse(info);
         }
 #elif defined(__GNUC__) /* MinGW goes here */
