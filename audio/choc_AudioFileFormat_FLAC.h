@@ -133,7 +133,7 @@ namespace flac
  static constexpr double M_LN2 = 0.69314718055994530942;
 #endif
 
-#if ! (defined (__arm__) || defined (__arm64__))
+#if ! (defined (__ARM_ARCH) || defined (__arm__) || defined (__arm64__))
  #define FLAC__HAS_X86INTRIN 1
 
  #if defined (_WIN64) || defined (_WIN64)
