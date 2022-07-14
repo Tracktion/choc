@@ -30,7 +30,7 @@ namespace choc::file
 */
 struct DynamicLibrary
 {
-    DynamicLibrary() = delete;
+    DynamicLibrary() = default;
 
     /// Attempts to laod a library with the given name or path.
     DynamicLibrary (std::string_view library);
