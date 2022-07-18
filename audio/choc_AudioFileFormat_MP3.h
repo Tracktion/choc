@@ -1571,7 +1571,13 @@ static void mp3d_synth(float *xl, mp3d_sample_t *dstl, int nch, float *lins)
         MINIMP3_V0(0) MINIMP3_V2(1) MINIMP3_V1(2) MINIMP3_V2(3) MINIMP3_V1(4) MINIMP3_V2(5) MINIMP3_V1(6) MINIMP3_V2(7)
 
         {
+           #if _MSC_VER && (defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64))
+            const float scale_init[4] = { 1.0f/32768.0f, 1.0f/32768.0f, 1.0f/32768.0f, 1.0f/32768.0f };
+            static const f4 g_scale = vld1q_f32 (scale_init);
+           #else
             static const f4 g_scale = { 1.0f/32768.0f, 1.0f/32768.0f, 1.0f/32768.0f, 1.0f/32768.0f };
+           #endif
+
             a = MINIMP3_VMUL(a, g_scale);
             b = MINIMP3_VMUL(b, g_scale);
 #if MINIMP3_HAVE_SSE
