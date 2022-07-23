@@ -2289,6 +2289,7 @@ void ValueView::visitObjectMembers (Visitor&& visit) const
 
 struct ValueView::Iterator
 {
+    Iterator (const ValueView& v) : value (v), numElements (v.size()) {}
     Iterator (const Iterator&) = default;
     Iterator& operator= (const Iterator&) = default;
 
@@ -2299,10 +2300,10 @@ struct ValueView::Iterator
     bool operator!= (EndIterator) const     { return index != numElements; }
 
     ValueView value;
-    uint32_t index, numElements;
+    uint32_t index = 0, numElements;
 };
 
-inline ValueView::Iterator ValueView::begin() const   { return { *this, 0, size() }; }
+inline ValueView::Iterator ValueView::begin() const   { return ValueView::Iterator (*this); }
 
 //==============================================================================
 template <typename OutputStream>

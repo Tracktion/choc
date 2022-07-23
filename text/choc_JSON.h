@@ -174,99 +174,99 @@ inline std::string doubleToString (double value)
 
 //==============================================================================
 template <typename Stream>
-void writeAsJSON (Stream& output, const value::ValueView& value, bool useMultipleLines)
+struct Writer
 {
+    Stream& out;
+    uint32_t indentSize, currentIndent = 0;
     static constexpr const char newLine = '\n';
 
-    struct Writer
+    std::string getIndent() const         { return std::string (currentIndent, ' '); }
+    void startIndent()                    { currentIndent += indentSize; out << newLine << getIndent(); }
+    void endIndent()                      { currentIndent -= indentSize; out << newLine << getIndent(); }
+
+    void dump (const value::ValueView& v)
     {
-        Stream& out;
-        uint32_t indentSize, currentIndent = 0;
+        if (v.isVoid())                   { out << "null"; return; }
+        if (v.isString())                 { out << getEscapedQuotedString (v.getString()); return; }
+        if (v.isBool())                   { out << (v.getBool() ? "true" : "false"); return; }
+        if (v.isFloat())                  { out << doubleToString (v.get<double>()); return; }
+        if (v.isInt())                    { out << v.get<int64_t>(); return; }
+        if (v.isObject())                 return dumpObject (v);
+        if (v.isArray() || v.isVector())  return dumpArrayOrVector (v);
+    }
 
-        std::string getIndent() const         { return std::string (currentIndent, ' '); }
-        void startIndent()                    { currentIndent += indentSize; out << newLine << getIndent(); }
-        void endIndent()                      { currentIndent -= indentSize; out << newLine << getIndent(); }
+    void dumpArrayOrVector (const value::ValueView& v)
+    {
+        out << '[';
+        auto numElements = v.size();
 
-        void dump (const value::ValueView& v)
+        if (indentSize != 0 && numElements != 0)
         {
-            if (v.isVoid())                   { out << "null"; return; }
-            if (v.isString())                 { out << getEscapedQuotedString (v.getString()); return; }
-            if (v.isBool())                   { out << (v.getBool() ? "true" : "false"); return; }
-            if (v.isFloat())                  { out << doubleToString (v.get<double>()); return; }
-            if (v.isInt())                    { out << v.get<int64_t>(); return; }
-            if (v.isObject())                 return dumpObject (v);
-            if (v.isArray() || v.isVector())  return dumpArrayOrVector (v);
+            startIndent();
+
+            for (uint32_t i = 0; i < numElements; ++i)
+            {
+                dump (v[i]);
+
+                if (i != numElements - 1)
+                    out << "," << newLine << getIndent();
+            }
+
+            endIndent();
+        }
+        else
+        {
+            for (uint32_t i = 0; i < numElements; ++i)
+            {
+                if (i != 0) out << ", ";
+                dump (v[i]);
+            }
         }
 
-        void dumpArrayOrVector (const value::ValueView& v)
+        out << ']';
+    }
+
+    void dumpObject (const value::ValueView& object)
+    {
+        out << '{';
+        auto numMembers = object.size();
+
+        if (indentSize != 0 && numMembers != 0)
         {
-            out << '[';
-            auto numElements = v.size();
+            startIndent();
 
-            if (indentSize != 0 && numElements != 0)
+            for (uint32_t i = 0; i < numMembers; ++i)
             {
-                startIndent();
+                auto member = object.getObjectMemberAt (i);
+                out << getEscapedQuotedString (member.name) << ": ";
+                dump (member.value);
 
-                for (uint32_t i = 0; i < numElements; ++i)
-                {
-                    dump (v[i]);
-
-                    if (i != numElements - 1)
-                        out << "," << newLine << getIndent();
-                }
-
-                endIndent();
-            }
-            else
-            {
-                for (uint32_t i = 0; i < numElements; ++i)
-                {
-                    if (i != 0) out << ", ";
-                    dump (v[i]);
-                }
+                if (i != numMembers - 1)
+                    out << "," << newLine << getIndent();
             }
 
-            out << ']';
+            endIndent();
+        }
+        else
+        {
+            for (uint32_t i = 0; i < numMembers; ++i)
+            {
+                if (i != 0) out << ", ";
+
+                auto member = object.getObjectMemberAt (i);
+                out << getEscapedQuotedString (member.name) << ": ";
+                dump (member.value);
+            }
         }
 
-        void dumpObject (const value::ValueView& object)
-        {
-            out << '{';
-            auto numMembers = object.size();
+        out << '}';
+    }
+};
 
-            if (indentSize != 0 && numMembers != 0)
-            {
-                startIndent();
-
-                for (uint32_t i = 0; i < numMembers; ++i)
-                {
-                    auto member = object.getObjectMemberAt (i);
-                    out << getEscapedQuotedString (member.name) << ": ";
-                    dump (member.value);
-
-                    if (i != numMembers - 1)
-                        out << "," << newLine << getIndent();
-                }
-
-                endIndent();
-            }
-            else
-            {
-                for (uint32_t i = 0; i < numMembers; ++i)
-                {
-                    if (i != 0) out << ", ";
-
-                    auto member = object.getObjectMemberAt (i);
-                    out << getEscapedQuotedString (member.name) << ": ";
-                    dump (member.value);
-                }
-            }
-
-            out << '}';
-        }
-    };
-
-    Writer { output, useMultipleLines ? 2u : 0u }.dump (value);
+template <typename Stream>
+void writeAsJSON (Stream& output, const value::ValueView& value, bool useMultipleLines)
+{
+    Writer<Stream> { output, useMultipleLines ? 2u : 0u }.dump (value);
 }
 
 inline std::string toString (const value::ValueView& v, bool useLineBreaks)
