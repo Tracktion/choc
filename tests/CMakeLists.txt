@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(choc_tests)
 
+add_executable(choc_tests main.cpp main2.cpp)
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 
@@ -35,6 +37,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
     endif ()
 
+    target_compile_features(choc_tests PRIVATE cxx_std_17)
+
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
     set(CompilerFlags
@@ -51,11 +55,9 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /W4 /WX /wd4068 /wd4996 -DWIN32 /bigobj -DNOMINMAX")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4996 /wd4267 /wd5281 /wd5293 /wd5313 /wd4305 /wd4018")
 
+    # MSVC seems to throw up more problems with C++20 mode than C++17
+    target_compile_features(choc_tests PRIVATE cxx_std_20)
 endif()
-
-add_executable(choc_tests main.cpp main2.cpp)
-
-target_compile_features(choc_tests PRIVATE cxx_std_17)
 
 install(TARGETS choc_tests)
 
