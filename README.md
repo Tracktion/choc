@@ -29,6 +29,7 @@ The library is getting quite big now. Some of its many delights include:
 - Some headers which will [disable and reenable warnings](./platform/choc_DisableAllWarnings.h) for times when you have to include messy 3rd-party code in your otherwise faultless codebase.
 - The world's simplest [unit test framework](./tests/choc_UnitTest.h). I mainly wrote this so that CHOC can self-host its own unit-tests without any external dependencies, but have found it surprisingly useful for something that's about 100 lines of code.
 - Cross-platform [dynamic library loading](./platform/choc_DynamicLibrary.h).
+- A tempting-but-probably-perilous [in-memory DLL loader](./platform/choc_MemoryDLL.h) which can load a DLL from memory instead of a file (Windows only).
 - Various maths and bit-twiddling [bits and bobs](./math/choc_MathHelpers.h).
 
 ##### Text and Files

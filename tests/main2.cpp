@@ -16,15 +16,21 @@
 //   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+
+
+// This empty-ish file exists so that we test the inclusion of all the
+// headers in more than one compile unit, That should catch any
+// non-inlined symbols that will cause duplicate function errors
+// at link time.
+
+
 // On Windows, we'll include windows.h before the headers, in contrast to what
 // happens in main.cpp
 #if defined (_WIN32) || defined (_WIN64)
  #include <windows.h>
 #endif
 
+// This one pulls in windows.h so keep it out of choc_tests.h
+#include "../platform/choc_MemoryDLL.h"
 
 #include "choc_tests.h"
-
-// This empty-ish file is here so that we test the inclusion of all the
-// headers in more than one compile unit, so that we can catch any
-// non-inlined symbols that would cause link errors.
