@@ -104,6 +104,19 @@ namespace minimp3
     uses the minimp3 library to implement the choc AudioFileFormat classes...
 */
 
+#ifdef CHOC_REGISTER_OPEN_SOURCE_LICENCE
+ CHOC_REGISTER_OPEN_SOURCE_LICENCE (minimp3, R"(
+==============================================================================
+minimp3 license:
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide.
+This software is distributed without any warranty.
+See <http://creativecommons.org/publicdomain/zero/1.0/>.
+)")
+#endif
+
 typedef struct
 {
     int frame_bytes, frame_offset, channels, hz, layer, bitrate_kbps;

@@ -31,6 +31,7 @@ The library is getting quite big now. Some of its many delights include:
 - Cross-platform [dynamic library loading](./platform/choc_DynamicLibrary.h).
 - A tempting-but-probably-perilous [in-memory DLL loader](./platform/choc_MemoryDLL.h) which can load a DLL from memory instead of a file (Windows only).
 - Various maths and bit-twiddling [bits and bobs](./math/choc_MathHelpers.h).
+- A system for easily adding and collecting all the [open-source licenses](./text/choc_OpenSourceLicenseList.h) that your project uses into a single string for displaying to a user (for license compliance).
 
 ##### Text and Files
 

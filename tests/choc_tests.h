@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../text/choc_OpenSourceLicenseList.h"
 #include "../audio/choc_AudioFileFormat_MP3.h"
 #include "../audio/choc_AudioFileFormat_FLAC.h"
 #include "../audio/choc_AudioFileFormat_Ogg.h"
@@ -535,6 +536,11 @@ inline void testStringUtilities (TestProgress& progress)
     {
         CHOC_TEST (URIEncoding)
         CHOC_EXPECT_EQ (choc::text::percentEncodeURI ("ABC://``\\123-abc~-xyz"), "ABC%3a%2f%2f%60%60%5c123-abc~-xyz");
+    }
+
+    {
+        CHOC_TEST (OpenSourceLicenseList)
+        CHOC_EXPECT_TRUE (choc::text::OpenSourceLicenseList::getAllLicenseText().length() > 1000);
     }
 
     {
