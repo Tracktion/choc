@@ -230,6 +230,8 @@ uint64_t copyAudioData (AudioFileWriter& destWriter,
 struct AudioFileFormatList
 {
     AudioFileFormatList() = default;
+    AudioFileFormatList (AudioFileFormatList&&) = default;
+    AudioFileFormatList& operator= (AudioFileFormatList&&) = default;
     ~AudioFileFormatList() = default;
 
     /// Adds an instance of a format
@@ -241,11 +243,11 @@ struct AudioFileFormatList
 
     /// Searches for the first format in this list that can load the
     /// given stream. If none of them can read it, returns nullptr.
-    std::unique_ptr<AudioFileReader> createReader (std::shared_ptr<std::istream>);
+    std::unique_ptr<AudioFileReader> createReader (std::shared_ptr<std::istream>) const;
 
     /// Searches for the first format in this list that can load a file
     /// from the given filename. If none of them can read it, returns nullptr.
-    std::unique_ptr<AudioFileReader> createReader (const std::string& filePath);
+    std::unique_ptr<AudioFileReader> createReader (const std::string& filePath) const;
 
     /// The list of registered formats
     std::vector<std::unique_ptr<AudioFileFormat>> formats;
@@ -463,7 +465,7 @@ inline void AudioFileFormatList::addFormat (std::unique_ptr<AudioFileFormat> for
     formats.push_back (std::move (formatToAdd));
 }
 
-inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (std::shared_ptr<std::istream> stream)
+inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (std::shared_ptr<std::istream> stream) const
 {
     try
     {
@@ -482,7 +484,7 @@ inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (std::
     return {};
 }
 
-inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (const std::string& p)
+inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (const std::string& p) const
 {
     return createReader (std::make_shared<std::ifstream> (p, std::ios::binary | std::ios::in));
 }
