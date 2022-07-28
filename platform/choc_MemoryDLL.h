@@ -81,6 +81,10 @@ private:
 
 #include <vector>
 #include <unordered_map>
+#undef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#undef  NOMINMAX
+#define NOMINMAX
 #include <windows.h>
 
 namespace choc::memory
