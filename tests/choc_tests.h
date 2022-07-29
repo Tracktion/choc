@@ -942,6 +942,7 @@ inline void testJSON (TestProgress& progress)
         CHOC_EXPECT_EQ (1.28,             choc::json::parseValue ("1.28").getFloat64());
         CHOC_EXPECT_EQ (-4,               choc::json::parseValue ("-4.0").getFloat64());
         CHOC_EXPECT_EQ (10.0,             choc::json::parseValue ("1.0e1").getFloat64());
+        CHOC_EXPECT_EQ (0.1,              choc::json::parseValue ("1.0e-1").getFloat64());
         CHOC_EXPECT_EQ (10.0,             choc::json::parseValue ("1E1").getFloat64());
         CHOC_EXPECT_EQ ("1234",           std::string (choc::json::parseValue ("\"1234\"").getString()));
     }

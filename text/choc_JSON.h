@@ -403,9 +403,16 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
                 auto lastPos = current;
                 auto c = pop();
 
-                if (c >= '0' && c <= '9')                        continue;
-                if (c == '.' && ! hadDot)                        { hadDot = true; continue; }
-                if (! hadExponent && (c == 'e' || c == 'E'))     { hadDot = true; hadExponent = true; continue; }
+                if (c >= '0' && c <= '9')  continue;
+                if (c == '.' && ! hadDot)  { hadDot = true; continue; }
+
+                if (! hadExponent && (c == 'e' || c == 'E'))
+                {
+                    hadDot = true;
+                    hadExponent = true;
+                    popIf ('-');
+                    continue;
+                }
 
                 if (isWhitespace (c) || c == ',' || c == '}' || c == ']' || c == 0)
                 {
