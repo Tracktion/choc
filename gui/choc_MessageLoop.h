@@ -19,8 +19,12 @@
 #ifndef CHOC_MESSAGELOOP_HEADER_INCLUDED
 #define CHOC_MESSAGELOOP_HEADER_INCLUDED
 
+#include <memory>
+#include <string>
 #include <functional>
+#include <mutex>
 #include "../platform/choc_Platform.h"
+#include "../platform/choc_Assert.h"
 
 
 //==============================================================================
@@ -46,6 +50,45 @@ namespace choc::messageloop
 
     /// Posts a function be invoked asynchronously by the message thread.
     void postMessage (std::function<void()>&&);
+
+    //==============================================================================
+    /// Manages a periodic timer whose callbacks happen on the message loop.
+    ///
+    /// You can create a Timer with a callback function and interval, and the
+    /// function will be repeatedly called (on the message thread) until the Timer
+    /// is deleted, or clear() is called, or the callback function returns false.
+    ///
+    struct Timer
+    {
+        Timer() = default;
+        Timer (Timer&&) = default;
+        Timer& operator= (Timer&&) = default;
+        ~Timer() = default;
+
+        /// The callback function should return true to keep the
+        /// timer running, or false to stop it.
+        using Callback = std::function<bool()>;
+
+        /// Creates and starts a Timer for a particular interval (in
+        /// milliseconds) and a callback.
+        /// The callback will continue to be called at this interval
+        /// until either the Timer object is deleted, or clear() is
+        /// called, or the callback returns `false`.
+        Timer (uint32_t intervalMillisecs,
+               Callback&& callbackFunction);
+
+        /// Stops and clears the timer. (You can also clear a Timer
+        /// by assigning an empty Timer to it).
+        void clear()                    { pimpl.reset(); }
+
+        /// Returns true if the Timer has been initialised with
+        /// a callback, or false if it's just an empty object.
+        operator bool() const           { return pimpl != nullptr; }
+
+    private:
+        struct Pimpl;
+        std::unique_ptr<Pimpl> pimpl;
+    };
 }
 
 
@@ -60,17 +103,19 @@ namespace choc::messageloop
 //
 //==============================================================================
 
-
 #if CHOC_LINUX
 
 #include "../platform/choc_DisableAllWarnings.h"
 #include <gtk/gtk.h>
 #include "../platform/choc_ReenableAllWarnings.h"
 
-inline void choc::messageloop::run()   { gtk_main(); }
-inline void choc::messageloop::stop()  { gtk_main_quit(); }
+namespace choc::messageloop
+{
 
-inline void choc::messageloop::postMessage (std::function<void()>&& fn)
+inline void run()   { gtk_main(); }
+inline void stop()  { gtk_main_quit(); }
+
+inline void postMessage (std::function<void()>&& fn)
 {
     g_idle_add_full (G_PRIORITY_HIGH_IDLE,
                      (GSourceFunc) ([](void* f) -> int
@@ -82,9 +127,31 @@ inline void choc::messageloop::postMessage (std::function<void()>&& fn)
                      [] (void* f) { delete static_cast<std::function<void()>*>(f); });
 }
 
+struct Timer::Pimpl
+{
+    Pimpl (Callback&& c, uint32_t interval) : callback (std::move (c))
+    {
+        handle = g_timeout_add (interval, staticCallback, this);
+    }
+
+    ~Pimpl()
+    {
+        g_source_remove (handle);
+    }
+
+    static gboolean staticCallback (gpointer context)
+    {
+        return static_cast<Pimpl*> (context)->callback();
+    }
+
+    Callback callback;
+    guint handle;
+};
+
 //==============================================================================
 #elif CHOC_APPLE
 
+#include <unordered_set>
 #include <objc/objc-runtime.h>
 #include <dispatch/dispatch.h>
 
@@ -105,12 +172,15 @@ namespace choc::objc
     static inline id getSharedNSApplication()              { return call<id> (getClass ("NSApplication"), "sharedApplication"); }
 }
 
-inline void choc::messageloop::run()
+namespace choc::messageloop
+{
+
+inline void run()
 {
     objc::call<void> (objc::getSharedNSApplication(), "run");
 }
 
-inline void choc::messageloop::stop()
+inline void stop()
 {
     using namespace choc::objc;
     static constexpr long NSEventTypeApplicationDefined = 15;
@@ -125,7 +195,7 @@ inline void choc::messageloop::stop()
     call<void> (getSharedNSApplication(), "postEvent:atStart:", dummyEvent, YES);
 }
 
-inline void choc::messageloop::postMessage (std::function<void()>&& fn)
+inline void postMessage (std::function<void()>&& fn)
 {
     dispatch_async_f (dispatch_get_main_queue(),
                       new std::function<void()> (std::move (fn)),
@@ -135,6 +205,70 @@ inline void choc::messageloop::postMessage (std::function<void()>&& fn)
                           (*f)();
                       }));
 }
+
+struct Timer::Pimpl
+{
+    Pimpl (Callback&& c, uint32_t i) : callback (std::move (c)), interval (i)
+    {
+        getList().add (this);
+        dispatch();
+    }
+
+    ~Pimpl()
+    {
+        getList().remove (this);
+    }
+
+    static void staticCallback (void* context)
+    {
+        if (getList().invokeIfStillAlive (static_cast<Pimpl*> (context)))
+            static_cast<Pimpl*> (context)->dispatch();
+    }
+
+    void dispatch()
+    {
+        dispatch_after_f (dispatch_time (DISPATCH_TIME_NOW, interval * 1000000),
+                          dispatch_get_main_queue(), this, staticCallback);
+    }
+
+    Callback callback;
+    const int64_t interval;
+
+    struct TimerList
+    {
+        std::recursive_mutex lock;
+        std::unordered_set<Pimpl*> timers;
+
+        bool invokeIfStillAlive (Pimpl* p)
+        {
+            std::lock_guard<decltype(lock)> l (lock);
+
+            // must check before AND after the call because the Pimpl
+            // may be deleted during the callback
+            return timers.find (p) != timers.end()
+                    && p->callback()
+                    && timers.find (p) != timers.end();
+        }
+
+        void add (Pimpl* p)
+        {
+            std::lock_guard<decltype(lock)> l (lock);
+            timers.insert (p);
+        }
+
+        void remove (Pimpl* p)
+        {
+            std::lock_guard<decltype(lock)> l (lock);
+            timers.erase (p);
+        }
+    };
+
+    static TimerList& getList()
+    {
+        static TimerList list;
+        return list;
+    }
+};
 
 //==============================================================================
 #elif CHOC_WINDOWS
@@ -192,10 +326,87 @@ inline void postMessage (std::function<void()>&& fn)
     PostThreadMessage (getMainThreadID(), WM_APP, 0, (LPARAM) new std::function<void()> (std::move (fn)));
 }
 
-} // namespace choc::messageloop
+struct Timer::Pimpl
+{
+    Pimpl (Callback&& c, uint32_t interval) : callback (std::move (c))
+    {
+        timerID = SetTimer (getHWND(), reinterpret_cast<UINT_PTR> (this),
+                            interval, (TIMERPROC) staticCallback);
+    }
+
+    ~Pimpl()
+    {
+        KillTimer (getHWND(), timerID);
+    }
+
+    void invoke()
+    {
+        // local copy in case this Pimpl has been deleted after the callback
+        auto localIDCopy = timerID;
+
+        if (! callback())
+            KillTimer (getHWND(), localIDCopy);
+    }
+
+    static void staticCallback (HWND, UINT, UINT_PTR p, DWORD)
+    {
+        reinterpret_cast<Pimpl*> (p)->invoke();
+    }
+
+    Callback callback;
+    UINT_PTR timerID;
+
+    struct MessageWindow
+    {
+        MessageWindow()
+        {
+            className = "choc_" + std::to_string (rand());
+
+            WNDCLASSEXA wc = {};
+            wc.cbSize = sizeof (wc);
+            wc.hInstance = GetModuleHandleA (nullptr);
+            wc.lpszClassName = className.c_str();
+            wc.lpfnWndProc = windowProc;
+
+            RegisterClassExA (std::addressof (wc));
+
+            hwnd = CreateWindowA (className.c_str(), "choc", 0, 0, 0, 0, 0,
+                                  nullptr, nullptr, wc.hInstance, nullptr);
+        }
+
+        ~MessageWindow()
+        {
+            DestroyWindow (hwnd);
+            UnregisterClassA (className.c_str(), nullptr);
+        }
+
+        static LRESULT CALLBACK windowProc (HWND h, UINT message, WPARAM wParam, LPARAM lParam)
+        {
+            return DefWindowProc (h, message, wParam, lParam);
+        }
+
+        HWND hwnd;
+        std::string className;
+    };
+
+    static HWND getHWND()
+    {
+        static MessageWindow w;
+        return w.hwnd;
+    }
+};
 
 #else
  #error "choc::messageloop only supports OSX, Windows or Linux!"
 #endif
+
+inline Timer::Timer (uint32_t interval, Callback&& cb)
+{
+    CHOC_ASSERT (cb != nullptr); // The callback must be a valid function!
+    pimpl = std::make_unique<Pimpl> (std::move (cb), interval);
+}
+
+} // namespace choc::messageloop
+
 
 #endif // CHOC_MESSAGELOOP_HEADER_INCLUDED

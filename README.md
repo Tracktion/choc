@@ -60,6 +60,7 @@ The library is getting quite big now. Some of its many delights include:
 #### GUI
 
 - Some bare-bones [message loop](./gui/choc_MessageLoop.h) control functions.
+- A [timer class](./gui/choc_MessageLoop.h) for cross-platform message loop timer callbacks.
 - The world's most hassle-free single-header [WebView](./gui/choc_WebView.h) class!
 
   This lets you create an embedded browser view (either as a desktop window or added to an existing window), and interact with it by invoking javascript code and binding callback C++ functions to be called by javascript. Something that makes this particularly special compared to other web-view libraries is that on Windows, it provides the modern Edge browser without you needing to install extra SDKs to compile it, and without any need to link or redistribute the Microsoft loader DLLs - it's literally a *dependency-free single-header Edge implementation*. (Internally, some absolutely hideous shenanegans are involved to make this possible!)

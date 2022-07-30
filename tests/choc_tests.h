@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../gui/choc_MessageLoop.h"
 #include "../text/choc_OpenSourceLicenseList.h"
 #include "../audio/choc_AudioFileFormat_MP3.h"
 #include "../audio/choc_AudioFileFormat_FLAC.h"
@@ -2270,6 +2271,39 @@ inline void testAudioFileFormat (TestProgress& progress)
     }
 }
 
+inline void testTimers (TestProgress& progress)
+{
+    CHOC_CATEGORY (MessageLoop);
+
+    {
+        CHOC_TEST (Timers)
+
+        int count = 0, messageCount = 0;
+
+        auto t1 = choc::messageloop::Timer (100, [&]
+        {
+            return ++count != 13;
+        });
+
+        auto t2 = choc::messageloop::Timer (1500, [&]
+        {
+            if (count < 13)
+                return true;
+
+            choc::messageloop::postMessage ([&messageCount, count]
+            {
+                messageCount = count;
+                choc::messageloop::stop();
+            });
+
+            return false;
+        });
+
+        choc::messageloop::run();
+        CHOC_EXPECT_EQ (messageCount, 13);
+    }
+}
+
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
@@ -2288,6 +2322,7 @@ inline bool runAllTests (TestProgress& progress)
     testCOM (progress);
     testStableSort (progress);
     testAudioFileFormat (progress);
+    testTimers (progress);
 
     progress.printReport();
     return progress.numFails == 0;
