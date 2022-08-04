@@ -61,6 +61,7 @@ namespace choc::messageloop
     struct Timer
     {
         Timer() = default;
+        Timer (const Timer&) = delete;
         Timer (Timer&&) = default;
         Timer& operator= (Timer&&) = default;
         ~Timer() = default;
@@ -348,7 +349,7 @@ struct Timer::Pimpl
             KillTimer (getHWND(), localIDCopy);
     }
 
-    static void staticCallback (HWND, UINT, UINT_PTR p, DWORD)
+    static void staticCallback (HWND, UINT, UINT_PTR p, DWORD) noexcept
     {
         reinterpret_cast<Pimpl*> (p)->invoke();
     }

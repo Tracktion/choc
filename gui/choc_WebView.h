@@ -19,29 +19,21 @@
 #ifndef CHOC_WEBVIEW_HEADER_INCLUDED
 #define CHOC_WEBVIEW_HEADER_INCLUDED
 
-#include <atomic>
 #include <unordered_map>
-
-#include "choc_MessageLoop.h"
 #include "../text/choc_JSON.h"
+#include "choc_MessageLoop.h"
 
 //==============================================================================
-namespace choc::webview
+namespace choc::ui
 {
-
-/// Contains optional settings to pass to a WebView constructor.
-struct Options
-{
-    /// The parent window in which the WebView should be embedded: this
-    /// will be a HWND, NSWindow* or GtkWidget** depending on the platform.
-    void* parentWindowHandle = nullptr;
-
-    /// If supported, this enables developer features in the browser
-    bool enableDebugMode = false;
-};
 
 /**
-    Creates a browser window, either standalone or embedded inside another window.
+    Creates an embedded browser which can be placed inside some kind of parent window.
+
+    After creating a WebView object, its getViewHandle() returns a platform-specific
+    handle that can be added to whatever kind of window is appropriate. The
+    choc::ui::DesktopWindow class is an example of a window that can have the
+    webview added to it via its choc::ui::DesktopWindow::setContent() method.
 
     There are unfortunately a few extra build steps needed for using WebView
     in your projects:
@@ -72,14 +64,19 @@ struct Options
 class WebView
 {
 public:
-    /// Creates a WebView with default options.
-    WebView();
+    /// Contains optional settings to pass to a WebView constructor.
+    struct Options
+    {
+        /// If supported, this enables developer features in the browser
+        bool enableDebugMode = false;
+    };
 
-    /// Creates a WebView with some options. If you want to embed the
-    /// view inside a window that is provided elsewhere, that's an option
-    /// in the `webview::Options` struct.
+    /// Creates a WebView with default options
+    WebView();
+    /// Creates a WebView with some options
     WebView (const Options&);
 
+    WebView (const WebView&) = delete;
     WebView (WebView&&) = default;
     WebView& operator= (WebView&&) = default;
     ~WebView();
@@ -104,22 +101,8 @@ public:
     /// Adds a script to run when the browser loads a page
     void addInitScript (const std::string& script);
 
-    /// Sets the title of the window that the browser is inside
-    void setWindowTitle (const std::string& newTitle);
-
-    /// Enables/disables user resizing of the window
-    void setResizable (bool);
-    void setMinimumSize (int minWidth, int minHeight);
-    void setMaximumSize (int maxWidth, int maxHeight);
-    void setWindowBounds (int x, int y, int width, int height);
-    void centreWithSize (int width, int height);
-    void toFront();
-
-    /// Returns a platform-specific handle for the parent window
-    void* getWindowHandle() const;
-
-    /// An optional callback that will be called when the parent window is closed
-    std::function<void()> windowClosed;
+    /// Returns a platform-specific handle for this view
+    void* getViewHandle() const;
 
 private:
     //==============================================================================
@@ -130,7 +113,7 @@ private:
     void invokeBinding (const std::string&);
 };
 
-} // namespace choc::webview
+} // namespace choc::ui
 
 
 //==============================================================================
@@ -151,44 +134,26 @@ private:
 #include <webkit2/webkit2.h>
 #include "../platform/choc_ReenableAllWarnings.h"
 
-struct choc::webview::WebView::Pimpl
+struct choc::ui::WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options& options)
-        : owner (v), window (static_cast<GtkWidget*> (options.parentWindowHandle))
+    Pimpl (WebView& v, const Options& options) : owner (v)
     {
         if (! gtk_init_check (0, nullptr))
           return;
 
-        if (window == nullptr)
-        {
-            window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-            ownsWindow = true;
-        }
-
-        destroyHandlerID = g_signal_connect (G_OBJECT (window), "destroy",
-                                             G_CALLBACK (+[](GtkWidget*, gpointer arg)
-                                             {
-                                                static_cast<Pimpl*> (arg)->windowDestroyEvent();
-                                             }),
-                                             this);
-
         webview = webkit_web_view_new();
-        WebKitUserContentManager* manager = webkit_web_view_get_user_content_manager (WEBKIT_WEB_VIEW (webview));
+        g_object_ref_sink (G_OBJECT (webview));
+        manager = webkit_web_view_get_user_content_manager (WEBKIT_WEB_VIEW (webview));
 
-        g_signal_connect (manager, "script-message-received::external",
-                          G_CALLBACK (+[] (WebKitUserContentManager*, WebKitJavascriptResult* r, gpointer arg)
-                          {
-                              auto s = jsc_value_to_string (webkit_javascript_result_get_js_value (r));
-                              static_cast<Pimpl*> (arg)->owner.invokeBinding (s);
-                              g_free (s);
-                          }),
-                          this);
+        signalHandlerID = g_signal_connect (manager, "script-message-received::external",
+                                            G_CALLBACK (+[] (WebKitUserContentManager*, WebKitJavascriptResult* r, gpointer arg)
+                                            {
+                                                static_cast<Pimpl*> (arg)->invokeCallback (r);
+                                            }),
+                                            this);
 
         webkit_user_content_manager_register_script_message_handler (manager, "external");
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } }");
-
-        gtk_container_add (GTK_CONTAINER (window), GTK_WIDGET (webview));
-        gtk_widget_grab_focus (GTK_WIDGET (webview));
 
         WebKitSettings* settings = webkit_web_view_get_settings (WEBKIT_WEB_VIEW (webview));
         webkit_settings_set_javascript_can_access_clipboard (settings, true);
@@ -199,80 +164,18 @@ struct choc::webview::WebView::Pimpl
             webkit_settings_set_enable_developer_extras (settings, true);
         }
 
-        gtk_widget_show_all (window);
+        gtk_widget_show_all (webview);
     }
 
     ~Pimpl()
     {
-        if (ownsWindow && window != nullptr)
-        {
-            if (destroyHandlerID != 0)
-                g_signal_handler_disconnect (window, destroyHandlerID);
+        if (signalHandlerID != 0 && webview != nullptr)
+            g_signal_handler_disconnect (manager, signalHandlerID);
 
-            gtk_widget_destroy (GTK_WIDGET (window));
-        }
+        g_clear_object (&webview);
     }
 
-    void windowDestroyEvent()
-    {
-        ownsWindow = false;
-        window = {};
-        windowClosed();
-    }
-
-    void windowClosed();
-    void* getWindowHandle() const     { return (void*) window; }
-
-    void setWindowTitle (const std::string& newTitle)
-    {
-        gtk_window_set_title (GTK_WINDOW (window), newTitle.c_str());
-    }
-
-    void setResizable (bool b)
-    {
-        gtk_window_set_resizable (GTK_WINDOW (window), b);
-    }
-
-    void setMinimumSize (int w, int h)
-    {
-        GdkGeometry g;
-        g.min_width = w;
-        g.min_height = h;
-        gtk_window_set_geometry_hints (GTK_WINDOW (window), nullptr, &g, GDK_HINT_MIN_SIZE);
-    }
-
-    void setMaximumSize (int w, int h)
-    {
-        GdkGeometry g;
-        g.max_width = w;
-        g.max_height = h;
-        gtk_window_set_geometry_hints (GTK_WINDOW (window), nullptr, &g, GDK_HINT_MAX_SIZE);
-    }
-
-    void setSize (int w, int h)
-    {
-        if (gtk_window_get_resizable (GTK_WINDOW (window)))
-            gtk_window_resize (GTK_WINDOW (window), w, h);
-        else
-            gtk_widget_set_size_request (window, w, h);
-    }
-
-    void centreWithSize (int w, int h)
-    {
-        setSize (w, h);
-        gtk_window_set_position (GTK_WINDOW (window), GTK_WIN_POS_CENTER);
-    }
-
-    void setWindowBounds (int x, int y, int w, int h)
-    {
-        setSize (w, h);
-        gtk_window_move (GTK_WINDOW (window), x, y);
-    }
-
-    void toFront()
-    {
-        gtk_window_activate_default (GTK_WINDOW (window));
-    }
+    void* getViewHandle() const     { return (void*) webview; }
 
     void evaluateJavascript (const std::string& js)
     {
@@ -291,19 +194,24 @@ struct choc::webview::WebView::Pimpl
 
     void addInitScript (const std::string& js)
     {
-        WebKitUserContentManager* manager = webkit_web_view_get_user_content_manager (WEBKIT_WEB_VIEW (webview));
-
-        webkit_user_content_manager_add_script (manager, webkit_user_script_new (js.c_str(), WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
-                                                                                 WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
-                                                                                 nullptr, nullptr));
+        if (manager != nullptr)
+            webkit_user_content_manager_add_script (manager, webkit_user_script_new (js.c_str(),
+                                                                                     WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
+                                                                                     WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
+                                                                                     nullptr, nullptr));
     }
 
-private:
+    void invokeCallback (WebKitJavascriptResult* r)
+    {
+        auto s = jsc_value_to_string (webkit_javascript_result_get_js_value (r));
+        owner.invokeBinding (s);
+        g_free (s);
+    }
+
     WebView& owner;
-    GtkWidget* window = {};
     GtkWidget* webview = {};
-    bool ownsWindow = false;
-    unsigned long destroyHandlerID = 0;
+    WebKitUserContentManager* manager = {};
+    unsigned long signalHandlerID = 0;
 };
 
 //==============================================================================
@@ -311,32 +219,15 @@ private:
 
 #include <CoreGraphics/CoreGraphics.h>
 
-struct choc::webview::WebView::Pimpl
+struct choc::ui::WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& options) : owner (v)
     {
         using namespace choc::objc;
-        auto app = getSharedNSApplication();
-        call<void> (app, "setActivationPolicy:", NSApplicationActivationPolicyRegular);
 
         auto delegate = createDelegate();
         objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
-        call<void> (app, "setDelegate:", delegate);
-
-        if (options.parentWindowHandle != nullptr)
-        {
-            window = (id) options.parentWindowHandle;
-        }
-        else
-        {
-            ownsWindow = true;
-            window = call<id> (call<id> (getClass ("NSWindow"), "alloc"),
-                               "initWithContentRect:styleMask:backing:defer:",
-                               CGRectMake (0, 0, 0, 0),
-                               NSWindowStyleMaskTitled, NSBackingStoreBuffered, (int) 0);
-        }
-
-        call<void> (window, "setDelegate:", delegate);
+        call<void> (getSharedNSApplication(), "setDelegate:", delegate);
 
         auto config = call<id> (getClass ("WKWebViewConfiguration"), "new");
         manager = call<id> (config, "userContentController");
@@ -355,24 +246,14 @@ struct choc::webview::WebView::Pimpl
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
 
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
-
-        call<void> (window, "setContentView:", webview);
-        call<void> (window, "makeKeyAndOrderFront:", (id) nullptr);
     }
 
     ~Pimpl()
     {
-        if (ownsWindow)
-            objc::call<void> (window, "close");
+        objc::call<void> (webview, "release");
     }
 
-    void windowClosed();
-    void* getWindowHandle() const     { return (void*) window; }
-
-    void setWindowTitle (const std::string& newTitle)
-    {
-        objc::call<void> (window, "setTitle:", objc::getNSString (newTitle));
-    }
+    void* getViewHandle() const     { return (void*) webview; }
 
     void addInitScript (const std::string& script)
     {
@@ -380,33 +261,6 @@ struct choc::webview::WebView::Pimpl
         auto s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
                                      getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1);
         call<void> (manager, "addUserScript:", s);
-    }
-
-    void setResizable (bool b)
-    {
-        auto style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-                        | (b ? NSWindowStyleMaskResizable : 0);
-
-        objc::call<void> (window, "setStyleMask:", (unsigned long) style);
-    }
-
-    void setMinimumSize (int w, int h) { objc::call<void> (window, "setContentMinSize:", CGSizeMake (w, h)); }
-    void setMaximumSize (int w, int h) { objc::call<void> (window, "setContentMaxSize:", CGSizeMake (w, h)); }
-
-    void centreWithSize (int w, int h)
-    {
-        setWindowBounds (0, 0, w, h);
-        objc::call<void> (window, "center");
-    }
-
-    void setWindowBounds (int x, int y, int w, int h)
-    {
-        objc::call<void> (window, "setFrame:display:animate:", CGRectMake (x, y, w, h), (BOOL) 1, (BOOL) 0);
-    }
-
-    void toFront()
-    {
-        choc::messageloop::postMessage ([=] { objc::call<void> (objc::getSharedNSApplication(), "activateIgnoringOtherApps:", (BOOL) 1); });
     }
 
     void navigate (const std::string& url)
@@ -435,24 +289,9 @@ struct choc::webview::WebView::Pimpl
 
     id createDelegate()
     {
-        auto delegateClsss = objc_allocateClassPair (objc_getClass ("NSResponder"), "AppDelegate", 0);
+        auto delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
 
-        if (auto p = objc_getProtocol ("NSWindowDelegate"))
-            class_addProtocol (delegateClsss, p);
-
-        class_addMethod (delegateClsss, objc::getSelector ("windowShouldClose:"),
-                         (IMP) (+[](id self, SEL, id) -> BOOL
-                         {
-                             getPimplFromContext (self).windowClosed();
-                             return TRUE;
-                         }),
-                         "c@:@");
-
-        class_addMethod (delegateClsss, objc::getSelector ("applicationShouldTerminateAfterLastWindowClosed:"),
-                         (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
-                         "c@:@");
-
-        class_addMethod (delegateClsss, objc::getSelector ("userContentController:didReceiveScriptMessage:"),
+        class_addMethod (delegateClass, objc::getSelector ("userContentController:didReceiveScriptMessage:"),
                          (IMP) (+[](id self, SEL, id, id msg)
                          {
                              auto body = objc::call<id> (msg, "body");
@@ -460,33 +299,19 @@ struct choc::webview::WebView::Pimpl
                          }),
                          "v@:@@");
 
-        objc_registerClassPair (delegateClsss);
+        objc_registerClassPair (delegateClass);
 
-        return objc::call<id> ((id) delegateClsss, "new");
+        return objc::call<id> ((id) delegateClass, "new");
     }
 
     WebView& owner;
-    id window = {}, webview = {}, manager = {};
-    bool ownsWindow = false;
+    id webview = {}, manager = {};
 
-    static constexpr long NSWindowStyleMaskTitled = 1;
-    static constexpr long NSWindowStyleMaskMiniaturizable = 4;
-    static constexpr long NSWindowStyleMaskResizable = 8;
-    static constexpr long NSWindowStyleMaskClosable = 2;
-    static constexpr long NSBackingStoreBuffered = 2;
-    static constexpr long NSApplicationActivationPolicyRegular = 0;
     static constexpr long WKUserScriptInjectionTimeAtDocumentStart = 0;
 };
 
 //==============================================================================
 #elif CHOC_WINDOWS
-
-#undef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#undef  NOMINMAX
-#define NOMINMAX
-#include <windows.h>
-#include <shlobj.h>
 
 // If you want to supply your own mechanism for finding the Microsoft
 // Webview2Loader.dll file, then define the CHOC_FIND_WEBVIEW2LOADER_DLL
@@ -494,20 +319,22 @@ struct choc::webview::WebView::Pimpl
 // which points to the DLL.
 #ifndef CHOC_FIND_WEBVIEW2LOADER_DLL
  #define CHOC_USE_INTERNAL_WEBVIEW_DLL 1
- #define CHOC_FIND_WEBVIEW2LOADER_DLL choc::webview::getWebview2LoaderDLL()
+ #define CHOC_FIND_WEBVIEW2LOADER_DLL choc::ui::getWebview2LoaderDLL()
  #include "../platform/choc_MemoryDLL.h"
- namespace choc::webview
+ namespace choc::ui
  {
     using WebViewDLL = choc::memory::MemoryDLL;
     static WebViewDLL getWebview2LoaderDLL();
  }
 #else
  #include "../platform/choc_DynamicLibrary.h"
- namespace choc::webview
+ namespace choc::ui
  {
     using WebViewDLL = choc::file::DynamicLibrary;
  }
 #endif
+
+#include "choc_DesktopWindow.h"
 
 #ifndef __webview2_h__
 #define __webview2_h__
@@ -516,13 +343,15 @@ struct choc::webview::WebView::Pimpl
 #define __REQUIRED_RPCNDR_H_VERSION__ 475
 #endif
 
+#include <atomic>
+#include <shlobj.h>
 #include <rpc.h>
 #include <rpcndr.h>
 #include <objidl.h>
 #include <oaidl.h>
 
 #ifndef __RPCNDR_H_VERSION__
-#error this stub requires an updated version of <rpcndr.h>
+#error "This code requires an updated version of <rpcndr.h>"
 #endif
 
 extern "C"
@@ -726,11 +555,15 @@ STDAPI CreateCoreWebView2EnvironmentWithOptions(PCWSTR, PCWSTR, void*, ICoreWebV
 
 }
 
-#endif
+#endif // __webview2_h__
 
-struct choc::webview::WebView::Pimpl
+namespace choc::ui
 {
-    Pimpl (WebView& v, const Options& options) : owner (v)
+
+//==============================================================================
+struct WebView::Pimpl
+{
+    Pimpl (WebView& v, const Options&) : owner (v)
     {
         // You cam define this macro to provide a custom way of getting a
         // choc::file::DynamicLibrary that contains the redistributable
@@ -740,46 +573,18 @@ struct choc::webview::WebView::Pimpl
         if (! webviewDLL)
             return;
 
-        if (options.parentWindowHandle == nullptr)
-        {
-            ownsWindow = true;
-            auto moduleHandle = GetModuleHandle (nullptr);
-            auto icon = (HICON) LoadImage (moduleHandle, IDI_APPLICATION, IMAGE_ICON,
-                                           GetSystemMetrics (SM_CXSMICON),
-                                           GetSystemMetrics (SM_CYSMICON),
-                                           LR_DEFAULTCOLOR);
+        hwnd = windowClass.createWindow (WS_POPUP, 400, 400, this);
 
-            WNDCLASSEXW wc;
-            ZeroMemory (&wc, sizeof(wc));
-            wc.cbSize = sizeof(wc);
-            wc.hInstance = moduleHandle;
-            wc.lpszClassName = L"CHOC_WebView";
-            wc.hIcon = icon;
-            wc.hIconSm = icon;
-            wc.lpfnWndProc = (WNDPROC) wndProc;
+        if (hwnd.hwnd == nullptr)
+            return;
 
-            RegisterClassExW (&wc);
-            hwnd = CreateWindowW (L"CHOC_WebView", L"", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                                  640, 480, nullptr, nullptr, moduleHandle, nullptr);
-
-            if (hwnd == nullptr)
-                return;
-
-            SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
-        }
-        else
-        {
-            hwnd = static_cast<HWND> (options.parentWindowHandle);
-        }
-
+        SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
         ShowWindow (hwnd, SW_SHOW);
-        UpdateWindow (hwnd);
-        SetFocus (hwnd);
 
         if (createEmbeddedWebView())
         {
-            resizeControllerToFit();
-            coreWebViewController->MoveFocus (COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+            resizeContentToFit();
+            // coreWebViewController->MoveFocus (COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
         }
     }
 
@@ -796,81 +601,9 @@ struct choc::webview::WebView::Pimpl
             coreWebViewController->Release();
             coreWebViewController = nullptr;
         }
-
-        if (ownsWindow && IsWindow (hwnd))
-            DestroyWindow (hwnd);
     }
 
-    void windowClosed();
-    void* getWindowHandle() const     { return (void*) hwnd; }
-
-    void setWindowTitle (const std::string& newTitle)
-    {
-        SetWindowTextW (hwnd, createUTF16StringFromUTF8 (newTitle).c_str());
-    }
-
-    void setResizable (bool b)
-    {
-        auto style = GetWindowLong (hwnd, GWL_STYLE);
-
-        if (b)
-            style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);
-        else
-            style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-
-        SetWindowLong (hwnd, GWL_STYLE, style);
-    }
-
-    void setMinimumSize (int w, int h)
-    {
-        minimumSize.x = w;
-        minimumSize.y = h;
-    }
-
-    void setMaximumSize (int w, int h)
-    {
-        maximumSize.x = w;
-        maximumSize.y = h;
-    }
-
-    void getMinMaxInfo (MINMAXINFO& m) const
-    {
-        if (maximumSize.x > 0 && maximumSize.y > 0)
-        {
-            m.ptMaxSize = maximumSize;
-            m.ptMaxTrackSize = maximumSize;
-        }
-
-        if (minimumSize.x > 0 && minimumSize.y > 0)
-            m.ptMinTrackSize = minimumSize;
-    }
-
-    void centreWithSize (int w, int h)
-    {
-        setBounds (0, 0, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
-    }
-
-    void setWindowBounds (int x, int y, int w, int h)
-    {
-        setBounds (x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-    }
-
-    void setBounds (int x, int y, int w, int h, DWORD flags)
-    {
-        RECT r;
-        r.left = x;
-        r.top = y;
-        r.right = w;
-        r.bottom = h;
-        AdjustWindowRect (&r, WS_OVERLAPPEDWINDOW, 0);
-        SetWindowPos (hwnd, nullptr, r.left, r.top, r.right - r.left, r.bottom - r.top, flags);
-        resizeControllerToFit();
-    }
-
-    void toFront()
-    {
-        BringWindowToTop (hwnd);
-    }
+    void* getViewHandle() const     { return (void*) hwnd.hwnd; }
 
     void navigate (const std::string& url)
     {
@@ -893,30 +626,30 @@ struct choc::webview::WebView::Pimpl
     }
 
 private:
-    void resizeControllerToFit()
+    WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
+    HWNDHolder hwnd;
+
+    static Pimpl* getPimpl (HWND h)     { return (Pimpl*) GetWindowLongPtr (h, GWLP_USERDATA); }
+
+    static LRESULT wndProc (HWND h, UINT msg, WPARAM wp, LPARAM lp)
+    {
+        if (msg == WM_SIZE)
+            if (auto w = getPimpl (h))
+                w->resizeContentToFit();
+
+        return DefWindowProcW (h, msg, wp, lp);
+    }
+
+    void resizeContentToFit()
     {
         if (coreWebViewController != nullptr)
         {
             RECT r;
-            GetClientRect (hwnd, &r);
+            GetWindowRect (hwnd, &r);
+            r.right -= r.left; r.bottom -= r.top;
+            r.left = r.top = 0;
             coreWebViewController->put_Bounds (r);
         }
-    }
-
-    static LRESULT wndProc (HWND h, UINT msg, WPARAM wp, LPARAM lp)
-    {
-        auto w = (Pimpl*) GetWindowLongPtr (h, GWLP_USERDATA);
-
-        switch (msg)
-        {
-            case WM_SIZE:            w->resizeControllerToFit(); break;
-            case WM_CLOSE:           DestroyWindow (h); break;
-            case WM_DESTROY:         w->windowClosed(); break;
-            case WM_GETMINMAXINFO:   if (w != nullptr) w->getMinMaxInfo (*(LPMINMAXINFO) lp); break;
-            default:                 return DefWindowProcW (h, msg, wp, lp);
-        }
-
-        return 0;
     }
 
     bool createEmbeddedWebView()
@@ -928,7 +661,8 @@ private:
             auto handler = new EventHandler (*this);
             webviewInitialising.test_and_set();
 
-            if (auto createWebView = (decltype(&CreateCoreWebView2EnvironmentWithOptions)) webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
+            if (auto createWebView = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
+                                        webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
             {
                 if (createWebView (nullptr, userDataFolder.c_str(), nullptr, handler) == S_OK)
                 {
@@ -977,6 +711,9 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (HRESULT, ICoreWebView2Environment* env) override
         {
+            if (env == nullptr)
+                return E_FAIL;
+
             env->CreateCoreWebView2Controller (ownerPimpl.hwnd, this);
             return S_OK;
         }
@@ -1014,16 +751,12 @@ private:
         }
 
         Pimpl& ownerPimpl;
-        HWND parentHWND;
         std::atomic<unsigned long> refCount { 0 };
     };
 
     //==============================================================================
     WebView& owner;
     WebViewDLL webviewDLL;
-    HWND hwnd = {};
-    bool ownsWindow = false;
-    POINT minimumSize = {}, maximumSize = {};
     ICoreWebView2* coreWebView = nullptr;
     ICoreWebView2Controller* coreWebViewController = nullptr;
     std::atomic_flag webviewInitialising = ATOMIC_FLAG_INIT;
@@ -1053,89 +786,31 @@ private:
 
         return {};
     }
-
-    static std::string createUTF8FromUTF16 (const std::wstring& utf16)
-    {
-        if (! utf16.empty())
-        {
-            auto numWideChars = static_cast<int> (utf16.size());
-            auto resultSize = WideCharToMultiByte (CP_UTF8, WC_ERR_INVALID_CHARS, utf16.data(), numWideChars, nullptr, 0, nullptr, nullptr);
-
-            if (resultSize > 0)
-            {
-                std::string result;
-                result.resize (static_cast<size_t> (resultSize));
-
-                if (WideCharToMultiByte (CP_UTF8, WC_ERR_INVALID_CHARS, utf16.data(), numWideChars, result.data(), resultSize, nullptr, nullptr) > 0)
-                    return result;
-            }
-        }
-
-        return {};
-    }
-
-    static std::wstring createUTF16StringFromUTF8 (std::string_view utf8)
-    {
-        if (! utf8.empty())
-        {
-            auto numUTF8Bytes = static_cast<int> (utf8.size());
-            auto resultSize = MultiByteToWideChar (CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), numUTF8Bytes, nullptr, 0);
-
-            if (resultSize > 0)
-            {
-                std::wstring result;
-                result.resize (static_cast<size_t> (resultSize));
-
-                if (MultiByteToWideChar (CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), numUTF8Bytes, result.data(), resultSize) > 0)
-                    return result;
-            }
-        }
-
-        return {};
-    }
 };
 
+} // namespace choc::ui
+
 #else
- #error "choc::WebView only supports OSX, Windows or Linux!"
+ #error "choc WebView only supports OSX, Windows or Linux!"
 #endif
 
-namespace choc::webview
+namespace choc::ui
 {
 
 //==============================================================================
-inline WebView::WebView() : WebView (Options())
-{
-}
-
-inline WebView::WebView (const Options& options)
-   : pimpl (std::make_unique<Pimpl> (*this, options))
-{
-}
+inline WebView::WebView() : WebView (Options()) {}
+inline WebView::WebView (const Options& options)  : pimpl (std::make_unique<Pimpl> (*this, options)) {}
 
 inline WebView::~WebView()
 {
     pimpl.reset();
 }
 
-inline void WebView::Pimpl::windowClosed()
-{
-    if (owner.windowClosed != nullptr)
-        owner.windowClosed();
-}
-
 inline void WebView::navigate (const std::string& url)               { pimpl->navigate (url.empty() ? "about:blank" : url); }
 inline void WebView::setHTML (const std::string& html)               { pimpl->setHTML (html); }
 inline void WebView::addInitScript (const std::string& script)       { pimpl->addInitScript (script); }
 inline void WebView::evaluateJavascript (const std::string& script)  { pimpl->evaluateJavascript (script); }
-
-inline void* WebView::getWindowHandle() const                        { return pimpl->getWindowHandle(); }
-inline void WebView::setWindowTitle (const std::string& title)       { pimpl->setWindowTitle (title); }
-inline void WebView::setMinimumSize (int w, int h)                   { pimpl->setMinimumSize (w, h); }
-inline void WebView::setMaximumSize (int w, int h)                   { pimpl->setMaximumSize (w, h); }
-inline void WebView::setResizable (bool b)                           { pimpl->setResizable (b); }
-inline void WebView::setWindowBounds (int x, int y, int w, int h)    { pimpl->setWindowBounds (x, y, w, h); }
-inline void WebView::centreWithSize (int w, int h)                   { pimpl->centreWithSize (w, h); }
-inline void WebView::toFront()                                       { pimpl->toFront(); }
+inline void* WebView::getViewHandle() const                          { return pimpl->getViewHandle(); }
 
 inline void WebView::bind (const std::string& functionName, CallbackFn&& fn)
 {
@@ -1201,7 +876,7 @@ inline void WebView::invokeBinding (const std::string& msg)
     {}
 }
 
-} // namespace choc::webview
+} // namespace choc::ui
 
 
 //==============================================================================
@@ -1287,7 +962,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 )")
 #endif
 
-inline choc::webview::WebViewDLL choc::webview::getWebview2LoaderDLL()
+inline choc::ui::WebViewDLL choc::ui::getWebview2LoaderDLL()
 {
    #ifdef _M_ARM64
     static constexpr unsigned char dllData[130488] = {

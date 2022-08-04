@@ -18,20 +18,24 @@
 
 #include "choc_tests.h"
 #include "../gui/choc_WebView.h"
+#include "../gui/choc_DesktopWindow.h"
 
 
 static void testWebView()
 {
-    choc::webview::WebView w;
+    choc::ui::DesktopWindow window ({ 100, 100, 800, 600 });
 
-    w.setWindowTitle ("Hello");
+    window.setWindowTitle ("Hello");
+    window.setResizable (true);
+    window.setMinimumSize (300, 300);
+    window.setMaximumSize (1500, 1200);
+    window.windowClosed = [] { choc::messageloop::stop(); };
 
-    w.setResizable (true);
-    w.setMinimumSize (300, 300);
-    w.setMaximumSize (1000, 1000);
-    w.centreWithSize (800, 600);
+    choc::ui::WebView webview;
 
-    w.bind ("eventCallbackFn", [] (const choc::value::ValueView& args) -> choc::value::Value
+    window.setContent (webview.getViewHandle());
+
+    webview.bind ("eventCallbackFn", [] (const choc::value::ValueView& args) -> choc::value::Value
     {
         auto message = "eventCallbackFn() called with args: " + choc::json::toString (args);
 
@@ -44,13 +48,13 @@ static void testWebView()
         return choc::value::createString (message);
     });
 
-    w.bind ("loadCHOCWebsite", [&w] (const choc::value::ValueView&) -> choc::value::Value
+    webview.bind ("loadCHOCWebsite", [&webview] (const choc::value::ValueView&) -> choc::value::Value
     {
-        w.navigate ("https://github.com/Tracktion/choc");
+        webview.navigate ("https://github.com/Tracktion/choc");
         return {};
     });
 
-    w.setHTML (R"xxx(
+    webview.setHTML (R"xxx(
       <!DOCTYPE html> <html>
         <head> <title>Page Title</title> </head>
         <script>
@@ -75,9 +79,7 @@ static void testWebView()
       </html>
     )xxx");
 
-    w.windowClosed = [] { choc::messageloop::stop(); };
-
-    w.toFront();
+    window.toFront();
     choc::messageloop::run();
 }
 
