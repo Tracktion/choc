@@ -1,11 +1,11 @@
 //
 //    ██████ ██   ██  ██████   ██████
-//   ██      ██   ██ ██    ██ ██            ** Clean Header-Only Classes **
+//   ██      ██   ██ ██    ██ ██            ** Classy Header-Only Classes **
 //   ██      ███████ ██    ██ ██
 //   ██      ██   ██ ██    ██ ██           https://github.com/Tracktion/choc
 //    ██████ ██   ██  ██████   ██████
 //
-//   CHOC is (C)2021 Tracktion Corporation, and is offered under the terms of the ISC license:
+//   CHOC is (C)2022 Tracktion Corporation, and is offered under the terms of the ISC license:
 //
 //   Permission to use, copy, modify, and/or distribute this software for any purpose with or
 //   without fee is hereby granted, provided that the above copyright notice and this permission
@@ -21,7 +21,7 @@
 #include "../gui/choc_DesktopWindow.h"
 
 
-static void testWebView()
+static int openDemoWebViewWindow()
 {
     choc::ui::DesktopWindow window ({ 100, 100, 800, 600 });
 
@@ -81,23 +81,21 @@ static void testWebView()
 
     window.toFront();
     choc::messageloop::run();
+    return 0;
 }
 
+//==============================================================================
 int main (int argc, const char** argv)
 {
     for (int i = 0; i < argc; ++i)
-    {
         if (std::string_view (argv[i]) == "webview")
-        {
-            testWebView();
-            return 0;
-        }
-    }
+            return openDemoWebViewWindow();
 
     choc::test::TestProgress progress;
     return choc::test::runAllTests (progress) ? 0 : 1;
 }
 
+//==============================================================================
 // include this after all the tests to make sure they don't rely on
 // anything that isn't included by the header.
 #undef CHOC_JAVASCRIPT_IMPLEMENTATION
