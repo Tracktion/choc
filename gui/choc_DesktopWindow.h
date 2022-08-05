@@ -244,6 +244,7 @@ struct choc::ui::DesktopWindow::Pimpl
         objc::call<void> (window, "setDelegate:", nullptr);
         objc::call<void> (window, "close");
         objc::call<void> (window, "release");
+        objc_disposeClassPair (delegateClass);
     }
 
     void* getWindowHandle() const     { return (void*) window; }
@@ -303,7 +304,8 @@ struct choc::ui::DesktopWindow::Pimpl
 
     id createDelegate()
     {
-        auto delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCDesktopWindowDelegate", 0);
+        delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCDesktopWindowDelegate", 0);
+        CHOC_ASSERT (delegateClass);
 
         if (auto p = objc_getProtocol ("NSWindowDelegate"))
             class_addProtocol (delegateClass, p);
@@ -339,6 +341,7 @@ struct choc::ui::DesktopWindow::Pimpl
 
     DesktopWindow& owner;
     id window = {};
+    Class delegateClass = {};
 
     static constexpr long NSWindowStyleMaskTitled = 1;
     static constexpr long NSWindowStyleMaskMiniaturizable = 4;

@@ -250,7 +250,9 @@ struct choc::ui::WebView::Pimpl
 
     ~Pimpl()
     {
+        objc::call<void> (objc::getSharedNSApplication(), "setDelegate:", nullptr);
         objc::call<void> (webview, "release");
+        objc_disposeClassPair (delegateClass);
     }
 
     void* getViewHandle() const     { return (void*) webview; }
@@ -289,7 +291,8 @@ struct choc::ui::WebView::Pimpl
 
     id createDelegate()
     {
-        auto delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
+        delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
+        CHOC_ASSERT (delegateClass);
 
         class_addMethod (delegateClass, objc::getSelector ("userContentController:didReceiveScriptMessage:"),
                          (IMP) (+[](id self, SEL, id, id msg)
@@ -306,6 +309,7 @@ struct choc::ui::WebView::Pimpl
 
     WebView& owner;
     id webview = {}, manager = {};
+    Class delegateClass = {};
 
     static constexpr long WKUserScriptInjectionTimeAtDocumentStart = 0;
 };
