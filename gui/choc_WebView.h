@@ -234,7 +234,6 @@ struct choc::ui::WebView::Pimpl
         webview = call<id> (getClass ("WKWebView"), "alloc");
 
         auto prefs = call<id> (config, "preferences");
-
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("fullScreenEnabled"));
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("DOMPasteAllowed"));
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("javaScriptCanAccessClipboard"));
@@ -243,7 +242,9 @@ struct choc::ui::WebView::Pimpl
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
         call<void> (webview, "initWithFrame:configuration:", CGRectMake (0, 0, 0, 0), config);
+        call<void> (config, "release");
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
+        call<void> (delegate, "release");
 
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
     }
