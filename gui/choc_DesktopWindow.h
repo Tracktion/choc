@@ -107,7 +107,7 @@ struct choc::ui::DesktopWindow::Pimpl
 {
     Pimpl (DesktopWindow& w, Bounds bounds)  : owner (w)
     {
-        if (! gtk_init_check (0, nullptr))
+        if (! gtk_init_check (nullptr, nullptr))
             return;
 
         window = gtk_window_new (GTK_WINDOW_TOPLEVEL);

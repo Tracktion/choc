@@ -138,7 +138,7 @@ struct choc::ui::WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& options) : owner (v)
     {
-        if (! gtk_init_check (0, nullptr))
+        if (! gtk_init_check (nullptr, nullptr))
           return;
 
         webview = webkit_web_view_new();

@@ -60,6 +60,10 @@
  #pragma GCC diagnostic ignored "-Wmisleading-indentation"
  #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
  #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+ #pragma GCC diagnostic ignored "-Wcast-function-type"
+ #pragma GCC diagnostic ignored "-Wunused-label"
+ #pragma GCC diagnostic ignored "-Wnarrowing"
+ #pragma GCC diagnostic ignored "-Wparentheses"
 
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
