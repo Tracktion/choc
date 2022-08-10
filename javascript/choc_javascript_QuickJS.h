@@ -9385,20 +9385,20 @@ enum
 };
 
 /* Note: c++ does not like nested designators */
-#define JS_CFUNC_DEF(name, length, func1)                   { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, { .func = { length, JS_CFUNC_generic, { .generic = func1 } } } }
-#define JS_CFUNC_MAGIC_DEF(name, length, func1, magic)      { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic, { .func = { length, JS_CFUNC_generic_magic, { .generic_magic = func1 } } } }
-#define JS_CFUNC_SPECIAL_DEF(name, length, cproto, func1)   { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, { .func = { length, JS_CFUNC_ ## cproto, { .cproto = func1 } } } }
-#define JS_ITERATOR_NEXT_DEF(name, length, func1, magic)    { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic, { .func = { length, JS_CFUNC_iterator_next, { .iterator_next = func1 } } } }
-#define JS_CGETSET_DEF(name, fgetter, fsetter)              { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET, 0, { .getset = { .get = { .getter = fgetter }, .set = { .setter = fsetter } } } }
-#define JS_CGETSET_MAGIC_DEF(name, fgetter, fsetter, magic) { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET_MAGIC, magic, { .getset = { .get = { .getter_magic = fgetter }, .set = { .setter_magic = fsetter } } } }
-#define JS_PROP_STRING_DEF(name, cstr, prop_flags)          { name, prop_flags, JS_DEF_PROP_STRING, 0, { .str = cstr } }
-#define JS_PROP_INT32_DEF(name, val, prop_flags)            { name, prop_flags, JS_DEF_PROP_INT32, 0, { .i32 = val } }
-#define JS_PROP_INT64_DEF(name, val, prop_flags)            { name, prop_flags, JS_DEF_PROP_INT64, 0, { .i64 = val } }
-#define JS_PROP_DOUBLE_DEF(name, val, prop_flags)           { name, prop_flags, JS_DEF_PROP_DOUBLE, 0, { .f64 = val } }
-#define JS_PROP_UNDEFINED_DEF(name, prop_flags)             { name, prop_flags, JS_DEF_PROP_UNDEFINED, 0, { .i32 = 0 } }
-#define JS_OBJECT_DEF(name, tab, len, prop_flags)           { name, prop_flags, JS_DEF_OBJECT, 0, { .prop_list = { tab, len } } }
-#define JS_ALIAS_DEF(name, from)                            { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_ALIAS, 0, { .alias = { from, -1 } } }
-#define JS_ALIAS_BASE_DEF(name, from, base)                 { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_ALIAS, 0, { .alias = { from, base } } }
+#define JS_CFUNC_DEF(name, length, func1)                   [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0     }; e.u.func = { length, JS_CFUNC_generic       }; e.u.func.cfunc.generic       = func1; return e; }()
+#define JS_CFUNC_MAGIC_DEF(name, length, func1, magic)      [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic }; e.u.func = { length, JS_CFUNC_generic_magic }; e.u.func.cfunc.generic_magic = func1; return e; }()
+#define JS_CFUNC_SPECIAL_DEF(name, length, cproto, func1)   [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0     }; e.u.func = { length, JS_CFUNC_ ## cproto    }; e.u.func.cfunc.cproto        = func1; return e; }()
+#define JS_ITERATOR_NEXT_DEF(name, length, func1, magic)    [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic }; e.u.func = { length, JS_CFUNC_iterator_next }; e.u.func.cfunc.iterator_next = func1; return e; }()
+#define JS_CGETSET_DEF(name, fgetter, fsetter)              [] { JSCFunctionListEntry e { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET,       0     }; e.u.getset.get.getter       = fgetter; e.u.getset.set.setter       = fsetter; return e; }()
+#define JS_CGETSET_MAGIC_DEF(name, fgetter, fsetter, magic) [] { JSCFunctionListEntry e { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET_MAGIC, magic }; e.u.getset.get.getter_magic = fgetter; e.u.getset.set.setter_magic = fsetter; return e; }()
+#define JS_PROP_STRING_DEF(name, cstr, prop_flags)          [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_PROP_STRING,    0 }; e.u.str = cstr; return e; }()
+#define JS_PROP_INT32_DEF(name, val, prop_flags)            [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_PROP_INT32,     0 }; e.u.i32 = val;  return e; }()
+#define JS_PROP_INT64_DEF(name, val, prop_flags)            [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_PROP_INT64,     0 }; e.u.i64 = val;  return e; }()
+#define JS_PROP_DOUBLE_DEF(name, val, prop_flags)           [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_PROP_DOUBLE,    0 }; e.u.f64 = val;  return e; }()
+#define JS_PROP_UNDEFINED_DEF(name, prop_flags)             [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_PROP_UNDEFINED, 0 }; e.u.i32 = 0;    return e; }()
+#define JS_OBJECT_DEF(name, tab, len, prop_flags)           [] { JSCFunctionListEntry e { name, prop_flags, JS_DEF_OBJECT,         0 }; e.u.prop_list = { tab, len }; return e; }()
+#define JS_ALIAS_DEF(name, from)                            [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_ALIAS, 0 }; e.u.alias = { from, -1 }; return e; }()
+#define JS_ALIAS_BASE_DEF(name, from, base)                 [] { JSCFunctionListEntry e { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_ALIAS, 0 }; e.u.alias = { from, base }; return e; }()
 
 void JS_SetPropertyFunctionList(JSContext *ctx, JSValueConst obj,
                                 const JSCFunctionListEntry *tab,
@@ -24882,7 +24882,7 @@ static int js_arguments_define_own_property(JSContext *ctx,
 }
 
 const JSClassExoticMethods js_arguments_exotic_methods = {
-    .define_own_property = js_arguments_define_own_property,
+    nullptr, nullptr, nullptr, js_arguments_define_own_property, nullptr, nullptr
 };
 
 static JSValue js_build_arguments(JSContext *ctx, int argc, JSValueConst *argv)
@@ -37611,7 +37611,7 @@ static int js_module_ns_has(JSContext *ctx, JSValueConst obj, JSAtom atom)
 }
 
 const JSClassExoticMethods js_module_ns_exotic_methods = {
-    .has_property = js_module_ns_has,
+    nullptr, nullptr, nullptr, nullptr, js_module_ns_has, nullptr, nullptr
 };
 
 static int exported_names_cmp(const void *p1, const void *p2, void *opaque)
@@ -50117,9 +50117,8 @@ static int js_string_delete_property(JSContext *ctx,
 }
 
 const JSClassExoticMethods js_string_exotic_methods = {
-    .get_own_property = js_string_get_own_property,
-    .delete_property = js_string_delete_property,
-    .define_own_property = js_string_define_own_property,
+    js_string_get_own_property, nullptr, js_string_delete_property,
+    js_string_define_own_property, nullptr, nullptr, nullptr
 };
 
 static JSValue js_string_constructor(JSContext *ctx, JSValueConst new_target,
@@ -55226,13 +55225,13 @@ static int js_proxy_isArray(JSContext *ctx, JSValueConst obj)
 }
 
 const JSClassExoticMethods js_proxy_exotic_methods = {
-    .get_own_property = js_proxy_get_own_property,
-    .get_own_property_names = js_proxy_get_own_property_names,
-    .delete_property = js_proxy_delete_property,
-    .define_own_property = js_proxy_define_own_property,
-    .has_property = js_proxy_has,
-    .get_property = js_proxy_get,
-    .set_property = js_proxy_set,
+    js_proxy_get_own_property,
+    js_proxy_get_own_property_names,
+    js_proxy_delete_property,
+    js_proxy_define_own_property,
+    js_proxy_has,
+    js_proxy_get,
+    js_proxy_set
 };
 
 static JSValue js_proxy_constructor(JSContext *ctx, JSValueConst this_val,
