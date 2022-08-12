@@ -226,6 +226,7 @@ struct choc::ui::DesktopWindow::Pimpl
     Pimpl (DesktopWindow& w, Bounds bounds)  : owner (w)
     {
         using namespace choc::objc;
+        AutoReleasePool autoreleasePool;
 
         call<void> (getSharedNSApplication(), "setActivationPolicy:", NSApplicationActivationPolicyRegular);
 
@@ -241,9 +242,13 @@ struct choc::ui::DesktopWindow::Pimpl
 
     ~Pimpl()
     {
-        objc::call<void> (window, "setDelegate:", nullptr);
-        objc::call<void> (window, "close");
-        objc::call<void> (window, "release");
+        {
+            objc::AutoReleasePool autoreleasePool;
+            objc::call<void> (window, "setDelegate:", nullptr);
+            objc::call<void> (window, "close");
+            objc::call<void> (window, "release");
+        }
+
         objc_disposeClassPair (delegateClass);
     }
 
@@ -251,6 +256,7 @@ struct choc::ui::DesktopWindow::Pimpl
 
     void setWindowTitle (const std::string& newTitle)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (window, "setTitle:", objc::getNSString (newTitle));
     }
 
@@ -290,6 +296,7 @@ struct choc::ui::DesktopWindow::Pimpl
     {
         choc::messageloop::postMessage ([this]
         {
+            objc::AutoReleasePool autoreleasePool;
             objc::call<void> (objc::getSharedNSApplication(), "activateIgnoringOtherApps:", (BOOL) 1);
             objc::call<void> (window, "makeKeyAndOrderFront:", (id) nullptr);
         });
@@ -310,7 +317,7 @@ struct choc::ui::DesktopWindow::Pimpl
         if (auto p = objc_getProtocol ("NSWindowDelegate"))
             class_addProtocol (delegateClass, p);
 
-        class_addMethod (delegateClass, objc::getSelector ("windowShouldClose:"),
+        class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
                          (IMP) (+[](id self, SEL, id) -> BOOL
                          {
                              if (auto callback = getPimplFromContext (self).owner.windowClosed)
@@ -320,7 +327,7 @@ struct choc::ui::DesktopWindow::Pimpl
                          }),
                          "c@:@");
 
-        class_addMethod (delegateClass, objc::getSelector ("windowDidResize:"),
+        class_addMethod (delegateClass, sel_registerName ("windowDidResize:"),
                          (IMP) (+[](id self, SEL, id)
                          {
                              if (auto callback = getPimplFromContext (self).owner.windowResized)
@@ -328,7 +335,7 @@ struct choc::ui::DesktopWindow::Pimpl
                          }),
                          "v@:@");
 
-        class_addMethod (delegateClass, objc::getSelector ("applicationShouldTerminateAfterLastWindowClosed:"),
+        class_addMethod (delegateClass, sel_registerName ("applicationShouldTerminateAfterLastWindowClosed:"),
                          (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
                          "c@:@");
 

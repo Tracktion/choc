@@ -224,14 +224,15 @@ struct choc::ui::WebView::Pimpl
     Pimpl (WebView& v, const Options& options) : owner (v)
     {
         using namespace choc::objc;
+        AutoReleasePool autoreleasePool;
 
         auto delegate = createDelegate();
         objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
         call<void> (getSharedNSApplication(), "setDelegate:", delegate);
+        call<void> (delegate, "release");
 
         auto config = call<id> (getClass ("WKWebViewConfiguration"), "new");
         manager = call<id> (config, "userContentController");
-        webview = call<id> (getClass ("WKWebView"), "alloc");
 
         auto prefs = call<id> (config, "preferences");
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("fullScreenEnabled"));
@@ -241,18 +242,23 @@ struct choc::ui::WebView::Pimpl
         if (options.enableDebugMode)
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
-        call<void> (webview, "initWithFrame:configuration:", CGRectMake (0, 0, 0, 0), config);
+        webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"),
+                            "initWithFrame:configuration:", CGRectMake (0, 0, 0, 0), config);
+
         call<void> (config, "release");
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
-        call<void> (delegate, "release");
 
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
     }
 
     ~Pimpl()
     {
-        objc::call<void> (objc::getSharedNSApplication(), "setDelegate:", nullptr);
-        objc::call<void> (webview, "release");
+        {
+            objc::AutoReleasePool autoreleasePool;
+            objc::call<void> (objc::getSharedNSApplication(), "setDelegate:", nullptr);
+            objc::call<void> (webview, "release");
+        }
+
         objc_disposeClassPair (delegateClass);
     }
 
@@ -261,25 +267,30 @@ struct choc::ui::WebView::Pimpl
     void addInitScript (const std::string& script)
     {
         using namespace choc::objc;
+        AutoReleasePool autoreleasePool;
         auto s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
                                      getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1);
         call<void> (manager, "addUserScript:", s);
+        call<void> (s, "release");
     }
 
     void navigate (const std::string& url)
     {
         using namespace choc::objc;
+        AutoReleasePool autoreleasePool;
         auto nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url));
         call<void> (webview, "loadRequest:", call<id> (getClass ("NSURLRequest"), "requestWithURL:", nsURL));
     }
 
     void setHTML (const std::string& html)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (webview, "loadHTMLString:baseURL:", objc::getNSString (html), (id) nullptr);
     }
 
     void evaluateJavascript (const std::string& script)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (webview, "evaluateJavaScript:completionHandler:", objc::getNSString (script), (id) nullptr);
     }
 
@@ -295,7 +306,7 @@ struct choc::ui::WebView::Pimpl
         delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
         CHOC_ASSERT (delegateClass);
 
-        class_addMethod (delegateClass, objc::getSelector ("userContentController:didReceiveScriptMessage:"),
+        class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
                          (IMP) (+[](id self, SEL, id, id msg)
                          {
                              auto body = objc::call<id> (msg, "body");

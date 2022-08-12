@@ -159,18 +159,25 @@ struct Timer::Pimpl
 namespace choc::objc
 {
     static inline id getClass (const char* s)              { return (id) objc_getClass (s); }
-    static inline SEL getSelector (const char* s)          { return sel_registerName (s); }
 
     template <typename ReturnType, typename... Args>
     static ReturnType call (id target, const char* selector, Args... args)
     {
-        return reinterpret_cast<ReturnType(*)(id, SEL, Args...)> (objc_msgSend) (target, getSelector (selector), args...);
+        return reinterpret_cast<ReturnType(*)(id, SEL, Args...)> (objc_msgSend) (target, sel_registerName (selector), args...);
     }
 
     static inline id getNSString (const char* s)           { return call<id> (getClass ("NSString"), "stringWithUTF8String:", s); }
     static inline id getNSString (const std::string& s)    { return getNSString (s.c_str()); }
     static inline id getNSNumberBool (bool b)              { return call<id> (getClass ("NSNumber"), "numberWithBool:", (BOOL) b); }
     static inline id getSharedNSApplication()              { return call<id> (getClass ("NSApplication"), "sharedApplication"); }
+
+    struct AutoReleasePool
+    {
+        AutoReleasePool()  { pool = call<id> (getClass ("NSAutoreleasePool"), "new"); }
+        ~AutoReleasePool() { call<void> (pool, "release"); }
+
+        id pool;
+    };
 }
 
 namespace choc::messageloop
@@ -178,6 +185,7 @@ namespace choc::messageloop
 
 inline void run()
 {
+    objc::AutoReleasePool autoreleasePool;
     objc::call<void> (objc::getSharedNSApplication(), "run");
 }
 
@@ -185,6 +193,8 @@ inline void stop()
 {
     using namespace choc::objc;
     static constexpr long NSEventTypeApplicationDefined = 15;
+
+    AutoReleasePool autoreleasePool;
 
     call<void> (getSharedNSApplication(), "stop:", (id) nullptr);
 
