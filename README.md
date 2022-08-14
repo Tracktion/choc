@@ -82,6 +82,10 @@ The library is getting quite big now. Some of its many delights include:
 - A [MIDI/audio block sync](./audio/choc_AudioMIDIBlockDispatcher.h) mechanism.
 - Functions for packing/unpacking [integer sample data](./audio/choc_AudioSampleData.h) to floats.
 
+#### Threading
+
+- Some threading helpers such as a [thread-safe functor](./threading/choc_ThreadSafeFunctor.h), a [task thread](./threading/choc_TaskThread.h) and [spin-lock](./threading/choc_SpinLock.h)
+
 -----------------------------------------------------------------------
 
 Hopefully some people will find some of these things useful! If you like it, please tell your friends! If you think you're up to contributing, that's great, but be aware that anything other than an utterly immaculate pull request will be given short shrift :)

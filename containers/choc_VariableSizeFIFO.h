@@ -22,7 +22,7 @@
 #include <vector>
 #include <mutex>
 #include "../platform/choc_Assert.h"
-#include "../platform/choc_SpinLock.h"
+#include "../threading/choc_SpinLock.h"
 
 namespace choc::fifo
 {

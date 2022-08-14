@@ -49,6 +49,10 @@ namespace choc::messageloop
     void stop();
 
     /// Posts a function be invoked asynchronously by the message thread.
+    ///
+    /// Tip: if you might need to cancel the callback after posting it,
+    /// you could use a `choc::threading::ThreadSafeFunctor` to wrap your
+    /// target function, which lets you safely nullify it.
     void postMessage (std::function<void()>&&);
 
     //==============================================================================

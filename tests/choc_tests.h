@@ -19,6 +19,8 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../threading/choc_ThreadSafeFunctor.h"
+#include "../threading/choc_TaskThread.h"
 #include "../gui/choc_MessageLoop.h"
 #include "../text/choc_OpenSourceLicenseList.h"
 #include "../audio/choc_AudioFileFormat_MP3.h"
@@ -29,7 +31,7 @@
 #include "../containers/choc_NonAllocatingStableSort.h"
 #include "../platform/choc_DetectDebugger.h"
 #include "../platform/choc_Platform.h"
-#include "../platform/choc_SpinLock.h"
+#include "../threading/choc_SpinLock.h"
 #include "../platform/choc_DynamicLibrary.h"
 #include "../platform/choc_Endianness.h"
 #include "../text/choc_CodePrinter.h"
@@ -2312,6 +2314,51 @@ inline void testTimers (TestProgress& progress)
     }
 }
 
+inline void testThreading (TestProgress& progress)
+{
+    CHOC_CATEGORY (Threading);
+
+    {
+        CHOC_TEST (TaskThread)
+
+        choc::threading::TaskThread tt1, tt2;
+        std::atomic<int> numCallbacks1 { 0 }, numCallbacks2 { 0 };
+
+        tt1.start (100, [&] { ++numCallbacks1; });
+        tt2.start (0,   [&] { ++numCallbacks2; });
+
+        std::this_thread::sleep_for (std::chrono::milliseconds (50));
+        CHOC_EXPECT_EQ (0, numCallbacks2.load());
+        tt2.trigger();
+
+        for (int i = 0;; ++i)
+        {
+            std::this_thread::sleep_for (std::chrono::milliseconds (5));
+
+            if (numCallbacks1 == 3)
+                break;
+
+            if (i > 100)
+                CHOC_FAIL ("Expected some callbacks");
+        }
+
+        CHOC_EXPECT_EQ (1, numCallbacks2.load());
+    }
+
+    {
+        CHOC_TEST (ThreadSafeFunctor)
+
+        choc::threading::ThreadSafeFunctor<std::function<void(int)>> tsf;
+
+        int result = 0;
+        tsf = [&] (int x) { result = x; };
+        CHOC_EXPECT_TRUE (tsf (2));
+        tsf.reset();
+        CHOC_EXPECT_FALSE (tsf (3));
+        CHOC_EXPECT_EQ (result, 2);
+    }
+}
+
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
@@ -2331,6 +2378,7 @@ inline bool runAllTests (TestProgress& progress)
     testStableSort (progress);
     testAudioFileFormat (progress);
     testTimers (progress);
+    testThreading (progress);
 
     progress.printReport();
     return progress.numFails == 0;
