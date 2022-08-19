@@ -219,9 +219,28 @@ struct choc::ui::DesktopWindow::Pimpl
 //==============================================================================
 #elif CHOC_APPLE
 
-#include <CoreGraphics/CoreGraphics.h>
+namespace choc::ui
+{
 
-struct choc::ui::DesktopWindow::Pimpl
+namespace
+{
+    // Including CodeGraphics.h can create all kinds of messy C/C++ symbol clashes
+    // with other headers, but all we actually need are these coordinate structs:
+   #if defined (__LP64__) && __LP64__
+    using CGFloat = double;
+   #else
+    using CGFloat = float;
+   #endif
+
+    struct CGPoint { CGFloat x = 0, y = 0; };
+    struct CGSize  { CGFloat width = 0, height = 0; };
+    struct CGRect  { CGPoint origin; CGSize size; };
+}
+
+static inline CGSize createCGSize (double w, double h)  { return { (CGFloat) w, (CGFloat) h }; }
+static inline CGRect createCGRect (choc::ui::Bounds b)  { return { { (CGFloat) b.x, (CGFloat) b.y }, { (CGFloat) b.width, (CGFloat) b.height } }; }
+
+struct DesktopWindow::Pimpl
 {
     Pimpl (DesktopWindow& w, Bounds bounds)  : owner (w)
     {
@@ -278,8 +297,8 @@ struct choc::ui::DesktopWindow::Pimpl
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
     }
 
-    void setMinimumSize (int w, int h) { objc::call<void> (window, "setContentMinSize:", CGSizeMake (w, h)); }
-    void setMaximumSize (int w, int h) { objc::call<void> (window, "setContentMaxSize:", CGSizeMake (w, h)); }
+    void setMinimumSize (int w, int h) { objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); }
+    void setMaximumSize (int w, int h) { objc::call<void> (window, "setContentMaxSize:", createCGSize (w, h)); }
 
     void centreWithSize (int w, int h)
     {
@@ -344,8 +363,6 @@ struct choc::ui::DesktopWindow::Pimpl
         return objc::call<id> ((id) delegateClass, "new");
     }
 
-    static CGRect createCGRect (Bounds b)  { return CGRectMake (b.x, b.y, b.width, b.height); }
-
     DesktopWindow& owner;
     id window = {};
     Class delegateClass = {};
@@ -357,6 +374,8 @@ struct choc::ui::DesktopWindow::Pimpl
     static constexpr long NSBackingStoreBuffered = 2;
     static constexpr long NSApplicationActivationPolicyRegular = 0;
 };
+
+} // namespace choc::ui
 
 //==============================================================================
 #elif CHOC_WINDOWS

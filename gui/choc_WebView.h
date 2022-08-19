@@ -217,8 +217,6 @@ struct choc::ui::WebView::Pimpl
 //==============================================================================
 #elif CHOC_APPLE
 
-#include <CoreGraphics/CoreGraphics.h>
-
 struct choc::ui::WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& options) : owner (v)
@@ -242,8 +240,7 @@ struct choc::ui::WebView::Pimpl
         if (options.enableDebugMode)
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
-        webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"),
-                            "initWithFrame:configuration:", CGRectMake (0, 0, 0, 0), config);
+        webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"), "initWithFrame:configuration:", CGRect(), config);
 
         call<void> (config, "release");
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
@@ -294,6 +291,7 @@ struct choc::ui::WebView::Pimpl
         objc::call<void> (webview, "evaluateJavaScript:completionHandler:", objc::getNSString (script), (id) nullptr);
     }
 
+private:
     static Pimpl& getPimplFromContext (id self)
     {
         auto view = (Pimpl*) objc_getAssociatedObject (self, "choc_webview");
@@ -324,6 +322,18 @@ struct choc::ui::WebView::Pimpl
     Class delegateClass = {};
 
     static constexpr long WKUserScriptInjectionTimeAtDocumentStart = 0;
+
+    // Including CodeGraphics.h can create all kinds of messy C/C++ symbol clashes
+    // with other headers, but all we actually need are these coordinate structs:
+   #if defined (__LP64__) && __LP64__
+    using CGFloat = double;
+   #else
+    using CGFloat = float;
+   #endif
+
+    struct CGPoint { CGFloat x = 0, y = 0; };
+    struct CGSize  { CGFloat width = 0, height = 0; };
+    struct CGRect  { CGPoint origin; CGSize size; };
 };
 
 //==============================================================================
