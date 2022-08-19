@@ -1664,8 +1664,6 @@ Type Type::createArrayOfVectors (uint32_t numArrayElements, uint32_t numVectorEl
 
 inline void Type::addArrayElements (Type elementType, uint32_t numElementsToAdd)
 {
-    check (! elementType.isVoid(), "Element type cannot be void");
-
     if (isType (MainType::primitiveArray))
     {
         if (elementType == content.primitiveArray.getElementType())
