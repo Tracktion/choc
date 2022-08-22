@@ -91,16 +91,17 @@ inline DynamicLibrary& DynamicLibrary::operator= (DynamicLibrary&& other)
 
 #if ! (defined (_WIN32) || defined (_WIN64))
 
-extern "C" void* dlopen (const char*, int);
-extern "C" void* dlsym (void*, const char*);
-extern "C" int dlclose (void*);
+#include <dlfcn.h>
 
 inline choc::file::DynamicLibrary::DynamicLibrary (std::string_view library)
 {
-    constexpr int RTLD_NOW = 2;
-    constexpr int RTLD_LOCAL = 4;
+   #if defined (LINUX) || defined (__linux__)
+    auto flags = RTLD_LOCAL | RTLD_NOW | RTLD_DEEPBIND;
+   #else
+    auto flags = RTLD_LOCAL | RTLD_NOW;
+   #endif
 
-    handle = ::dlopen (std::string (library).c_str(), RTLD_LOCAL | RTLD_NOW);
+    handle = ::dlopen (std::string (library).c_str(), flags);
 }
 
 inline void choc::file::DynamicLibrary::close()
