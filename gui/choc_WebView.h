@@ -889,14 +889,14 @@ inline void WebView::invokeBinding (const std::string& msg)
             auto result = b->second (json["params"]);
 
             auto call = callbackItem + ".resolve(" + choc::json::toString (result) + "); delete " + callbackItem + ";";
-            choc::messageloop::postMessage ([call, this] { evaluateJavascript (call); });
+            evaluateJavascript (call);
             return;
         }
         catch (const std::exception&)
         {}
 
         auto call = callbackItem + ".reject(); delete " + callbackItem + ";";
-        choc::messageloop::postMessage ([call, this] { evaluateJavascript (call); });
+        evaluateJavascript (call);
     }
     catch (const std::exception&)
     {}
