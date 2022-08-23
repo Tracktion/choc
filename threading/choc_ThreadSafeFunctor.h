@@ -51,11 +51,19 @@ struct ThreadSafeFunctor
     /// and will block until it's safe to change the function
     ThreadSafeFunctor& operator= (FunctionType&& newFunctor);
 
+    /// Changes the function that will be called - this is thread-safe
+    /// and will block until it's safe to change the function
+    ThreadSafeFunctor& operator= (const FunctionType& newFunctor);
+
     /// Tries to invoke the function if one has been set. Returns true if
     /// the target function is valid and was invoked, or false if there was
     /// no function to call.
     template <typename... Args>
     bool operator() (Args&&... args) const;
+
+    /// Returns true if the function isn't null (although it's still safe to
+    /// call this when it's null, and it will do nothing
+    operator bool() const;
 
     /// Clears the function - this is thread-safe, and will block until
     /// the function can safely be changed
@@ -115,8 +123,23 @@ template <typename FunctionType>
 ThreadSafeFunctor<FunctionType>& ThreadSafeFunctor<FunctionType>::operator= (FunctionType&& f)
 {
     std::lock_guard<decltype(callback->lock)> l (callback->lock);
+    callback->fn = std::move (f);
+    return *this;
+}
+
+template <typename FunctionType>
+ThreadSafeFunctor<FunctionType>& ThreadSafeFunctor<FunctionType>::operator= (const FunctionType& f)
+{
+    std::lock_guard<decltype(callback->lock)> l (callback->lock);
     callback->fn = f;
     return *this;
+}
+
+template <typename FunctionType>
+ThreadSafeFunctor<FunctionType>::operator bool() const
+{
+    std::lock_guard<decltype(callback->lock)> l (callback->lock);
+    return callback->fn;
 }
 
 template <typename FunctionType>
