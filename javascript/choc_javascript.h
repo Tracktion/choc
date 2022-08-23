@@ -254,4 +254,3 @@ inline choc::value::Value Context::evaluate (const std::string& javascriptCode)
  // in (only!) one of your source files, and use that to create instances of that engine.
  #error "CHOC_JAVASCRIPT_IMPLEMENTATION is deprecated"
 #endif
-

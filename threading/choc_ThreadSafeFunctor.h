@@ -62,7 +62,7 @@ struct ThreadSafeFunctor
     bool operator() (Args&&... args) const;
 
     /// Returns true if the function isn't null (although it's still safe to
-    /// call this when it's null, and it will do nothing
+    /// call this when it's null, and it will do nothing)
     operator bool() const;
 
     /// Clears the function - this is thread-safe, and will block until

@@ -51867,19 +51867,19 @@ struct timeval
 
 static int gettimeofday (struct timeval* tp, struct timezone * tzp)
 {
-	SYSTEMTIME sysTime;
-	GetSystemTime (&sysTime);
+    SYSTEMTIME sysTime;
+    GetSystemTime (&sysTime);
 
-	FILETIME fileTime;
-	SystemTimeToFileTime (&sysTime, &fileTime);
+    FILETIME fileTime;
+    SystemTimeToFileTime (&sysTime, &fileTime);
 
-	auto t = static_cast<uint64_t> (fileTime.dwLowDateTime)
+    auto t = static_cast<uint64_t> (fileTime.dwLowDateTime)
                + (static_cast<uint64_t> (fileTime.dwHighDateTime) << 32);
 
-	tp->tv_sec  = static_cast<long> ((t - 116444736000000000ull) / 10000000u);
-	tp->tv_usec = static_cast<long> (sysTime.wMilliseconds * 1000);
+    tp->tv_sec  = static_cast<long> ((t - 116444736000000000ull) / 10000000u);
+    tp->tv_usec = static_cast<long> (sysTime.wMilliseconds * 1000);
 
-	return 0;
+    return 0;
 }
 #endif
 
