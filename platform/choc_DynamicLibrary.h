@@ -95,13 +95,7 @@ inline DynamicLibrary& DynamicLibrary::operator= (DynamicLibrary&& other)
 
 inline choc::file::DynamicLibrary::DynamicLibrary (std::string_view library)
 {
-   #if defined (LINUX) || defined (__linux__)
-    auto flags = RTLD_LOCAL | RTLD_NOW | RTLD_DEEPBIND;
-   #else
-    auto flags = RTLD_LOCAL | RTLD_NOW;
-   #endif
-
-    handle = ::dlopen (std::string (library).c_str(), flags);
+    handle = ::dlopen (std::string (library).c_str(), RTLD_LOCAL | RTLD_NOW);
 }
 
 inline void choc::file::DynamicLibrary::close()
