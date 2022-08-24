@@ -340,7 +340,10 @@ struct DesktopWindow::Pimpl
                          (IMP) (+[](id self, SEL, id) -> BOOL
                          {
                              if (auto callback = getPimplFromContext (self).owner.windowClosed)
+                             {
+                                 objc::AutoReleasePool autoreleasePool;
                                  callback();
+                             }
 
                              return TRUE;
                          }),
@@ -350,7 +353,10 @@ struct DesktopWindow::Pimpl
                          (IMP) (+[](id self, SEL, id)
                          {
                              if (auto callback = getPimplFromContext (self).owner.windowResized)
+                             {
+                                 objc::AutoReleasePool autoreleasePool;
                                  callback();
+                             }
                          }),
                          "v@:@");
 
