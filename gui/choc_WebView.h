@@ -224,11 +224,6 @@ struct choc::ui::WebView::Pimpl
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
 
-        auto delegate = createDelegate();
-        objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
-        call<void> (getSharedNSApplication(), "setDelegate:", delegate);
-        call<void> (delegate, "release");
-
         auto config = call<id> (getClass ("WKWebViewConfiguration"), "new");
         manager = call<id> (config, "userContentController");
 
@@ -243,7 +238,11 @@ struct choc::ui::WebView::Pimpl
         webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"), "initWithFrame:configuration:", CGRect(), config);
 
         call<void> (config, "release");
+
+        auto delegate = createDelegate();
+        objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
+        call<void> (delegate, "release");
 
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
     }
@@ -252,7 +251,6 @@ struct choc::ui::WebView::Pimpl
     {
         {
             objc::AutoReleasePool autoreleasePool;
-            objc::call<void> (objc::getSharedNSApplication(), "setDelegate:", nullptr);
             objc::call<void> (webview, "release");
         }
 
