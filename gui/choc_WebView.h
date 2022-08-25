@@ -239,22 +239,18 @@ struct choc::ui::WebView::Pimpl
 
         call<void> (config, "release");
 
-        auto delegate = createDelegate();
+        delegate = createDelegate();
         objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
-        call<void> (delegate, "release");
 
         addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
     }
 
     ~Pimpl()
     {
-        {
-            objc::AutoReleasePool autoreleasePool;
-            objc::call<void> (webview, "release");
-        }
-
-        objc_disposeClassPair (delegateClass);
+        objc::AutoReleasePool autoreleasePool;
+        objc::call<void> (webview, "release");
+        objc::call<void> (delegate, "release");
     }
 
     void* getViewHandle() const     { return (void*) webview; }
@@ -299,25 +295,38 @@ private:
 
     id createDelegate()
     {
-        delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
-        CHOC_ASSERT (delegateClass);
-
-        class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
-                         (IMP) (+[](id self, SEL, id, id msg)
-                         {
-                             auto body = objc::call<id> (msg, "body");
-                             getPimplFromContext (self).owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
-                         }),
-                         "v@:@@");
-
-        objc_registerClassPair (delegateClass);
-
-        return objc::call<id> ((id) delegateClass, "new");
+        static DelegateClass dc;
+        return objc::call<id> ((id) dc.delegateClass, "new");
     }
 
     WebView& owner;
-    id webview = {}, manager = {};
-    Class delegateClass = {};
+    id webview = {}, manager = {}, delegate = {};
+
+    struct DelegateClass
+    {
+        DelegateClass()
+        {
+            delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCWebViewDelegate", 0);
+            CHOC_ASSERT (delegateClass);
+
+            class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
+                            (IMP) (+[](id self, SEL, id, id msg)
+                            {
+                                auto body = objc::call<id> (msg, "body");
+                                getPimplFromContext (self).owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
+                            }),
+                            "v@:@@");
+
+            objc_registerClassPair (delegateClass);
+        }
+
+        ~DelegateClass()
+        {
+            objc_disposeClassPair (delegateClass);
+        }
+
+        Class delegateClass = {};
+    };
 
     static constexpr long WKUserScriptInjectionTimeAtDocumentStart = 0;
 

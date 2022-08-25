@@ -216,6 +216,7 @@ inline void postMessage (std::function<void()>&& fn)
                       new std::function<void()> (std::move (fn)),
                       (dispatch_function_t) (+[](void* arg)
                       {
+                          objc::AutoReleasePool autoReleasePool;
                           std::unique_ptr<std::function<void()>> f (static_cast<std::function<void()>*> (arg));
                           (*f)();
                       }));
@@ -237,7 +238,10 @@ struct Timer::Pimpl
     static void staticCallback (void* context)
     {
         if (getList().invokeIfStillAlive (static_cast<Pimpl*> (context)))
+        {
+            objc::AutoReleasePool autoReleasePool;
             static_cast<Pimpl*> (context)->dispatch();
+        }
     }
 
     void dispatch()

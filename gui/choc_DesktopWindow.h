@@ -133,10 +133,10 @@ struct choc::ui::DesktopWindow::Pimpl
 
     void windowDestroyEvent()
     {
+        g_clear_object (&window);
+
         if (owner.windowClosed != nullptr)
             owner.windowClosed();
-
-        g_clear_object (&window);
     }
 
     void* getWindowHandle() const     { return (void*) window; }
@@ -254,21 +254,18 @@ struct DesktopWindow::Pimpl
                            createCGRect (bounds),
                            NSWindowStyleMaskTitled, NSBackingStoreBuffered, (int) 0);
 
-        auto delegate = createDelegate();
+        delegate = createDelegate();
         objc_setAssociatedObject (delegate, "choc_window", (id) this, OBJC_ASSOCIATION_ASSIGN);
         call<void> (window, "setDelegate:", delegate);
     }
 
     ~Pimpl()
     {
-        {
-            objc::AutoReleasePool autoreleasePool;
-            objc::call<void> (window, "setDelegate:", nullptr);
-            objc::call<void> (window, "close");
-            objc::call<void> (window, "release");
-        }
-
-        objc_disposeClassPair (delegateClass);
+        objc::AutoReleasePool autoreleasePool;
+        objc::call<void> (window, "setDelegate:", nullptr);
+        objc::call<void> (window, "close");
+        objc::call<void> (window, "release");
+        objc::call<void> (delegate, "release");
     }
 
     void* getWindowHandle() const     { return (void*) window; }
@@ -281,44 +278,46 @@ struct DesktopWindow::Pimpl
 
     void setContent (void* view)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (window, "setContentView:", (id) view);
     }
 
     void setVisible (bool visible)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (window, "setIsVisible:", (BOOL) visible);
     }
 
     void setResizable (bool b)
     {
+        objc::AutoReleasePool autoreleasePool;
         auto style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
                         | (b ? NSWindowStyleMaskResizable : 0);
 
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
     }
 
-    void setMinimumSize (int w, int h) { objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); }
-    void setMaximumSize (int w, int h) { objc::call<void> (window, "setContentMaxSize:", createCGSize (w, h)); }
+    void setMinimumSize (int w, int h) { objc::AutoReleasePool p; objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); }
+    void setMaximumSize (int w, int h) { objc::AutoReleasePool p; objc::call<void> (window, "setContentMaxSize:", createCGSize (w, h)); }
 
     void centreWithSize (int w, int h)
     {
-        setBounds ({ 0, 0, w, h });
+        objc::AutoReleasePool autoreleasePool;
+        objc::call<void> (window, "setFrame:display:animate:", createCGRect ({ 0, 0, w, h }), (BOOL) 1, (BOOL) 0);
         objc::call<void> (window, "center");
     }
 
     void setBounds (Bounds b)
     {
+        objc::AutoReleasePool autoreleasePool;
         objc::call<void> (window, "setFrame:display:animate:", createCGRect (b), (BOOL) 1, (BOOL) 0);
     }
 
     void toFront()
     {
-        choc::messageloop::postMessage ([this]
-        {
-            objc::AutoReleasePool autoreleasePool;
-            objc::call<void> (objc::getSharedNSApplication(), "activateIgnoringOtherApps:", (BOOL) 1);
-            objc::call<void> (window, "makeKeyAndOrderFront:", (id) nullptr);
-        });
+        objc::AutoReleasePool autoreleasePool;
+        objc::call<void> (objc::getSharedNSApplication(), "activateIgnoringOtherApps:", (BOOL) 1);
+        objc::call<void> (window, "makeKeyAndOrderFront:", (id) nullptr);
     }
 
     static Pimpl& getPimplFromContext (id self)
@@ -330,48 +329,61 @@ struct DesktopWindow::Pimpl
 
     id createDelegate()
     {
-        delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCDesktopWindowDelegate", 0);
-        CHOC_ASSERT (delegateClass);
-
-        if (auto p = objc_getProtocol ("NSWindowDelegate"))
-            class_addProtocol (delegateClass, p);
-
-        class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
-                         (IMP) (+[](id self, SEL, id) -> BOOL
-                         {
-                             if (auto callback = getPimplFromContext (self).owner.windowClosed)
-                             {
-                                 objc::AutoReleasePool autoreleasePool;
-                                 callback();
-                             }
-
-                             return TRUE;
-                         }),
-                         "c@:@");
-
-        class_addMethod (delegateClass, sel_registerName ("windowDidResize:"),
-                         (IMP) (+[](id self, SEL, id)
-                         {
-                             if (auto callback = getPimplFromContext (self).owner.windowResized)
-                             {
-                                 objc::AutoReleasePool autoreleasePool;
-                                 callback();
-                             }
-                         }),
-                         "v@:@");
-
-        class_addMethod (delegateClass, sel_registerName ("applicationShouldTerminateAfterLastWindowClosed:"),
-                         (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
-                         "c@:@");
-
-        objc_registerClassPair (delegateClass);
-
-        return objc::call<id> ((id) delegateClass, "new");
+        static DelegateClass dc;
+        return objc::call<id> ((id) dc.delegateClass, "new");
     }
 
     DesktopWindow& owner;
-    id window = {};
-    Class delegateClass = {};
+    id window = {}, delegate = {};
+
+    struct DelegateClass
+    {
+        DelegateClass()
+        {
+            delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCDesktopWindowDelegate", 0);
+            CHOC_ASSERT (delegateClass);
+
+            if (auto p = objc_getProtocol ("NSWindowDelegate"))
+                class_addProtocol (delegateClass, p);
+
+            class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
+                            (IMP) (+[](id self, SEL, id) -> BOOL
+                            {
+                                objc::AutoReleasePool autoreleasePool;
+                                auto& p = getPimplFromContext (self);
+                                p.window = {};
+
+                                if (auto callback = p.owner.windowClosed)
+                                    choc::messageloop::postMessage ([callback] { callback(); });
+
+                                return TRUE;
+                            }),
+                            "c@:@");
+
+            class_addMethod (delegateClass, sel_registerName ("windowDidResize:"),
+                            (IMP) (+[](id self, SEL, id)
+                            {
+                                objc::AutoReleasePool autoreleasePool;
+
+                                if (auto callback = getPimplFromContext (self).owner.windowResized)
+                                    callback();
+                            }),
+                            "v@:@");
+
+            class_addMethod (delegateClass, sel_registerName ("applicationShouldTerminateAfterLastWindowClosed:"),
+                            (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
+                            "c@:@");
+
+            objc_registerClassPair (delegateClass);
+        }
+
+        ~DelegateClass()
+        {
+            objc_disposeClassPair (delegateClass);
+        }
+
+        Class delegateClass = {};
+    };
 
     static constexpr long NSWindowStyleMaskTitled = 1;
     static constexpr long NSWindowStyleMaskMiniaturizable = 4;
