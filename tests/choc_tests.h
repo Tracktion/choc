@@ -2285,6 +2285,8 @@ inline void testTimers (TestProgress& progress)
 {
     CHOC_CATEGORY (MessageLoop);
 
+    choc::messageloop::initialise();
+
     {
         CHOC_TEST (Timers)
 

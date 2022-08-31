@@ -41,8 +41,18 @@
 */
 namespace choc::messageloop
 {
-    /// Synchronously runs the system message loop. You'll need a message
-    /// loop to be running for the WebView to work correctly.
+    /// On some platforms (yep, I mean Windows), it's only possible to send
+    /// messages after some initialisation has been run on the message thread
+    /// itself.
+    /// If you call choc::messageloop::run(), then that will automatically
+    /// set things up correctly and you don't need to call this function.
+    /// But if you're running in a program where there's a 3rd-party event
+    /// loop, you'll need to manually call choc::messageloop::initialise() on
+    /// your application's message thread at the start of your program to make
+    /// sure that any threaded calls to postMessage() work correctly.
+    void initialise();
+
+    /// Synchronously runs the system message loop.
     void run();
 
     /// Posts a message to make the message loop exit and terminate the app.
@@ -117,6 +127,7 @@ namespace choc::messageloop
 namespace choc::messageloop
 {
 
+inline void initialise() {}
 inline void run()   { gtk_main(); }
 inline void stop()  { gtk_main_quit(); }
 
@@ -186,6 +197,8 @@ namespace choc::objc
 
 namespace choc::messageloop
 {
+
+inline void initialise() {}
 
 inline void run()
 {
@@ -301,15 +314,75 @@ struct Timer::Pimpl
 namespace choc::messageloop
 {
 
-static DWORD& getMainThreadID()
+struct MessageWindow
 {
-    static DWORD threadID = GetCurrentThreadId();
-    return threadID;
+    MessageWindow()
+    {
+        className = "choc_" + std::to_string (rand());
+
+        WNDCLASSEXA wc = {};
+        wc.cbSize = sizeof (wc);
+        wc.hInstance = GetModuleHandleA (nullptr);
+        wc.lpszClassName = className.c_str();
+        wc.lpfnWndProc = windowProc;
+
+        RegisterClassExA (std::addressof (wc));
+
+        hwnd = CreateWindowA (className.c_str(), "choc", 0, 0, 0, 0, 0,
+                              nullptr, nullptr, wc.hInstance, nullptr);
+    }
+
+    ~MessageWindow()
+    {
+        DestroyWindow (hwnd);
+        UnregisterClassA (className.c_str(), nullptr);
+    }
+
+    static LRESULT CALLBACK windowProc (HWND h, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        if (message == WM_APP && wParam == magicWParam)
+        {
+            std::unique_ptr<std::function<void()>> f (reinterpret_cast<std::function<void()>*> (lParam));
+            (*f)();
+        }
+
+        return DefWindowProc (h, message, wParam, lParam);
+    }
+
+    static inline constexpr WPARAM magicWParam = 0xc40cc40c;
+
+    HWND hwnd;
+    std::string className;
+    DWORD threadID = GetCurrentThreadId();
+};
+
+struct LockedMessageWindow
+{
+    HWND hwnd;
+    std::unique_lock<std::mutex> lock;
+};
+
+static LockedMessageWindow getSharedMessageWindow (bool reacreateIfWrongThread = false)
+{
+    static std::unique_ptr<MessageWindow> window;
+    static std::mutex lock;
+
+    std::unique_lock<std::mutex> l (lock);
+
+    if (window == nullptr || (reacreateIfWrongThread && window->threadID != GetCurrentThreadId()))
+        window = std::make_unique<MessageWindow>();
+
+    return LockedMessageWindow { window->hwnd, std::move (l) };
+}
+
+inline void initialise()
+{
+    getSharedMessageWindow (true);
 }
 
 inline void run()
 {
-    getMainThreadID() = GetCurrentThreadId();
+    initialise();
 
     for (;;)
     {
@@ -317,12 +390,6 @@ inline void run()
 
         if (GetMessage (std::addressof (msg), nullptr, 0, 0) == -1)
             break;
-
-        if (msg.message == WM_APP)
-        {
-            std::unique_ptr<std::function<void()>> f (reinterpret_cast<std::function<void()>*> (msg.lParam));
-            (*f)();
-        }
 
         if (msg.message == WM_QUIT)
             break;
@@ -342,20 +409,21 @@ inline void stop()
 
 inline void postMessage (std::function<void()>&& fn)
 {
-    PostThreadMessage (getMainThreadID(), WM_APP, 0, (LPARAM) new std::function<void()> (std::move (fn)));
+    PostMessageA (getSharedMessageWindow().hwnd, WM_APP, MessageWindow::magicWParam,
+                  (LPARAM) new std::function<void()> (std::move (fn)));
 }
 
 struct Timer::Pimpl
 {
     Pimpl (Callback&& c, uint32_t interval) : callback (std::move (c))
     {
-        timerID = SetTimer (getHWND(), reinterpret_cast<UINT_PTR> (this),
+        timerID = SetTimer (getSharedMessageWindow().hwnd, reinterpret_cast<UINT_PTR> (this),
                             interval, (TIMERPROC) staticCallback);
     }
 
     ~Pimpl()
     {
-        KillTimer (getHWND(), timerID);
+        KillTimer (getSharedMessageWindow().hwnd, timerID);
     }
 
     void invoke()
@@ -364,7 +432,7 @@ struct Timer::Pimpl
         auto localIDCopy = timerID;
 
         if (! callback())
-            KillTimer (getHWND(), localIDCopy);
+            KillTimer (getSharedMessageWindow().hwnd, localIDCopy);
     }
 
     static void staticCallback (HWND, UINT, UINT_PTR p, DWORD) noexcept
@@ -374,45 +442,6 @@ struct Timer::Pimpl
 
     Callback callback;
     UINT_PTR timerID;
-
-    struct MessageWindow
-    {
-        MessageWindow()
-        {
-            className = "choc_" + std::to_string (rand());
-
-            WNDCLASSEXA wc = {};
-            wc.cbSize = sizeof (wc);
-            wc.hInstance = GetModuleHandleA (nullptr);
-            wc.lpszClassName = className.c_str();
-            wc.lpfnWndProc = windowProc;
-
-            RegisterClassExA (std::addressof (wc));
-
-            hwnd = CreateWindowA (className.c_str(), "choc", 0, 0, 0, 0, 0,
-                                  nullptr, nullptr, wc.hInstance, nullptr);
-        }
-
-        ~MessageWindow()
-        {
-            DestroyWindow (hwnd);
-            UnregisterClassA (className.c_str(), nullptr);
-        }
-
-        static LRESULT CALLBACK windowProc (HWND h, UINT message, WPARAM wParam, LPARAM lParam)
-        {
-            return DefWindowProc (h, message, wParam, lParam);
-        }
-
-        HWND hwnd;
-        std::string className;
-    };
-
-    static HWND getHWND()
-    {
-        static MessageWindow w;
-        return w.hwnd;
-    }
 };
 
 #else
