@@ -173,6 +173,16 @@ inline void replaceFileWithContent (const std::string& filename, std::string_vie
 {
     try
     {
+        auto path = std::filesystem::path (filename);
+
+        try
+        {
+            if (path.has_parent_path())
+                if (auto parent = path.parent_path(); ! exists (parent))
+                    create_directories (parent);
+        }
+        catch (const std::ios_base::failure&) {}
+
         std::ofstream stream;
         stream.exceptions (std::ofstream::failbit | std::ofstream::badbit);
         stream.open (filename, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
