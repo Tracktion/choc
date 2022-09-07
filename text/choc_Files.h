@@ -24,9 +24,7 @@
 #include <cwctype>
 #include <stdexcept>
 #include <random>
-#ifndef __MINGW32__
- #include <filesystem>
-#endif
+#include <filesystem>
 #include "../text/choc_UTF8.h"
 
 namespace choc::file
@@ -58,8 +56,6 @@ void replaceFileWithContent (const std::string& filename,
                              std::string_view newContent);
 
 //==============================================================================
-#ifndef __MINGW32__ // sorry, MINGW doesn't seem to have std::filesystem support yet
-
 /// A self-deleting temp file or folder.
 struct TempFile
 {
@@ -99,8 +95,6 @@ struct TempFile
     /// file will be deleted (recursively if it is a folder).
     std::filesystem::path file;
 };
-
-#endif
 
 
 
@@ -198,8 +192,6 @@ inline void replaceFileWithContent (const std::string& filename, std::string_vie
 }
 
 //==============================================================================
-#ifndef __MINGW32__ // sorry, MINGW doesn't seem to have std::filesystem support yet
-
 inline TempFile::TempFile() = default;
 
 inline TempFile::TempFile (std::string_view folder)
@@ -240,8 +232,6 @@ inline TempFile::~TempFile()
 {
     remove_all (file);
 }
-
-#endif
 
 } // namespace choc::file
 
