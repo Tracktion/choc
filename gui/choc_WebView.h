@@ -249,6 +249,7 @@ struct choc::ui::WebView::Pimpl
     ~Pimpl()
     {
         objc::AutoReleasePool autoreleasePool;
+        objc_setAssociatedObject (delegate, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc::call<void> (webview, "release");
         objc::call<void> (delegate, "release");
     }
@@ -286,13 +287,6 @@ struct choc::ui::WebView::Pimpl
     }
 
 private:
-    static Pimpl& getPimplFromContext (id self)
-    {
-        auto view = (Pimpl*) objc_getAssociatedObject (self, "choc_webview");
-        CHOC_ASSERT (view != nullptr);
-        return *view;
-    }
-
     id createDelegate()
     {
         static DelegateClass dc;
@@ -312,8 +306,11 @@ private:
             class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
                             (IMP) (+[](id self, SEL, id, id msg)
                             {
-                                auto body = objc::call<id> (msg, "body");
-                                getPimplFromContext (self).owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
+                                if (auto p = (Pimpl*) objc_getAssociatedObject (self, "choc_webview"))
+                                {
+                                    auto body = objc::call<id> (msg, "body");
+                                    p->owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
+                                }
                             }),
                             "v@:@@");
 
