@@ -67,8 +67,8 @@ struct AudioMIDIBlockDispatcher
                           choc::buffer::ChannelArrayView<float> output);
 
     /// Before calling processInChunks(), this must be called to provide the audio buffers.
-    void setAudioBuffers (const float** inputData, int numInputChannels,
-                          float** outputData, int numOutputChannels, int numFrames);
+    void setAudioBuffers (const float* const* inputData, int numInputChannels,
+                          float* const* outputData, int numOutputChannels, int numFrames);
 
     /// Before calling processInChunks(), this may be called to receive MIDI output events.
     void setMidiOutputCallback (std::function<void(uint32_t frame, choc::midi::ShortMessage)>);
@@ -180,8 +180,8 @@ inline void AudioMIDIBlockDispatcher::setAudioBuffers (choc::buffer::ChannelArra
     nextOutputBlock = output;
 }
 
-inline void AudioMIDIBlockDispatcher::setAudioBuffers (const float** inputData, int numInputChannels,
-                                                       float** outputData, int numOutputChannels, int numFrames)
+inline void AudioMIDIBlockDispatcher::setAudioBuffers (const float* const* inputData, int numInputChannels,
+                                                       float* const* outputData, int numOutputChannels, int numFrames)
 {
     setAudioBuffers (choc::buffer::createChannelArrayView (inputData,
                                                            static_cast<choc::buffer::ChannelCount> (numInputChannels),
