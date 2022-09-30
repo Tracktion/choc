@@ -81,6 +81,8 @@ std::string getEscapedQuotedString (std::string_view sourceString);
 /// Converts a double to a JSON-format string representation.
 std::string doubleToString (double value);
 
+
+
 //==============================================================================
 //        _        _           _  _
 //     __| |  ___ | |_   __ _ (_)| | ___
