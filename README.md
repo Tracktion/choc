@@ -54,8 +54,6 @@ The library is getting quite big now. Some of its many delights include:
 - A handy [SmallVector](./containers/choc_SmallVector.h) class which offers a std::vector interface but has pre-allocated internal storage.
 - One of those [aligned memory block](./containers/choc_AlignedMemoryBlock.h) classes that you always end up needing for some reason.
 - Everyone hates COM, but sometimes you need some [COM helper classes](./containers/choc_COM.h) to hide the ugliness.
-- A range of atomic FIFOs, and a handy [variable size object FIFO](./containers/choc_VariableSizeFIFO.h) for handling queues of heterogenous objects without locking.
-- A lock-free [dirty list](./containers/choc_DirtyList.h) for efficiently queueing up objects that need some attention.
 
 #### GUI
 
@@ -85,6 +83,9 @@ The library is getting quite big now. Some of its many delights include:
 #### Threading
 
 - Some threading helpers such as a [thread-safe functor](./threading/choc_ThreadSafeFunctor.h), a [task thread](./threading/choc_TaskThread.h) and [spin-lock](./threading/choc_SpinLock.h)
+- A range of atomic FIFOs, and a handy [variable size object FIFO](./containers/choc_VariableSizeFIFO.h) for handling queues of heterogenous objects without locking.
+- A lock-free [dirty list](./containers/choc_DirtyList.h) for efficiently queueing up objects that need some attention.
+
 
 -----------------------------------------------------------------------
 
