@@ -19,7 +19,9 @@
 #ifndef CHOC_WEBVIEW_HEADER_INCLUDED
 #define CHOC_WEBVIEW_HEADER_INCLUDED
 
+#include <optional>
 #include <unordered_map>
+#include <vector>
 #include "../text/choc_JSON.h"
 #include "choc_MessageLoop.h"
 
@@ -69,6 +71,26 @@ public:
     {
         /// If supported, this enables developer features in the browser
         bool enableDebugMode = false;
+
+        /// Serve resources to the browser from a C++ callback function.
+        /// This can effectively be used to implement a basic web server,
+        /// serving resources to the browser in any way the client code chooses.
+        /// Given the path URL component (i.e. starting from "/"), the client should
+        /// return some bytes, and the associated MIME type, for that resource.
+        /// When provided, this function will initially be called with the root path
+        /// ("/") in order to serve the initial content for the page.
+        /// (i.e. the client should return some HTML with a "text/html" MIME type).
+        /// Subsequent relative requests made from the page (i.e. via `img` tags,
+        /// `fetch` calls from javascript etc) will result in subsequent calls here.
+        struct Resource
+        {
+            std::vector<uint8_t> data;
+            std::string mimeType;
+        };
+
+        using Path = std::string;
+        using FetchResource = std::function<std::optional<Resource>(const Path&)>;
+        FetchResource fetchResource;
     };
 
     /// Creates a WebView with default options
@@ -136,12 +158,15 @@ private:
 
 struct choc::ui::WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options& options) : owner (v)
+    Pimpl (WebView& v, const Options& options)
+        : owner (v), fetchResource (options.fetchResource)
     {
         if (! gtk_init_check (nullptr, nullptr))
           return;
 
-        webview = webkit_web_view_new();
+        webviewContext = webkit_web_context_new();
+        g_object_ref_sink (G_OBJECT (webviewContext));
+        webview = webkit_web_view_new_with_context (webviewContext);
         g_object_ref_sink (G_OBJECT (webview));
         manager = webkit_web_view_get_user_content_manager (WEBKIT_WEB_VIEW (webview));
 
@@ -164,6 +189,50 @@ struct choc::ui::WebView::Pimpl
             webkit_settings_set_enable_developer_extras (settings, true);
         }
 
+        if (options.fetchResource)
+        {
+            const auto onResourceRequested = [](auto* request, auto* context)
+            {
+                try
+                {
+                    const auto* path = webkit_uri_scheme_request_get_path (request);
+
+                    if (const auto resource = static_cast<Pimpl*> (context)->fetchResource (path))
+                    {
+                        const auto& [bytes, mimeType] = *resource;
+
+                        const auto streamLength = static_cast<gssize> (bytes.size());
+                        auto* stream = g_memory_input_stream_new_from_data (bytes.data(), streamLength, nullptr);
+
+                        webkit_uri_scheme_request_finish (request, stream, streamLength, mimeType.c_str());
+
+                        g_object_unref (stream);
+                    }
+                    else
+                    {
+                        auto* stream = g_memory_input_stream_new();
+                        auto* response = webkit_uri_scheme_response_new (stream, -1);
+                        webkit_uri_scheme_response_set_status (response, 404, nullptr);
+
+                        webkit_uri_scheme_request_finish_with_response (request, response);
+
+                        g_object_unref (stream);
+                        g_object_unref (response);
+                    }
+                }
+                catch (...)
+                {
+                    auto* error = g_error_new (WEBKIT_NETWORK_ERROR, WEBKIT_NETWORK_ERROR_FAILED, "Something went wrong");
+                    webkit_uri_scheme_request_finish_error (request, error);
+                    g_error_free (error);
+                }
+            };
+
+            webkit_web_context_register_uri_scheme (webviewContext, "choc", onResourceRequested, this, nullptr);
+
+            navigate ("choc://choc.choc/");
+        }
+
         gtk_widget_show_all (webview);
     }
 
@@ -173,6 +242,7 @@ struct choc::ui::WebView::Pimpl
             g_signal_handler_disconnect (manager, signalHandlerID);
 
         g_clear_object (&webview);
+        g_clear_object (&webviewContext);
     }
 
     void* getViewHandle() const     { return (void*) webview; }
@@ -209,6 +279,8 @@ struct choc::ui::WebView::Pimpl
     }
 
     WebView& owner;
+    Options::FetchResource fetchResource;
+    WebKitWebContext* webviewContext = {};
     GtkWidget* webview = {};
     WebKitUserContentManager* manager = {};
     unsigned long signalHandlerID = 0;
@@ -219,13 +291,13 @@ struct choc::ui::WebView::Pimpl
 
 struct choc::ui::WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options& options) : owner (v)
+    Pimpl (WebView& v, const Options& options)
+        : owner (v), fetchResource (options.fetchResource)
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
 
         auto config = call<id> (getClass ("WKWebViewConfiguration"), "new");
-        manager = call<id> (config, "userContentController");
 
         auto prefs = call<id> (config, "preferences");
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("fullScreenEnabled"));
@@ -235,15 +307,24 @@ struct choc::ui::WebView::Pimpl
         if (options.enableDebugMode)
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
+        delegate = createDelegate();
+        objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
+
+        manager = call<id> (config, "userContentController");
+        call<void> (manager, "retain");
+        call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
+
+        addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
+
+        if (options.fetchResource)
+            call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString ("choc"));
+
         webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"), "initWithFrame:configuration:", CGRect(), config);
 
         call<void> (config, "release");
 
-        delegate = createDelegate();
-        objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
-        call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
-
-        addInitScript ("window.external = { invoke: function(s) { window.webkit.messageHandlers.external.postMessage(s); } };");
+        if (options.fetchResource)
+            navigate ("choc://choc.choc/");
     }
 
     ~Pimpl()
@@ -251,6 +332,8 @@ struct choc::ui::WebView::Pimpl
         objc::AutoReleasePool autoreleasePool;
         objc_setAssociatedObject (delegate, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc::call<void> (webview, "release");
+        objc::call<void> (manager, "removeScriptMessageHandlerForName:", objc::getNSString ("external"));
+        objc::call<void> (manager, "release");
         objc::call<void> (delegate, "release");
     }
 
@@ -293,7 +376,62 @@ private:
         return objc::call<id> ((id) dc.delegateClass, "new");
     }
 
+    void onResourceRequested (id task)
+    {
+        using namespace choc::objc;
+        AutoReleasePool autoreleasePool;
+
+        try
+        {
+            const auto requestUrl = call<id> (call<id> (task, "request"), "URL");
+
+            const auto makeResponse = [&](auto responseCode, id headerFields = nullptr)
+            {
+                return call<id> (call<id> (call<id> (getClass ("NSHTTPURLResponse"), "alloc"),
+                                           "initWithURL:statusCode:HTTPVersion:headerFields:",
+                                           requestUrl,
+                                           responseCode,
+                                           getNSString ("HTTP/1.1"),
+                                           headerFields), "autorelease");
+            };
+
+            const auto* path = objc::call<const char*> (call<id> (requestUrl, "path"),  "UTF8String");
+
+            if (const auto resource = fetchResource (path))
+            {
+                const auto& [bytes, mimeType] = *resource;
+
+                const auto contentLength = std::to_string (bytes.size());
+                const id headerKeys[] = { getNSString ("Content-Length"), getNSString ("Content-Type") };
+                const id headerObjects[] = { getNSString (contentLength), getNSString (mimeType) };
+                const auto headerFields = call<id> (getClass ("NSDictionary"),
+                                                    "dictionaryWithObjects:forKeys:count:",
+                                                    headerObjects,
+                                                    headerKeys,
+                                                    sizeof (headerObjects) / sizeof (id));
+
+                call<void> (task, "didReceiveResponse:", makeResponse (200, headerFields));
+
+                const auto data = call<id> (getClass ("NSData"), "dataWithBytes:length:", bytes.data(), bytes.size());
+                call<void> (task, "didReceiveData:", data);
+            }
+            else
+            {
+                call<void> (task, "didReceiveResponse:", makeResponse (404));
+            }
+
+            call<void> (task, "didFinish");
+        }
+        catch (...)
+        {
+            const auto error = call<id> (getClass ("NSError"), "errorWithDomain:code:userInfo:",
+                                         getNSString ("NSURLErrorDomain"), -1, nullptr);
+            call<void> (task, "didFailWithError:", error);
+        }
+    }
+
     WebView& owner;
+    Options::FetchResource fetchResource;
     id webview = {}, manager = {}, delegate = {};
 
     struct DelegateClass
@@ -306,13 +444,23 @@ private:
             class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
                             (IMP) (+[](id self, SEL, id, id msg)
                             {
-                                if (auto p = (Pimpl*) objc_getAssociatedObject (self, "choc_webview"))
+                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
                                 {
                                     auto body = objc::call<id> (msg, "body");
                                     p->owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
                                 }
                             }),
                             "v@:@@");
+
+            class_addMethod (delegateClass, sel_registerName ("webView:startURLSchemeTask:"),
+                            (IMP) (+[](id self, SEL, id, id task)
+                            {
+                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                    p->onResourceRequested (task);
+                            }),
+                            "v@:@@");
+
+            class_addMethod (delegateClass, sel_registerName ("webView:stopURLSchemeTask:"), (IMP) (+[](id, SEL, id, id) {}), "v@:@@");
 
             objc_registerClassPair (delegateClass);
         }
@@ -343,6 +491,8 @@ private:
 //==============================================================================
 #elif CHOC_WINDOWS
 
+#include "../platform/choc_DynamicLibrary.h"
+
 // If you want to supply your own mechanism for finding the Microsoft
 // Webview2Loader.dll file, then define the CHOC_FIND_WEBVIEW2LOADER_DLL
 // macro, which must evaluate to a choc::file::DynamicLibrary object
@@ -357,7 +507,6 @@ private:
     static WebViewDLL getWebview2LoaderDLL();
  }
 #else
- #include "../platform/choc_DynamicLibrary.h"
  namespace choc::ui
  {
     using WebViewDLL = choc::file::DynamicLibrary;
@@ -392,6 +541,13 @@ struct EventRegistrationToken { __int64 value; };
 typedef interface ICoreWebView2 ICoreWebView2;
 typedef interface ICoreWebView2Controller ICoreWebView2Controller;
 typedef interface ICoreWebView2Environment ICoreWebView2Environment;
+typedef interface ICoreWebView2HttpHeadersCollectionIterator ICoreWebView2HttpHeadersCollectionIterator;
+typedef interface ICoreWebView2HttpRequestHeaders ICoreWebView2HttpRequestHeaders;
+typedef interface ICoreWebView2HttpResponseHeaders ICoreWebView2HttpResponseHeaders;
+typedef interface ICoreWebView2WebResourceRequest ICoreWebView2WebResourceRequest;
+typedef interface ICoreWebView2WebResourceRequestedEventArgs ICoreWebView2WebResourceRequestedEventArgs;
+typedef interface ICoreWebView2WebResourceRequestedEventHandler ICoreWebView2WebResourceRequestedEventHandler;
+typedef interface ICoreWebView2WebResourceResponse ICoreWebView2WebResourceResponse;
 
 MIDL_INTERFACE("8B4F98CE-DB0D-4E71-85FD-C4C4EF1F2630")
 ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler : public IUnknown
@@ -412,7 +568,7 @@ ICoreWebView2Environment : public IUnknown
 {
 public:
      virtual HRESULT STDMETHODCALLTYPE CreateCoreWebView2Controller(HWND, ICoreWebView2CreateCoreWebView2ControllerCompletedHandler*) = 0;
-     virtual HRESULT STDMETHODCALLTYPE CreateWebResourceResponse(void*, int, LPCWSTR, LPCWSTR, void**) = 0;
+     virtual HRESULT STDMETHODCALLTYPE CreateWebResourceResponse(IStream*, int, LPCWSTR, LPCWSTR, ICoreWebView2WebResourceResponse**) = 0;
      virtual HRESULT STDMETHODCALLTYPE get_BrowserVersionString(LPWSTR*) = 0;
      virtual HRESULT STDMETHODCALLTYPE add_NewBrowserVersionAvailable(void*, EventRegistrationToken*) = 0;
      virtual HRESULT STDMETHODCALLTYPE remove_NewBrowserVersionAvailable(EventRegistrationToken) = 0;
@@ -460,13 +616,29 @@ enum COREWEBVIEW2_MOVE_FOCUS_REASON
 };
 
 enum COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT {};
-enum COREWEBVIEW2_WEB_RESOURCE_CONTEXT {};
+enum COREWEBVIEW2_WEB_RESOURCE_CONTEXT
+{
+    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL = 0
+};
 
 MIDL_INTERFACE("A7ED8BF0-3EC9-4E39-8427-3D6F157BD285")
 ICoreWebView2Deferral : public IUnknown
 {
 public:
      virtual HRESULT STDMETHODCALLTYPE Complete() = 0;
+};
+
+MIDL_INTERFACE("97055cd4-512c-4264-8b5f-e3f446cea6a5")
+ICoreWebView2WebResourceRequest : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE get_Uri(LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_Uri(LPCWSTR) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Method(LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_Method(LPCWSTR) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Content(IStream**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_Content(IStream*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Headers(ICoreWebView2HttpRequestHeaders**) = 0;
 };
 
 MIDL_INTERFACE("774B5EA1-3FAD-435C-B1FC-A77D1ACD5EAF")
@@ -544,10 +716,10 @@ public:
     virtual HRESULT STDMETHODCALLTYPE add_ContainsFullScreenElementChanged(void*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_ContainsFullScreenElementChanged(EventRegistrationToken) = 0;
     virtual HRESULT STDMETHODCALLTYPE get_ContainsFullScreenElement(BOOL*) = 0;
-    virtual HRESULT STDMETHODCALLTYPE add_WebResourceRequested(void*, EventRegistrationToken*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE add_WebResourceRequested(ICoreWebView2WebResourceRequestedEventHandler*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_WebResourceRequested(EventRegistrationToken) = 0;
     virtual HRESULT STDMETHODCALLTYPE AddWebResourceRequestedFilter(const LPCWSTR, const COREWEBVIEW2_WEB_RESOURCE_CONTEXT) = 0;
-    virtual HRESULT STDMETHODCALLTYPE RemoveWebResourceRequestedFilter(const LPCWSTR, const COREWEBVIEW2_WEB_RESOURCE_CONTEXT resourceContext) = 0;
+    virtual HRESULT STDMETHODCALLTYPE RemoveWebResourceRequestedFilter(const LPCWSTR, const COREWEBVIEW2_WEB_RESOURCE_CONTEXT) = 0;
     virtual HRESULT STDMETHODCALLTYPE add_WindowCloseRequested(void*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_WindowCloseRequested(EventRegistrationToken) = 0;
 };
@@ -583,6 +755,69 @@ public:
 
 STDAPI CreateCoreWebView2EnvironmentWithOptions(PCWSTR, PCWSTR, void*, ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler*);
 
+MIDL_INTERFACE("4212F3A7-0FBC-4C9C-8118-17ED6370C1B3")
+ICoreWebView2HttpHeadersCollectionIterator : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE GetCurrentHeader(LPWSTR*, LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_HasCurrentHeader(BOOL*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE MoveNext(BOOL*) = 0;
+};
+
+MIDL_INTERFACE("2C1F04DF-C90E-49E4-BD25-4A659300337B")
+ICoreWebView2HttpRequestHeaders : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE GetHeader(LPCWSTR, LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetHeaders(LPCWSTR, ICoreWebView2HttpHeadersCollectionIterator**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Contains(LPCWSTR, BOOL*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetHeader(LPCWSTR, LPCWSTR) = 0;
+    virtual HRESULT STDMETHODCALLTYPE RemoveHeader(LPCWSTR) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetIterator(ICoreWebView2HttpHeadersCollectionIterator**) = 0;
+};
+
+MIDL_INTERFACE("B5F6D4D5-1BFF-4869-85B8-158153017B04")
+ICoreWebView2HttpResponseHeaders : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE AppendHeader(LPCWSTR, LPCWSTR) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Contains(LPCWSTR, BOOL*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetHeader(LPCWSTR, LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetHeaders(LPCWSTR, ICoreWebView2HttpHeadersCollectionIterator**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetIterator(ICoreWebView2HttpHeadersCollectionIterator**) = 0;
+};
+
+MIDL_INTERFACE("2D7B3282-83B1-41CA-8BBF-FF18F6BFE320")
+ICoreWebView2WebResourceRequestedEventArgs : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE get_Request(ICoreWebView2WebResourceRequest**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Response(ICoreWebView2WebResourceResponse**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_Response(ICoreWebView2WebResourceResponse*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetDeferral(ICoreWebView2Deferral**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_ResourceContext(COREWEBVIEW2_WEB_RESOURCE_CONTEXT*) = 0;
+};
+
+MIDL_INTERFACE("F6DC79F2-E1FA-4534-8968-4AFF10BBAA32")
+ICoreWebView2WebResourceRequestedEventHandler : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs*) = 0;
+};
+
+MIDL_INTERFACE("5953D1FC-B08F-46DD-AFD3-66B172419CD0")
+ICoreWebView2WebResourceResponse : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE get_Content(IStream**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_Content(IStream*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Headers(ICoreWebView2HttpResponseHeaders**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_StatusCode(int*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_StatusCode(int) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_ReasonPhrase(LPWSTR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_ReasonPhrase(LPCWSTR) = 0;
+};
+
 }
 
 #endif // __webview2_h__
@@ -593,7 +828,8 @@ namespace choc::ui
 //==============================================================================
 struct WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options&) : owner (v)
+    Pimpl (WebView& v, const Options& options)
+        : owner (v), fetchResource (options.fetchResource)
     {
         // You cam define this macro to provide a custom way of getting a
         // choc::file::DynamicLibrary that contains the redistributable
@@ -631,6 +867,12 @@ struct WebView::Pimpl
             coreWebViewController->Release();
             coreWebViewController = nullptr;
         }
+
+        if (coreWebViewEnvironment != nullptr)
+        {
+            coreWebViewEnvironment->Release();
+            coreWebViewEnvironment = nullptr;
+        }
     }
 
     void* getViewHandle() const     { return (void*) hwnd.hwnd; }
@@ -658,6 +900,7 @@ struct WebView::Pimpl
 private:
     WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
     HWNDHolder hwnd;
+    const std::string resourceRequestFilterUriPrefix = "https://choc.localhost/";
 
     static Pimpl* getPimpl (HWND h)     { return (Pimpl*) GetWindowLongPtr (h, GWLP_USERDATA); }
 
@@ -705,12 +948,30 @@ private:
                     }
 
                     addInitScript ("window.external = { invoke: function(s) { window.chrome.webview.postMessage(s); } }");
+
+                    if (fetchResource)
+                    {
+                        const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestFilterUriPrefix.c_str()) + L"*";
+                        coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+                        EventRegistrationToken token;
+                        coreWebView->add_WebResourceRequested (handler, std::addressof (token));
+
+                        navigate (resourceRequestFilterUriPrefix);
+                    }
+
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    void environmentCreated (ICoreWebView2Environment* env)
+    {
+        env->AddRef();
+        coreWebViewEnvironment = env;
     }
 
     void webviewCreated (ICoreWebView2Controller* controller, ICoreWebView2* view)
@@ -722,11 +983,108 @@ private:
         webviewInitialising.clear();
     }
 
+    HRESULT onResourceRequested (ICoreWebView2WebResourceRequestedEventArgs* args)
+    {
+        struct ScopedExit
+        {
+            using Fn = std::function<void()>;
+
+            explicit ScopedExit (Fn&& fn) : onExit (std::move (fn)) {}
+
+            ScopedExit (const ScopedExit&) = delete;
+            ScopedExit (ScopedExit&&) = delete;
+            ScopedExit& operator= (const ScopedExit&) = delete;
+            ScopedExit& operator= (ScopedExit&&) = delete;
+
+            ~ScopedExit()
+            {
+                if (onExit)
+                    onExit();
+            }
+
+            Fn onExit;
+        };
+
+        const auto makeCleanup = [](auto*& ptr, auto cleanup)
+        {
+            return [&ptr, cleanup]
+            {
+                if (ptr)
+                    cleanup (ptr);
+            };
+        };
+
+        const auto makeCleanupIUnknown = [=](auto*& ptr)
+        {
+            return makeCleanup (ptr, [](auto* p) { p->Release(); });
+        };
+
+        try
+        {
+            ICoreWebView2WebResourceRequest* request = {};
+            const auto cleanupRequest = ScopedExit (makeCleanupIUnknown (request));
+
+            if (args->get_Request (std::addressof (request)) != S_OK)
+                return E_FAIL;
+
+            LPWSTR uri = {};
+            const auto cleanupUri = ScopedExit (makeCleanup (uri, CoTaskMemFree));
+
+            if (request->get_Uri (std::addressof (uri)) != S_OK)
+                return E_FAIL;
+
+            const auto path = createUTF8FromUTF16 (uri).substr (resourceRequestFilterUriPrefix.size() - 1);
+
+            ICoreWebView2WebResourceResponse* response = {};
+            const auto cleanupResponse = ScopedExit (makeCleanupIUnknown (response));
+
+            if (const auto resource = fetchResource (path))
+            {
+                const auto makeMemoryStream = [](const auto* data, auto length) -> IStream*
+                {
+                    choc::file::DynamicLibrary lib ("shlwapi.dll");
+                    using SHCreateMemStreamFn = IStream*(__stdcall *)(const BYTE*, UINT);
+                    auto fn = reinterpret_cast<SHCreateMemStreamFn> (lib.findFunction ("SHCreateMemStream"));
+                    return fn ? fn (data, length) : nullptr;
+                };
+
+                const auto& [bytes, mimeType] = *resource;
+
+                auto* stream = makeMemoryStream (reinterpret_cast<const BYTE*> (bytes.data()), static_cast<UINT> (bytes.size()));
+                const auto cleanupStream = ScopedExit (makeCleanupIUnknown (stream));
+
+                if (! stream)
+                    return E_FAIL;
+
+                const auto mimeTypeHeader = std::string ("Content-Type: ") + mimeType;
+                const auto headers = createUTF16StringFromUTF8 (mimeTypeHeader);
+
+                if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headers.c_str(), std::addressof (response)) != S_OK)
+                    return E_FAIL;
+            }
+            else
+            {
+                if (coreWebViewEnvironment->CreateWebResourceResponse (nullptr, 404, L"Not Found", nullptr, std::addressof (response)) != S_OK)
+                    return E_FAIL;
+            }
+
+            if (args->put_Response (response) != S_OK)
+                return E_FAIL;
+        }
+        catch (...)
+        {
+            return E_FAIL;
+        }
+
+        return S_OK;
+    }
+
     //==============================================================================
     struct EventHandler  : public ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler,
                            public ICoreWebView2CreateCoreWebView2ControllerCompletedHandler,
                            public ICoreWebView2WebMessageReceivedEventHandler,
-                           public ICoreWebView2PermissionRequestedEventHandler
+                           public ICoreWebView2PermissionRequestedEventHandler,
+                           public ICoreWebView2WebResourceRequestedEventHandler
     {
         EventHandler (Pimpl& p) : ownerPimpl (p) {}
         EventHandler (const EventHandler&) = delete;
@@ -744,6 +1102,7 @@ private:
             if (env == nullptr)
                 return E_FAIL;
 
+            ownerPimpl.environmentCreated (env);
             env->CreateCoreWebView2Controller (ownerPimpl.hwnd, this);
             return S_OK;
         }
@@ -780,6 +1139,11 @@ private:
             return S_OK;
         }
 
+        HRESULT STDMETHODCALLTYPE Invoke (ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* args) override
+        {
+            return ownerPimpl.onResourceRequested (args);
+        }
+
         Pimpl& ownerPimpl;
         std::atomic<unsigned long> refCount { 0 };
     };
@@ -787,6 +1151,8 @@ private:
     //==============================================================================
     WebView& owner;
     WebViewDLL webviewDLL;
+    Options::FetchResource fetchResource;
+    ICoreWebView2Environment* coreWebViewEnvironment = nullptr;
     ICoreWebView2* coreWebView = nullptr;
     ICoreWebView2Controller* coreWebViewController = nullptr;
     std::atomic_flag webviewInitialising = ATOMIC_FLAG_INIT;
