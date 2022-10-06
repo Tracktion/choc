@@ -264,7 +264,6 @@ struct DesktopWindow::Pimpl
         objc::AutoReleasePool autoreleasePool;
         objc::call<void> (window, "setDelegate:", nullptr);
         objc::call<void> (window, "close");
-        objc::call<void> (window, "release");
         objc::call<void> (delegate, "release");
     }
 
