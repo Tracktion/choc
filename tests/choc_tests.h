@@ -138,10 +138,10 @@ inline void testPlatform (TestProgress& progress)
         CHOC_EXPECT_EQ (buffer[7], 8);
         CHOC_EXPECT_EQ (choc::memory::readBigEndian<decltype(a)> (buffer), a);
 
-        CHOC_EXPECT_EQ (choc::memory::bitcast<uint64_t> (1.0), 0x3ff0000000000000ull);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<double> (0x3ff0000000000000ull), 1.0);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<uint32_t> (1.0f), 0x3f800000u);
-        CHOC_EXPECT_EQ (choc::memory::bitcast<float> (0x3f800000u), 1.0f);
+        CHOC_EXPECT_EQ (choc::memory::bit_cast<uint64_t> (1.0), 0x3ff0000000000000ull);
+        CHOC_EXPECT_EQ (choc::memory::bit_cast<double> (0x3ff0000000000000ull), 1.0);
+        CHOC_EXPECT_EQ (choc::memory::bit_cast<uint32_t> (1.0f), 0x3f800000u);
+        CHOC_EXPECT_EQ (choc::memory::bit_cast<float> (0x3f800000u), 1.0f);
     }
 
     {

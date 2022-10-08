@@ -143,6 +143,6 @@ IntegerType zigzagDecode (IntegerType n)
     return static_cast<IntegerType> (static_cast<decltype (sn)> (un >> 1) ^ -(sn & static_cast<decltype (sn)> (1)));
 }
 
-} // namespace choc::bitcast
+} // namespace choc::integer_encoding
 
 #endif // CHOC_VAR_LEN_INTS_HEADER_INCLUDED

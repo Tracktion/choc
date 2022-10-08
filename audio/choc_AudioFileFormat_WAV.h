@@ -469,7 +469,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             acid.setMember ("numBeats",          static_cast<int32_t> (readInt<uint32_t>()));
             acid.setMember ("meterDenominator",  static_cast<int32_t> (readInt<uint16_t>()));
             acid.setMember ("meterNumerator",    static_cast<int32_t> (readInt<uint16_t>()));
-            acid.setMember ("tempo",             choc::memory::bitcast<float> (readInt<uint32_t>()));
+            acid.setMember ("tempo",             choc::memory::bit_cast<float> (readInt<uint32_t>()));
 
             addMetadata (std::move (acid));
         }
@@ -980,7 +980,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             writeInt<uint32_t> (static_cast<uint32_t> (acid["numBeats"].getWithDefault<int64_t> (0)));
             writeInt<uint16_t> (static_cast<uint16_t> (acid["meterDenominator"].getWithDefault<int64_t> (0)));
             writeInt<uint16_t> (static_cast<uint16_t> (acid["meterNumerator"].getWithDefault<int64_t> (0)));
-            writeInt<uint32_t> (choc::memory::bitcast<uint32_t> (acid["tempo"].getWithDefault<float> (0)));
+            writeInt<uint32_t> (choc::memory::bit_cast<uint32_t> (acid["tempo"].getWithDefault<float> (0)));
         }
 
         static uint32_t getMetadataSize_Unknown (const choc::value::ValueView& u)  { return 8u + getDecodedBase64Size (u, "content"); }
