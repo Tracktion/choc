@@ -19,7 +19,7 @@
 #ifndef CHOC_INT_TO_SAMPLE_CONVERSION_HEADER_INCLUDED
 #define CHOC_INT_TO_SAMPLE_CONVERSION_HEADER_INCLUDED
 
-#include "../platform/choc_Endianness.h"
+#include "../memory/choc_Endianness.h"
 
 
 //==============================================================================

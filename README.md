@@ -25,7 +25,6 @@ The library is getting quite big now. Some of its many delights include:
 
 - A tiny [platform-detection](./platform/choc_Platform.h) header.
 - A fast, round-trip-accurate [float/double to string converter](./text/choc_FloatToString.h).
-- Helpers for reading writing data with different [endianness](./platform/choc_Endianness.h).
 - Some headers which will [disable and reenable warnings](./platform/choc_DisableAllWarnings.h) for times when you have to include messy 3rd-party code in your otherwise faultless codebase.
 - The world's simplest [unit test framework](./tests/choc_UnitTest.h). I mainly wrote this so that CHOC can self-host its own unit-tests without any external dependencies, but have found it surprisingly useful for something that's about 100 lines of code.
 - Cross-platform [dynamic library loading](./platform/choc_DynamicLibrary.h).
@@ -43,17 +42,22 @@ The library is getting quite big now. Some of its many delights include:
 - A [HTML generator](./text/choc_HTML.h) for creating a tree of DOM objects and generating HTML text for it
 - A [text table generator](./text/choc_TextTable.h), which can take an array of strings and tabulate it to align the columns nicely.
 - A [file wildcard](./text/choc_Wildcard.h) matcher. I claim this is the cleanest possible implementation of this algorithm - I challenge you to prove me wrong!
-- A [base64](./text/choc_Base64.h) encoder/decoder.
-- Some [integer compression and zigzag encoding](./platform/choc_VariableLengthEncoding.h) functions.
-- An implementation of the [xxHash](./text/choc_xxHash.h) very-fast-but-pretty-secure hash algorithm.
 
 #### Containers
 
 - A [span](./containers/choc_Span.h) class to fill the gap until we can finally use `std::span`.
 - Some [type and value](./containers/choc_Value.h) classes which can represent typed values, but also build them dynamically, serialise them to a compact binary format (or as JSON).
 - A handy [SmallVector](./containers/choc_SmallVector.h) class which offers a std::vector interface but has pre-allocated internal storage.
-- One of those [aligned memory block](./containers/choc_AlignedMemoryBlock.h) classes that you always end up needing for some reason.
 - Everyone hates COM, but sometimes you need some [COM helper classes](./containers/choc_COM.h) to hide the ugliness.
+
+#### Memory
+
+- One of those [aligned memory block](./memory/choc_AlignedMemoryBlock.h) classes that you always end up needing for some reason.
+- A fast [memory pool allocator](./memory/choc_PoolAllocator.h).
+- Helpers for reading writing data with different [endianness](./memory/choc_Endianness.h).
+- Some [integer compression and zigzag encoding](./memory/choc_VariableLengthEncoding.h) functions.
+- A [base64](./memory/choc_Base64.h) encoder/decoder.
+- An implementation of the [xxHash](./memory/choc_xxHash.h) very-fast-but-pretty-secure hash algorithm.
 
 #### GUI
 

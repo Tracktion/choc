@@ -22,7 +22,7 @@
 #include "../platform/choc_Assert.h"
 #include "choc_AudioFileFormat.h"
 #include "choc_AudioSampleData.h"
-#include "../text/choc_Base64.h"
+#include "../memory/choc_Base64.h"
 
 namespace choc::audio
 {
