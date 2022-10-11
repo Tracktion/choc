@@ -522,8 +522,8 @@ inline value::Value parse (const char* text, size_t numbytes, bool parseBareValu
 {
     if (text == nullptr)
     {
-        CHOC_ASSERT (numbytes == 0);
         text = "";
+        numbytes = 0;
     }
 
     if (auto error = text::findInvalidUTF8Data (text, numbytes))
