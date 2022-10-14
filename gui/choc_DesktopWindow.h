@@ -339,8 +339,7 @@ struct DesktopWindow::Pimpl
     {
         DelegateClass()
         {
-            delegateClass = objc_allocateClassPair (objc_getClass ("NSResponder"), "CHOCDesktopWindowDelegate", 0);
-            CHOC_ASSERT (delegateClass);
+            delegateClass = choc::objc::createDelegateClass ("NSResponder", "CHOCDesktopWindowDelegate_");
 
             if (auto p = objc_getProtocol ("NSWindowDelegate"))
                 class_addProtocol (delegateClass, p);

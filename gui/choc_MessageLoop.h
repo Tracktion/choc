@@ -186,6 +186,17 @@ namespace choc::objc
     static inline id getNSNumberBool (bool b)              { return call<id> (getClass ("NSNumber"), "numberWithBool:", (BOOL) b); }
     static inline id getSharedNSApplication()              { return call<id> (getClass ("NSApplication"), "sharedApplication"); }
 
+    static inline Class createDelegateClass (const char* baseClass, const char* root)
+    {
+        auto time = std::chrono::high_resolution_clock::now().time_since_epoch();
+        auto micros = std::chrono::duration_cast<std::chrono::microseconds> (time).count();
+        auto uniqueDelegateName = root + std::to_string (static_cast<uint32_t> (micros));
+
+        auto c = objc_allocateClassPair (objc_getClass (baseClass), uniqueDelegateName.c_str(), 0);
+        CHOC_ASSERT (c);
+        return c;
+    }
+
     struct AutoReleasePool
     {
         AutoReleasePool()  { pool = call<id> (getClass ("NSAutoreleasePool"), "new"); }
