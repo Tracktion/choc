@@ -59804,7 +59804,7 @@ struct OggAudioFileFormat<supportWriting>::Implementation
             auto add = [this] (const char* name)
             {
                 if (properties.metadata.isObject())
-                    if (auto s = properties.metadata[name].template getWithDefault<std::string> ({}); ! s.empty())
+                    if (auto s = properties.metadata[name].toString(); ! s.empty())
                         vorbis_comment_add_tag (std::addressof (vorbisComment), name, s.c_str());
             };
 

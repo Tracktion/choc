@@ -509,6 +509,11 @@ public:
     /// returns the default value provided instead of throwing an Error.
     template <typename TargetType> TargetType getWithDefault (TargetType defaultValue) const;
 
+    /// A handy way to convert this value as a string where possible, or to return an empty
+    /// string (without throwing any errors) if not possible. The function is basically the
+    /// same as calling getWithDefault<std::string> ({})
+    std::string toString() const;
+
     /// Attempts to write a new value to the memory pointed to by this view, as long as the type
     /// provided exactly matches the value's type.
     template <typename PrimitiveType> void set (PrimitiveType newValue);
@@ -768,6 +773,11 @@ public:
     /// Attempts to get this value as the given target type, but if this isn't possible,
     /// returns the default value provided instead of throwing an Error.
     template <typename TargetType> TargetType getWithDefault (TargetType defaultValue) const;
+
+    /// A handy way to convert this value as a string where possible, or to return an empty
+    /// string (without throwing any errors) if not possible. The function is basically the
+    /// same as calling getWithDefault<std::string> ({})
+    std::string toString() const;
 
     /// If this object is a vector, array or object, this returns the number of items it contains; otherwise
     /// it will throw an Error exception.
@@ -2173,6 +2183,8 @@ template <typename TargetType> TargetType ValueView::getWithDefault (TargetType 
     return castToType<TargetType> (std::addressof (defaultValue));
 }
 
+inline std::string ValueView::toString() const  { return getWithDefault<std::string> ({}); }
+
 template <typename PrimitiveType> void ValueView::setUnchecked (PrimitiveType v)
 {
     static_assert (isPrimitiveType<PrimitiveType>() || isStringType<PrimitiveType>(),
@@ -2813,6 +2825,7 @@ void Value::setMember (std::string_view name, MemberType v)
 
 template <typename TargetType> TargetType Value::get() const                           { return value.get<TargetType>(); }
 template <typename TargetType> TargetType Value::getWithDefault (TargetType d) const   { return value.getWithDefault<TargetType> (std::forward<TargetType> (d)); }
+inline std::string Value::toString() const                                             { return value.toString(); }
 
 inline ValueView::Iterator Value::begin() const    { return value.begin(); }
 inline ValueView::EndIterator Value::end() const   { return {}; }
