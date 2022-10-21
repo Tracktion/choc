@@ -680,7 +680,7 @@ namespace choc::ui
 {
 
 //==============================================================================
-inline DesktopWindow::DesktopWindow (Bounds b) : pimpl (std::make_unique<Pimpl> (*this, b)) {}
+inline DesktopWindow::DesktopWindow (Bounds b) { pimpl = std::make_unique<Pimpl> (*this, b); }
 inline DesktopWindow::~DesktopWindow()  {}
 
 inline void* DesktopWindow::getWindowHandle() const                        { return pimpl->getWindowHandle(); }

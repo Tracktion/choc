@@ -1194,7 +1194,7 @@ namespace choc::ui
 
 //==============================================================================
 inline WebView::WebView() : WebView (Options()) {}
-inline WebView::WebView (const Options& options)  : pimpl (std::make_unique<Pimpl> (*this, options)) {}
+inline WebView::WebView (const Options& options)  { pimpl = std::make_unique<Pimpl> (*this, options); }
 
 inline WebView::~WebView()
 {
