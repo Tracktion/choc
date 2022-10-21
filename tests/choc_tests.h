@@ -1761,11 +1761,25 @@ inline void testFIFOs (TestProgress& progress)
 
         int msgCount = 0;
 
+        queue.popAllAvailable ([&] (void* data, size_t size)
+                               {
+                                   CHOC_EXPECT_EQ (sizeof (int), size);
+                                   auto i = choc::memory::readNativeEndian<int> (data);
+
+                                   if (i == 20)
+                                       return false;
+
+                                   CHOC_EXPECT_EQ (msgCount++, i);
+                                   return true;
+                               });
+
+        CHOC_EXPECT_EQ (msgCount, 20);
+
         while (queue.pop ([&] (void* data, size_t size)
                           {
                               CHOC_EXPECT_EQ (sizeof (int), size);
-                              auto i = static_cast<int*> (data);
-                              CHOC_EXPECT_EQ (msgCount, *i);
+                              auto i = choc::memory::readNativeEndian<int> (data);
+                              CHOC_EXPECT_EQ (msgCount, i);
                           }))
         {
             ++msgCount;
