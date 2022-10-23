@@ -38,7 +38,7 @@ The library is getting quite big now. Some of its many delights include:
 - Some [more esoteric](./text/choc_StringUtilities.h) string utilities like pretty-printing durations and sizes, URI encoding, etc.
 - Some [UTF8](./text/choc_UTF8.h) validation and iteration classes.
 - Some [file utilities](./text/choc_Files.h) to provide single-function-call ways to do obvious things like loading a file's content, or saving a string into a file, creating self-deleting temp files, etc.
-- A [CodePrinter](./text/CodePrinter.h) class to help creating indented code listings.
+- A [CodePrinter](./text/choc_CodePrinter.h) class to help creating indented code listings.
 - A [HTML generator](./text/choc_HTML.h) for creating a tree of DOM objects and generating HTML text for it
 - A [text table generator](./text/choc_TextTable.h), which can take an array of strings and tabulate it to align the columns nicely.
 - A [file wildcard](./text/choc_Wildcard.h) matcher. I claim this is the cleanest possible implementation of this algorithm - I challenge you to prove me wrong!
