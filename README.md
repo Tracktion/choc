@@ -38,7 +38,7 @@ The library is getting quite big now. Some of its many delights include:
 - Some [more esoteric](./text/choc_StringUtilities.h) string utilities like pretty-printing durations and sizes, URI encoding, etc.
 - Some [UTF8](./text/choc_UTF8.h) validation and iteration classes.
 - Some [file utilities](./text/choc_Files.h) to provide single-function-call ways to do obvious things like loading a file's content, or saving a string into a file, creating self-deleting temp files, etc.
-- A [CodePrinter](./text/CodePrinter.h) class to help creating indented code listings.
+- A [CodePrinter](./text/choc_CodePrinter.h) class to help creating indented code listings.
 - A [HTML generator](./text/choc_HTML.h) for creating a tree of DOM objects and generating HTML text for it
 - A [text table generator](./text/choc_TextTable.h), which can take an array of strings and tabulate it to align the columns nicely.
 - A [file wildcard](./text/choc_Wildcard.h) matcher. I claim this is the cleanest possible implementation of this algorithm - I challenge you to prove me wrong!
@@ -77,7 +77,7 @@ The library is getting quite big now. Some of its many delights include:
 #### Audio
 
 - Some [audio buffer classes](./audio/choc_SampleBuffers.h) for managing blocks of multi-channel sample data. These can flexibly handle both owned buffers and non-owned views in either packed/interleaved or separate-channel formats.
-- Utility classes for handling [MIDI messages](./audio/choc_MIDI.h), [MIDI sequences](./audio/choc_MIDISequence.h) and [MIDI files](./.audio/choc_MIDIFile.h).
+- Utility classes for handling [MIDI messages](./audio/choc_MIDI.h), [MIDI sequences](./audio/choc_MIDISequence.h) and [MIDI files](./audio/choc_MIDIFile.h).
 - An [AudioFileFormat](./audio/choc_AudioFileFormat.h) system for reading/writing audio files, with support for WAV, FLAC, Ogg-Vorbis, and read-only support for MP3. Hopefully more formats will get added in due course.
 - Some basic audio utilities like simple [oscillators](./audio/choc_Oscillators.h).
 - A [sinc interpolator](./audio/choc_SincInterpolator.h)
