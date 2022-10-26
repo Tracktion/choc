@@ -1667,6 +1667,17 @@ inline void testAudioBuffers (TestProgress& progress)
         test (3, 50);
         test (5, 120);
     }
+
+    {
+        CHOC_TEST (Oscillators)
+
+        auto b1 = choc::oscillator::createChannelArraySine<float> ({ 2, 100 }, 10, 1000);
+        auto b2 = choc::oscillator::createInterleavedSine<float> ({ 2, 100 }, 10, 1000);
+
+        CHOC_EXPECT_TRUE (b1.getSize() == b2.getSize());
+        CHOC_EXPECT_TRUE (b1.getSample (0, 20) != 0);
+        CHOC_EXPECT_TRUE (b2.getSample (1, 30) != 0);
+    }
 }
 
 
