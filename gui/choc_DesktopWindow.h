@@ -60,20 +60,34 @@ struct DesktopWindow
     /// Sets the title of the window that the browser is inside
     void setWindowTitle (const std::string& newTitle);
 
+    /// Gives the window a child/content view to display.
+    /// The pointer being passed in will be a platform-specific native handle,
+    /// so a HWND on Windows, an NSView* on OSX, etc.
     void setContent (void* nativeView);
 
+    /// Shows or hides the window. It's visible by default when created.
     void setVisible (bool visible);
 
     /// Enables/disables user resizing of the window
     void setResizable (bool);
 
+    /// Changes the window's position
     void setBounds (Bounds);
-    void centreWithSize (int width, int height);
-    void toFront();
 
+    /// Gives the window a given size and positions it in the middle of the
+    /// default monitor
+    void centreWithSize (int width, int height);
+
+    /// Sets a minimum size below which the user can't shrink the window
     void setMinimumSize (int minWidth, int minHeight);
+    /// Sets a maximum size above which the user can't grow the window
     void setMaximumSize (int maxWidth, int maxHeight);
 
+    /// Tries to bring this window to the front of the Z-order.
+    void toFront();
+
+    /// Returns the native OS handle, which may be a HWND on Windows, an
+    /// NSWindow* on OSX or a GtkWidget* on linux.
     void* getWindowHandle() const;
 
     /// An optional callback that will be called when the parent window is resized
@@ -85,6 +99,12 @@ private:
     struct Pimpl;
     std::unique_ptr<Pimpl> pimpl;
 };
+
+//==============================================================================
+/// This Windows-only function turns on high-DPI awareness for the current
+/// process. On other OSes where no equivalent call is needed, this function is
+/// just a stub.
+void setWindowsDPIAwareness();
 
 
 } // namespace choc::ui
@@ -216,6 +236,8 @@ struct choc::ui::DesktopWindow::Pimpl
     unsigned long destroyHandlerID = 0;
 };
 
+inline void choc::ui::setWindowsDPIAwareness() {}
+
 //==============================================================================
 #elif CHOC_APPLE
 
@@ -239,6 +261,8 @@ namespace
 
 static inline CGSize createCGSize (double w, double h)  { return { (CGFloat) w, (CGFloat) h }; }
 static inline CGRect createCGRect (choc::ui::Bounds b)  { return { { (CGFloat) b.x, (CGFloat) b.y }, { (CGFloat) b.width, (CGFloat) b.height } }; }
+
+inline void setWindowsDPIAwareness() {}
 
 struct DesktopWindow::Pimpl
 {
@@ -417,6 +441,15 @@ static RECT boundsToRect (Bounds b)
     return r;
 }
 
+template <typename FunctionType>
+FunctionType getUser32Function (const char* name)
+{
+    if (auto user32 = choc::file::DynamicLibrary ("user32.dll"))
+        return reinterpret_cast<FunctionType> (user32.findFunction (name));
+
+    return {};
+}
+
 struct HWNDHolder
 {
     HWNDHolder() = default;
@@ -522,6 +555,12 @@ static std::wstring createUTF16StringFromUTF8 (std::string_view utf8)
     return {};
 }
 
+inline void setWindowsDPIAwareness()
+{
+    if (auto setProcessDPIAwarenessContext = getUser32Function<int(__stdcall *)(void*)> ("SetProcessDpiAwarenessContext"))
+        setProcessDPIAwarenessContext (/*DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2*/ (void*) -4);
+}
+
 //==============================================================================
 struct DesktopWindow::Pimpl
 {
@@ -612,7 +651,7 @@ struct DesktopWindow::Pimpl
 
     void setBounds (Bounds b, DWORD flags)
     {
-        auto r = boundsToRect (b);
+        auto r = boundsToRect (scaleBounds (b, getWindowDPI() / 96.0));
         AdjustWindowRect (&r, WS_OVERLAPPEDWINDOW, 0);
         SetWindowPos (hwnd, nullptr, r.left, r.top, r.right - r.left, r.bottom - r.top, flags);
         resizeContentToFit();
@@ -628,6 +667,16 @@ private:
     HWNDHolder hwnd;
     POINT minimumSize = {}, maximumSize = {};
     WindowClass windowClass { L"CHOCWindow", (WNDPROC) wndProc };
+
+    Bounds scaleBounds (Bounds b, double scale)
+    {
+        b.x      = static_cast<decltype(b.x)> (b.x * scale);
+        b.y      = static_cast<decltype(b.y)> (b.y * scale);
+        b.width  = static_cast<decltype(b.width)> (b.width * scale);
+        b.height = static_cast<decltype(b.height)> (b.height * scale);
+
+        return b;
+    }
 
     HWND getFirstChildWindow()
     {
@@ -656,12 +705,27 @@ private:
         }
     }
 
+    static void enableNonClientDPIScaling (HWND h)
+    {
+        if (auto fn = getUser32Function<BOOL(__stdcall*)(HWND)> ("EnableNonClientDpiScaling"))
+            fn (h);
+    }
+
+    uint32_t getWindowDPI() const
+    {
+        if (auto getDpiForWindow = getUser32Function<UINT(__stdcall*)(HWND)> ("GetDpiForWindow"))
+            return getDpiForWindow (hwnd);
+
+        return 96;
+    }
+
     static Pimpl* getPimpl (HWND h)     { return (Pimpl*) GetWindowLongPtr (h, GWLP_USERDATA); }
 
     static LRESULT wndProc (HWND h, UINT msg, WPARAM wp, LPARAM lp)
     {
         switch (msg)
         {
+            case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
             case WM_SIZE:            if (auto w = getPimpl (h)) w->resizeContentToFit(); break;
             case WM_CLOSE:           if (auto w = getPimpl (h)) if (w->owner.windowClosed != nullptr) w->owner.windowClosed(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;

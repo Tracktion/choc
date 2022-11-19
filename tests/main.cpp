@@ -23,6 +23,8 @@
 
 static int openDemoWebViewWindow()
 {
+    choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
+
     choc::ui::DesktopWindow window ({ 100, 100, 800, 600 });
 
     window.setWindowTitle ("Hello");
