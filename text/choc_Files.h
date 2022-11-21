@@ -52,7 +52,7 @@ std::string loadFileAsString (const std::string& filename);
 /// Attempts to create or overwrite the specified file with some new data.
 /// This will attempt to create and parent folders needed for the file, and will
 /// throw an Error exception if something goes wrong.
-void replaceFileWithContent (const std::string& filename,
+void replaceFileWithContent (const std::filesystem::path& file,
                              std::string_view newContent);
 
 //==============================================================================
@@ -163,12 +163,10 @@ inline std::string loadFileAsString (const std::string& filename)
     return result;
 }
 
-inline void replaceFileWithContent (const std::string& filename, std::string_view newContent)
+inline void replaceFileWithContent (const std::filesystem::path& path, std::string_view newContent)
 {
     try
     {
-        auto path = std::filesystem::path (filename);
-
         try
         {
             if (path.has_parent_path())
@@ -179,16 +177,16 @@ inline void replaceFileWithContent (const std::string& filename, std::string_vie
 
         std::ofstream stream;
         stream.exceptions (std::ofstream::failbit | std::ofstream::badbit);
-        stream.open (filename, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
+        stream.open (path.string(), std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
         stream.write (newContent.data(), static_cast<std::streamsize> (newContent.size()));
         return;
     }
     catch (const std::ios_base::failure& e)
     {
-        throw Error ("Failed to write to file: " + filename + ": " + e.what());
+        throw Error ("Failed to write to file: " + path.string() + ": " + e.what());
     }
 
-    throw Error ("Failed to open file: " + filename);
+    throw Error ("Failed to open file: " + path.string());
 }
 
 //==============================================================================
@@ -218,14 +216,16 @@ inline TempFile::TempFile (std::string_view folder, std::string_view root, std::
 
 inline std::string TempFile::createRandomFilename (std::string_view root, std::string_view suffix)
 {
-    if (! suffix.empty() && suffix[0] == '.')
-        return createRandomFilename (root, suffix.substr (1));
-
     std::random_device seed;
     std::mt19937 rng (seed());
     std::uniform_int_distribution<> dist (1, 99999999);
     auto randomID = std::to_string (static_cast<uint32_t> (dist (rng)));
-    return std::string (root) + "_" + randomID + "." + std::string (suffix);
+    auto name = std::string (root) + "_" + randomID;
+
+    if (! suffix.empty())
+        name += (suffix[0] == '.' ? "" : ".") + std::string (suffix);
+
+    return name;
 }
 
 inline TempFile::~TempFile()
