@@ -2389,6 +2389,20 @@ inline void testThreading (TestProgress& progress)
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
+    choc::threading::TaskThread emergencyKillThread;
+    int secondsElapsed = 0;
+
+    emergencyKillThread.start (1000, [&]
+    {
+         if (++secondsElapsed > 60)
+         {
+            std::cerr << "FAIL!! Tests timed out and were killed!" << std::endl;
+            std::terminate();
+         }
+
+         return true;
+    });
+
     testPlatform (progress);
     testContainerUtils (progress);
     testStringUtilities (progress);
