@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../platform/choc_FileWatcher.h"
 #include "../threading/choc_ThreadSafeFunctor.h"
 #include "../threading/choc_TaskThread.h"
 #include "../gui/choc_MessageLoop.h"
@@ -2386,6 +2387,71 @@ inline void testThreading (TestProgress& progress)
     }
 }
 
+static void testFileWatcher (TestProgress& progress)
+{
+    CHOC_CATEGORY (FileWatcher);
+
+    {
+        CHOC_TEST (Watch)
+
+        choc::file::TempFile tempFolder ("choc_test_tmp");
+        auto folder = tempFolder.file / choc::file::TempFile::createRandomFilename ("choc_test", {});
+        auto testFile = folder / "blah" / "test1.txt";
+        choc::file::replaceFileWithContent (testFile, "blah");
+        std::filesystem::remove_all (folder / "blah");
+        std::this_thread::sleep_for (std::chrono::milliseconds (100));
+
+        std::mutex lock;
+        std::string lastEvent;
+
+        choc::file::Watcher watcher (folder, [&] (const choc::file::Watcher::Event& e)
+        {
+            std::lock_guard<decltype(lock)> lg (lock);
+
+            switch (e.eventType)
+            {
+                case choc::file::Watcher::EventType::modified:      lastEvent += " modified"; break;
+                case choc::file::Watcher::EventType::created:       lastEvent += " created"; break;
+                case choc::file::Watcher::EventType::destroyed:     lastEvent += " destroyed"; break;
+                case choc::file::Watcher::EventType::renamed:       lastEvent += " renamed"; break;
+                case choc::file::Watcher::EventType::ownerChanged:  lastEvent += " ownerChanged"; break;
+                case choc::file::Watcher::EventType::other:
+                default:                                            lastEvent += " other"; break;
+            }
+
+            if (e.fileType == choc::file::Watcher::FileType::file)      lastEvent += " file ";
+            if (e.fileType == choc::file::Watcher::FileType::folder)    lastEvent += " folder ";
+
+            lastEvent += e.file.filename().string();
+        });
+
+        auto waitFor = [&] (std::string_view contentNeeded)
+        {
+            for (int i = 0; i < 400; ++i)
+            {
+                std::this_thread::sleep_for (std::chrono::milliseconds (10));
+                std::lock_guard<decltype(lock)> lg (lock);
+
+                if (choc::text::contains (lastEvent, contentNeeded))
+                    return;
+            }
+
+            std::lock_guard<decltype(lock)> lg (lock);
+            CHOC_FAIL ("Expected '" + std::string (contentNeeded) + "' in '" + lastEvent + "'");
+        };
+
+        choc::file::replaceFileWithContent (testFile, "blah");
+        waitFor ("created folder blah");
+       #ifdef __MINGW32__  // for some reason the mingw runner seems to have low-res timestamps
+        std::this_thread::sleep_for (std::chrono::milliseconds (1000));
+       #endif
+        choc::file::replaceFileWithContent (testFile, "blah2");
+        waitFor ("modified file test1.txt");
+        std::filesystem::remove_all (testFile);
+        waitFor ("destroyed file test1.txt");
+    }
+}
+
 //==============================================================================
 inline bool runAllTests (TestProgress& progress)
 {
@@ -2403,6 +2469,7 @@ inline bool runAllTests (TestProgress& progress)
          return true;
     });
 
+    testFileWatcher (progress);
     testPlatform (progress);
     testContainerUtils (progress);
     testStringUtilities (progress);

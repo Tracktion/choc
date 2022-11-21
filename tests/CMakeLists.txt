@@ -61,7 +61,7 @@ endif()
 
 # On OSX, need to add the WebKit framework for WebView functionality
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    target_link_libraries(choc_tests "-framework WebKit")
+    target_link_libraries(choc_tests "-framework WebKit -framework CoreServices")
 endif ()
 
 # This is an example of how to link the packages required for WebView on Linux
