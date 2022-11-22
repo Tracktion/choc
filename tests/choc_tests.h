@@ -2049,7 +2049,7 @@ inline void testCOM (TestProgress& progress)
 
         static int numObjs = 0;
 
-        struct TestObj final  : public choc::com::ObjectWithAtomicRefCount<choc::com::Object>
+        struct TestObj final  : public choc::com::ObjectWithAtomicRefCount<choc::com::Object, TestObj>
         {
             TestObj() { ++numObjs; }
             ~TestObj() { --numObjs; }
