@@ -237,7 +237,7 @@ int ObjectWithAtomicRefCount<BaseClass, DerivedClass>::release() noexcept
     if (count > 0)
         return count;
 
-    delete reinterpret_cast<DerivedClass*> (this);
+    delete static_cast<DerivedClass*> (this);
 
     // A negative ref-count means that something has gone very wrong...
     CHOC_ASSERT (count == 0);
