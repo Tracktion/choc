@@ -19,7 +19,6 @@
 #ifndef CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 #define CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 
-#include "choc_MessageLoop.h"
 
 //==============================================================================
 namespace choc::ui
@@ -240,6 +239,8 @@ inline void choc::ui::setWindowsDPIAwareness() {}
 
 //==============================================================================
 #elif CHOC_APPLE
+
+#include "choc_MessageLoop.h"
 
 namespace choc::ui
 {

@@ -22,8 +22,8 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
+#include "../platform/choc_Platform.h"
 #include "../text/choc_JSON.h"
-#include "choc_MessageLoop.h"
 
 //==============================================================================
 namespace choc::ui
@@ -162,7 +162,7 @@ struct choc::ui::WebView::Pimpl
         : owner (v), fetchResource (options.fetchResource)
     {
         if (! gtk_init_check (nullptr, nullptr))
-          return;
+            return;
 
         webviewContext = webkit_web_context_new();
         g_object_ref_sink (G_OBJECT (webviewContext));
@@ -288,6 +288,8 @@ struct choc::ui::WebView::Pimpl
 
 //==============================================================================
 #elif CHOC_APPLE
+
+#include "choc_MessageLoop.h"
 
 struct choc::ui::WebView::Pimpl
 {
