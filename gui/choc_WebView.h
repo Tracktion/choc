@@ -201,10 +201,11 @@ struct choc::ui::WebView::Pimpl
                     {
                         const auto& [bytes, mimeType] = *resource;
 
-                        const auto streamLength = static_cast<gssize> (bytes.size());
-                        auto* stream = g_memory_input_stream_new_from_data (bytes.data(), streamLength, nullptr);
+                        auto* streamBytes = g_bytes_new (bytes.data(), static_cast<gsize> (bytes.size()));
+                        auto* stream = g_memory_input_stream_new_from_bytes (streamBytes);
+                        g_bytes_unref (streamBytes);
 
-                        webkit_uri_scheme_request_finish (request, stream, streamLength, mimeType.c_str());
+                        webkit_uri_scheme_request_finish (request, stream, static_cast<gint64> (bytes.size()), mimeType.c_str());
 
                         g_object_unref (stream);
                     }
