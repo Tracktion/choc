@@ -69,6 +69,8 @@ struct HTMLElement
     /// Appends a content element to this element's list of children.
     /// Note that this returns the parent object, not the new child, to allow chaining.
     HTMLElement& addContent (std::string_view text);
+    /// Adds a raw, unescaped content element as a child of this element.
+    HTMLElement& addRawContent (std::string text);
     /// Appends a 'br' element to this element's content.
     HTMLElement& addLineBreak();
     /// Appends an &nbsp; to this element's content.
@@ -104,7 +106,6 @@ private:
     template <typename Output>
     PrintStatus print (Output&, size_t indent, PrintStatus) const;
 
-    HTMLElement& addRawContent (std::string text);
     static std::string escapeHTMLString (std::string_view, bool escapeNewLines);
 };
 
