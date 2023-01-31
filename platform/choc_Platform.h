@@ -56,6 +56,9 @@
 #elif defined (_POSIX_VERSION)
  #define  CHOC_POSIX 1
  #define  CHOC_OPERATING_SYSTEM_NAME   "Posix"
+#elif defined (__EMSCRIPTEN__)
+ #define  CHOC_EMSCRIPTEN 1
+ #define  CHOC_OPERATING_SYSTEM_NAME   "Emscripten"
 #else
  #error "Unknown platform!"
 #endif
