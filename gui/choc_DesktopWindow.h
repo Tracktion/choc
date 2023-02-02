@@ -324,17 +324,22 @@ struct DesktopWindow::Pimpl
     void setMinimumSize (int w, int h) { objc::AutoReleasePool p; objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); }
     void setMaximumSize (int w, int h) { objc::AutoReleasePool p; objc::call<void> (window, "setContentMaxSize:", createCGSize (w, h)); }
 
+    CGRect getFrameRectForContent (Bounds b)
+    {
+        return objc::call<CGRect> (window, "frameRectForContentRect:", createCGRect (b));
+    }
+
     void centreWithSize (int w, int h)
     {
         objc::AutoReleasePool autoreleasePool;
-        objc::call<void> (window, "setFrame:display:animate:", createCGRect ({ 0, 0, w, h }), (BOOL) 1, (BOOL) 0);
+        objc::call<void> (window, "setFrame:display:animate:", getFrameRectForContent ({ 0, 0, w, h }), (BOOL) 1, (BOOL) 0);
         objc::call<void> (window, "center");
     }
 
     void setBounds (Bounds b)
     {
         objc::AutoReleasePool autoreleasePool;
-        objc::call<void> (window, "setFrame:display:animate:", createCGRect (b), (BOOL) 1, (BOOL) 0);
+        objc::call<void> (window, "setFrame:display:animate:", getFrameRectForContent (b), (BOOL) 1, (BOOL) 0);
     }
 
     void toFront()
