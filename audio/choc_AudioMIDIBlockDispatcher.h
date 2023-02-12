@@ -89,6 +89,9 @@ struct AudioMIDIBlockDispatcher
     template <typename Callback>
     void processInChunks (Callback&&);
 
+    /// This clears the output buffers which were configured via a call to setAudioBuffers().
+    void clearOutputBuffers();
+
     /// This governs the granularity at which MIDI events are time-stamped, and hence
     /// determines the smallest chunk size into which the callbacks will be split.
     /// Smaller sizes will give more accurate MIDI timing at the expense of extra callback
@@ -254,6 +257,11 @@ void AudioMIDIBlockDispatcher::processInChunks (Callback&& process)
     }
 
     CHOC_ASSERT(chunkFrameOffset <= numFrames);
+}
+
+inline void AudioMIDIBlockDispatcher::clearOutputBuffers()
+{
+    nextOutputBlock.clear();
 }
 
 inline void AudioMIDIBlockDispatcher::fetchMIDIBlockFromFIFO (uint32_t numFramesNeeded)
