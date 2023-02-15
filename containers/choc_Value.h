@@ -51,10 +51,9 @@ struct ElementTypeAndOffset;
 #endif
 
 //==============================================================================
-/** An exception object which is thrown by the Type, Value and ValueView classes when various
-    runtime checks fail.
-    @see Type, Value, ValueView
-*/
+/// An exception object which is thrown by the Type, Value and ValueView classes when various
+/// runtime checks fail.
+/// @see Type, Value, ValueView
 struct Error  : public std::exception
 {
     Error (const char* desc) : description (desc) {}
@@ -64,24 +63,33 @@ struct Error  : public std::exception
 };
 
 
-/** Throws an error exception.
-    Note that the message string is taken as a raw pointer and not copied, so must be a string literal.
-    This is used by the Type, Value and ValueView classes.
-    @see Type, Value, ValueView
-*/
+/// Throws an error exception.
+/// Note that the message string is taken as a raw pointer and not copied, so must be a string literal.
+/// This is used by the Type, Value and ValueView classes.
+/// @see Type, Value, ValueView
 [[noreturn]] static void throwError (const char* errorMessage)     { throw Error (errorMessage); }
 
-/** Throws an Error with the given message if the condition argument is false.
-    Note that the message string is taken as a raw pointer and not copied, so must be a string literal.
-    This is used by the Type, Value and ValueView classes.
-*/
+/// Throws an Error with the given message if the condition argument is false.
+/// Note that the message string is taken as a raw pointer and not copied, so must be a string literal.
+/// This is used by the Type, Value and ValueView classes.
 static void check (bool condition, const char* errorMessage)       { if (! condition) throwError (errorMessage); }
 
-/** Used by some deserialisation methods in Type, Value and StringDictionary */
+/// Used by some deserialisation methods in Type, Value and StringDictionary
 struct InputData
 {
     const uint8_t* start;
     const uint8_t* end;
+};
+
+/// This helper class holds a chunk of data that is a serialised Value or ValueView, and has
+/// a handy method to turn it back into a Value object.
+struct SerialisedData
+{
+    std::vector<uint8_t> data;
+
+    Value deserialise() const;
+    InputData getInputData() const;
+    void write (const void*, size_t);
 };
 
 /** A custom allocator class which can be used to replace the normal heap allocator
@@ -611,6 +619,11 @@ public:
     template <typename OutputStream>
     void serialise (OutputStream&) const;
 
+    /// Returns an object containing a serialised representation of this value. This is a helper
+    /// function to make it easier to call serialise() without needing to use your own output
+    /// stream class.
+    SerialisedData serialise() const;
+
     /// Recreates a temporary ValueView from serialised data that was created by the
     /// ValueView::serialise() method.
     /// If a ValueView is successfully deserialised from the data, the handler functor will be
@@ -870,6 +883,11 @@ public:
     /// @see Value::deserialise, ValueView::deserialise
     template <typename OutputStream>
     void serialise (OutputStream&) const;
+
+    /// Returns an object containing a serialised representation of this value. This is a helper
+    /// function to make it easier to call serialise() without needing to use your own output
+    /// stream class.
+    SerialisedData serialise() const;
 
     /// Recreates a Value from serialised data that was created by the Value::serialise() method.
     /// Any errors while reading the data will cause an Error exception to be thrown.
@@ -2316,6 +2334,16 @@ struct ValueView::Iterator
 inline ValueView::Iterator ValueView::begin() const   { return ValueView::Iterator (*this); }
 
 //==============================================================================
+inline Value SerialisedData::deserialise() const        { auto i = getInputData(); return Value::deserialise (i); }
+inline InputData SerialisedData::getInputData() const   { return { data.data(), data.data() + data.size() }; }
+
+inline void SerialisedData::write (const void* d, size_t num)
+{
+    auto src = static_cast<const uint8_t*> (d);
+    data.insert (data.end(), src, src + num);
+}
+
+//==============================================================================
 template <typename OutputStream>
 void ValueView::serialise (OutputStream& output) const
 {
@@ -2378,6 +2406,13 @@ void ValueView::serialise (OutputStream& output) const
         char nullTerm = 0;
         output.write (std::addressof (nullTerm), 1u);
     }
+}
+
+inline SerialisedData ValueView::serialise() const
+{
+    SerialisedData result;
+    serialise (result);
+    return result;
 }
 
 template <typename Handler>
@@ -2845,6 +2880,13 @@ template <typename OutputStream> void Value::serialise (OutputStream& o) const
             o.write (dictionary.strings.data(), stringDataSize);
         }
     }
+}
+
+inline SerialisedData Value::serialise() const
+{
+    SerialisedData result;
+    serialise (result);
+    return result;
 }
 
 inline Value Value::deserialise (InputData& input)

@@ -867,18 +867,6 @@ inline void testValues (TestProgress& progress)
         {
             CHOC_TEST (Serialisation)
 
-            struct Serialiser
-            {
-                choc::value::InputData getData() const  { return { data.data(), data.data() + data.size() }; }
-
-                void write (const void* d, size_t num)
-                {
-                    data.insert (data.end(), static_cast<const char*> (d), static_cast<const char*> (d) + num);
-                }
-
-                std::vector<uint8_t> data;
-            };
-
             auto compare = [&] (const choc::value::ValueView& original, const choc::value::ValueView& deserialised)
             {
                 auto s1 = choc::json::toString (original, false);
@@ -890,25 +878,20 @@ inline void testValues (TestProgress& progress)
             };
 
             {
-                Serialiser serialised;
-                v.serialise (serialised);
-                auto data = serialised.getData();
-                auto deserialised = choc::value::Value::deserialise (data);
+                auto serialised = v.serialise();
+                auto deserialised = serialised.deserialise();
                 compare (v, deserialised);
             }
 
             {
-                Serialiser serialised;
-                v.getView().serialise (serialised);
-                auto data = serialised.getData();
-                auto deserialised = choc::value::Value::deserialise (data);
+                auto serialised = v.getView().serialise();
+                auto deserialised = serialised.deserialise();
                 compare (v, deserialised);
             }
 
             {
-                Serialiser serialised;
-                v.serialise (serialised);
-                auto data = serialised.getData();
+                auto serialised = v.serialise();
+                auto data = serialised.getInputData();
 
                 choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
                 {
@@ -917,9 +900,8 @@ inline void testValues (TestProgress& progress)
             }
 
             {
-                Serialiser serialised;
-                v.getView().serialise (serialised);
-                auto data = serialised.getData();
+                auto serialised = v.getView().serialise();
+                auto data = serialised.getInputData();
 
                 choc::value::ValueView::deserialise (data, [&] (const choc::value::ValueView& deserialised)
                 {
