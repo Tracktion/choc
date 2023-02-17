@@ -64,6 +64,7 @@
  #pragma GCC diagnostic ignored "-Wunused-label"
  #pragma GCC diagnostic ignored "-Wnarrowing"
  #pragma GCC diagnostic ignored "-Wparentheses"
+ #pragma GCC diagnostic ignored "-Wwrite-strings"
 
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
