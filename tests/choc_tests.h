@@ -2358,14 +2358,39 @@ inline void testThreading (TestProgress& progress)
     {
         CHOC_TEST (ThreadSafeFunctor)
 
-        choc::threading::ThreadSafeFunctor<std::function<void(int)>> tsf;
+        {
+            choc::threading::ThreadSafeFunctor<std::function<void(int)>> tsf;
 
-        int result = 0;
-        tsf = [&] (int x) { result = x; };
-        CHOC_EXPECT_TRUE (tsf (2));
-        tsf.reset();
-        CHOC_EXPECT_FALSE (tsf (3));
-        CHOC_EXPECT_EQ (result, 2);
+            int result = 0;
+            tsf = [&] (int x) { result = x; };
+            CHOC_EXPECT_TRUE (tsf (2));
+            tsf.reset();
+            CHOC_EXPECT_FALSE (tsf (3));
+            CHOC_EXPECT_EQ (result, 2);
+        }
+
+        {
+            choc::threading::ThreadSafeFunctor<std::function<void(size_t, size_t&)>> factorial;
+
+            factorial = [&] (size_t n, size_t& out)
+            {
+                if (n == 1)
+                {
+                    out = 1;
+                    return;
+                }
+
+                factorial (n - 1, out);
+
+                out = n * out;
+            };
+
+            size_t result;
+
+            CHOC_EXPECT_TRUE (factorial (4ul, result));
+
+            CHOC_EXPECT_EQ (result, 24ul);
+        }
     }
 }
 

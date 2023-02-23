@@ -74,7 +74,7 @@ private:
     //==============================================================================
     struct CallbackHolder  : public std::enable_shared_from_this<CallbackHolder>
     {
-        std::mutex lock;
+        std::recursive_mutex lock;
         FunctionType fn;
     };
 
