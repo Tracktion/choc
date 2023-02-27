@@ -740,6 +740,28 @@ inline void testValues (TestProgress& progress)
     }
 
     {
+        CHOC_TEST (CreatingArrays)
+
+        std::vector<std::string> items1 = { "a", "b", "c" };
+        auto v1 = choc::value::createArray (items1);
+        CHOC_EXPECT_EQ (v1.size(), items1.size());
+        CHOC_EXPECT_EQ (v1[0].toString(), items1[0]);
+        CHOC_EXPECT_EQ (v1[1].toString(), items1[1]);
+
+        std::vector<int32_t> items2 = { 1, 2, 3, 4 };
+        auto v2 = choc::value::createArray (items2);
+        CHOC_EXPECT_EQ (v2.size(), items2.size());
+        CHOC_EXPECT_EQ (v2[0].get<int32_t>(), items2[0]);
+        CHOC_EXPECT_EQ (v2[1].get<int32_t>(), items2[1]);
+
+        std::vector<choc::value::Value> items3 = { choc::value::createString ("xx"), choc::value::createPrimitive (1234)};
+        auto v3 = choc::value::createArray (items3);
+        CHOC_EXPECT_EQ (v3.size(), items3.size());
+        CHOC_EXPECT_EQ (choc::json::toString (v3[0]), choc::json::toString (items3[0]));
+        CHOC_EXPECT_EQ (choc::json::toString (v3[1]), choc::json::toString (items3[1]));
+    }
+
+    {
         CHOC_TEST (Alignment)
 
         {

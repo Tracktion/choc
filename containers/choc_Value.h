@@ -958,6 +958,11 @@ static Value createArray (uint32_t numElements, const GetElementValue& getValueF
 template <typename GetElementValue>
 static Value createArray (uint32_t numArrayElements, uint32_t numVectorElements, const GetElementValue& getValueAt);
 
+/// Creates an array from an iterable container such as a std::vector. The container
+/// must contain either Values, or primitive elements which can be turned into Values.
+template <typename ContainerType>
+static Value createArray (const ContainerType&);
+
 /// Allocates a copy of a packed array of vector primitives.
 template <typename ElementType>
 static Value create2DArray (const ElementType* sourceElements, uint32_t numArrayElements, uint32_t numVectorElements);
@@ -2639,13 +2644,13 @@ inline Value createBool      (bool v)              { return Value (v); }
 inline Value createEmptyArray()                    { return Value (Type::createEmptyArray()); }
 
 template <typename ElementType>
-inline Value createVector (const ElementType* source, uint32_t numElements)
+Value createVector (const ElementType* source, uint32_t numElements)
 {
     return Value (Type::createVector<ElementType> (numElements), source, getTypeSize<ElementType>() * numElements);
 }
 
 template <typename GetElementValue>
-inline Value createVector (uint32_t numElements, const GetElementValue& getValueForIndex)
+Value createVector (uint32_t numElements, const GetElementValue& getValueForIndex)
 {
     using ElementType = decltype (getValueForIndex (0));
     static_assert (isPrimitiveType<ElementType>(), "The template type needs to be one of the supported primitive types");
@@ -2662,10 +2667,10 @@ inline Value createVector (uint32_t numElements, const GetElementValue& getValue
 }
 
 template <typename GetElementValue>
-inline Value createArray (uint32_t numElements, const GetElementValue& getValueForIndex)
+Value createArray (uint32_t numElements, const GetElementValue& getValueForIndex)
 {
     using ElementType = decltype (getValueForIndex (0));
-    static_assert (isPrimitiveType<ElementType>() || isValueType<ElementType>(),
+    static_assert (isPrimitiveType<ElementType>() || isValueType<ElementType>() || isStringType<ElementType>(),
                    "The functor needs to return either a supported primitive type, or a Value");
 
     if constexpr (isPrimitiveType<ElementType>())
@@ -2693,9 +2698,9 @@ inline Value createArray (uint32_t numElements, const GetElementValue& getValueF
 }
 
 template <typename GetElementValue>
-inline Value createArray (uint32_t numArrayElements, uint32_t numVectorElements, const GetElementValue& getValueAt)
+Value createArray (uint32_t numArrayElements, uint32_t numVectorElements, const GetElementValue& getValueAt)
 {
-    using ElementType = decltype (getValueAt (0, 0));
+    using ElementType = typename std::remove_const<typename std::remove_reference<decltype (getValueAt (0, 0))>::type>::type;
     static_assert (isPrimitiveType<ElementType>(), "The functor needs to return a supported primitive type");
 
     Value v (Type::createArray (Type::createVector<ElementType> (numVectorElements), numArrayElements));
@@ -2711,6 +2716,17 @@ inline Value createArray (uint32_t numArrayElements, uint32_t numVectorElements,
     }
 
     return v;
+}
+
+template <typename ContainerType>
+Value createArray (const ContainerType& container)
+{
+    using ElementType = typename std::remove_const<typename std::remove_reference<decltype (container[0])>::type>::type;
+    static_assert (isPrimitiveType<ElementType>() || isValueType<ElementType>() || isStringType<ElementType>(),
+                   "The container provided must have elements which can be converted to a Value");
+
+    return createArray (static_cast<uint32_t> (container.size()),
+                        [&] (uint32_t i) { return container[i]; });
 }
 
 template <typename ElementType>
