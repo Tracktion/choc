@@ -231,6 +231,14 @@ struct AudioFileData
 {
     choc::buffer::ChannelArrayBuffer<float> frames;
     double sampleRate = 0;
+
+    /// Attempts to resample the data in this object to match the given target rate.
+    /// If the ratio is too high or some other error occurs, this will
+    /// throw a std::exception with an error message.
+    /// If maxNumFrames is not 0, then any attempts to generate a larger buffer
+    /// will cause a failure.
+    void resample (double requiredRate,
+                   uint64_t maxNumFrames = 0);
 };
 
 
@@ -508,6 +516,31 @@ inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (const
     return createReader (std::make_shared<std::ifstream> (p, std::ios::binary | std::ios::in));
 }
 
+inline void AudioFileData::resample (double targetSampleRate, uint64_t maxNumFrames)
+{
+    if (targetSampleRate != 0 && std::abs (targetSampleRate - sampleRate) > 1.0)
+    {
+        static constexpr double maxRatio = 64.0;
+
+        if (targetSampleRate > sampleRate * maxRatio || targetSampleRate < sampleRate / maxRatio)
+            throw std::runtime_error ("Resampling ratio is out-of-range");
+
+        auto ratio = targetSampleRate / sampleRate;
+        auto newFrameCount = static_cast<uint64_t> (ratio * static_cast<double> (frames.getNumFrames()) + 0.5);
+
+        if (maxNumFrames != 0 && newFrameCount > maxNumFrames)
+            throw std::runtime_error ("File too long");
+
+        if (newFrameCount != frames.getNumFrames())
+        {
+            choc::buffer::ChannelArrayBuffer<float> resampled (frames.getNumChannels(), static_cast<uint32_t> (newFrameCount));
+            choc::interpolation::sincInterpolate (resampled, frames);
+            frames = std::move (resampled);
+            sampleRate = targetSampleRate;
+        }
+    }
+}
+
 inline AudioFileData AudioFileFormatList::loadFileContent (std::shared_ptr<std::istream> fileReader,
                                                            double targetSampleRate,
                                                            uint64_t maxNumFrames,
@@ -538,27 +571,8 @@ inline AudioFileData AudioFileFormatList::loadFileContent (std::shared_ptr<std::
     if (! reader->readFrames (0, data.frames.getView()))
         throw std::runtime_error ("Failed to read from file");
 
-    if (targetSampleRate != 0 && std::abs (targetSampleRate - rate) > 1.0)
-    {
-        static constexpr double maxRatio = 64.0;
-
-        if (targetSampleRate > rate * maxRatio || targetSampleRate < rate / maxRatio)
-            throw std::runtime_error ("Resampling ratio is out-of-range");
-
-        auto ratio = targetSampleRate / rate;
-        auto newFrameCount = static_cast<uint64_t> (ratio * static_cast<double> (numFrames) + 0.5);
-
-        if (newFrameCount > maxNumFrames)
-            throw std::runtime_error ("File too long");
-
-        if (newFrameCount != numFrames)
-        {
-            choc::buffer::ChannelArrayBuffer<float> resampled (numChannels, static_cast<uint32_t> (newFrameCount));
-            choc::interpolation::sincInterpolate (resampled, data.frames);
-            data.frames = std::move (resampled);
-            data.sampleRate = targetSampleRate;
-        }
-    }
+    if (targetSampleRate > 0)
+        data.resample (targetSampleRate, maxNumFrames);
 
     return data;
 }
