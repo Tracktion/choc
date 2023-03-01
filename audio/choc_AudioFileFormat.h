@@ -22,6 +22,7 @@
 #include <vector>
 #include <fstream>
 #include "choc_SampleBuffers.h"
+#include "choc_SincInterpolator.h"
 #include "../text/choc_StringUtilities.h"
 #include "../text/choc_JSON.h"
 
@@ -225,6 +226,15 @@ uint64_t copyAudioData (AudioFileWriter& destWriter,
                         uint64_t maxNumFramesToCopy = 0);
 
 //==============================================================================
+/// This is a container for a chunk of audio data with an associated sample rate
+struct AudioFileData
+{
+    choc::buffer::ChannelArrayBuffer<float> frames;
+    double sampleRate = 0;
+};
+
+
+//==============================================================================
 /// Holds a list of audio formats, and can try each one in turn when to find
 /// one that'll open a stream.
 struct AudioFileFormatList
@@ -249,9 +259,18 @@ struct AudioFileFormatList
     /// from the given filename. If none of them can read it, returns nullptr.
     std::unique_ptr<AudioFileReader> createReader (const std::string& filePath) const;
 
+    /// Attempts to load the contents of an audio file into a buffer, optionally
+    /// resampling the data to match a target sample rate.
+    /// Any problems will throw a std::exception with a suitable error message.
+    AudioFileData loadFileContent (std::shared_ptr<std::istream> fileReader,
+                                   double targetSampleRate = 0,
+                                   uint64_t maxNumFrames = 48000 * 100,
+                                   uint32_t maxNumChannels = 16) const;
+
     /// The list of registered formats
     std::vector<std::unique_ptr<AudioFileFormat>> formats;
 };
+
 
 //==============================================================================
 //        _        _           _  _
@@ -487,6 +506,61 @@ inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (std::
 inline std::unique_ptr<AudioFileReader> AudioFileFormatList::createReader (const std::string& p) const
 {
     return createReader (std::make_shared<std::ifstream> (p, std::ios::binary | std::ios::in));
+}
+
+inline AudioFileData AudioFileFormatList::loadFileContent (std::shared_ptr<std::istream> fileReader,
+                                                           double targetSampleRate,
+                                                           uint64_t maxNumFrames,
+                                                           uint32_t maxNumChannels) const
+{
+    auto reader = createReader (fileReader);
+
+    if (reader == nullptr)
+        throw std::runtime_error ("Cannot open file");
+
+    const auto& props = reader->getProperties();
+
+    auto rate = props.sampleRate;
+    auto numFrames = props.numFrames;
+    auto numChannels = props.numChannels;
+
+    if (rate <= 0)                      throw std::runtime_error ("Cannot open file");
+    if (numFrames > maxNumFrames)       throw std::runtime_error ("File is too long");
+    if (numChannels > maxNumChannels)   throw std::runtime_error ("File contains too many channels");
+
+    if (numFrames == 0)
+        return {};
+
+    AudioFileData data;
+    data.frames.resize ({ numChannels, static_cast<choc::buffer::FrameCount> (numFrames) });
+    data.sampleRate = rate;
+
+    if (! reader->readFrames (0, data.frames.getView()))
+        throw std::runtime_error ("Failed to read from file");
+
+    if (targetSampleRate != 0 && std::abs (targetSampleRate - rate) > 1.0)
+    {
+        static constexpr double maxRatio = 64.0;
+
+        if (targetSampleRate > rate * maxRatio || targetSampleRate < rate / maxRatio)
+            throw std::runtime_error ("Resampling ratio is out-of-range");
+
+        auto ratio = targetSampleRate / rate;
+        auto newFrameCount = static_cast<uint64_t> (ratio * static_cast<double> (numFrames) + 0.5);
+
+        if (newFrameCount > maxNumFrames)
+            throw std::runtime_error ("File too long");
+
+        if (newFrameCount != numFrames)
+        {
+            choc::buffer::ChannelArrayBuffer<float> resampled (numChannels, static_cast<uint32_t> (newFrameCount));
+            choc::interpolation::sincInterpolate (resampled, data.frames);
+            data.frames = std::move (resampled);
+            data.sampleRate = targetSampleRate;
+        }
+    }
+
+    return data;
 }
 
 } // namespace choc::audio
