@@ -98,6 +98,22 @@ struct AudioFileProperties
 };
 
 //==============================================================================
+/// This is a container for a chunk of audio data with an associated sample rate
+struct AudioFileData
+{
+    choc::buffer::ChannelArrayBuffer<float> frames;
+    double sampleRate = 0;
+
+    /// Attempts to resample the data in this object to match the given target rate.
+    /// If the ratio is too high or some other error occurs, this will
+    /// throw a std::exception with an error message.
+    /// If maxNumFrames is not 0, then any attempts to generate a larger buffer
+    /// will cause a failure.
+    void resample (double requiredRate,
+                   uint64_t maxNumFrames = 0);
+};
+
+//==============================================================================
 /// A base class for streams that will read audio frames from a stream.
 /// See AudioFileFormat::createReader()
 class AudioFileReader
@@ -127,6 +143,13 @@ public:
     /// parameter lets you specify whether you want a float or double buffer.
     template <typename SampleType>
     choc::buffer::ChannelArrayBuffer<SampleType> readEntireStream();
+
+    /// Attempts to load the contents of an audio file into a buffer, optionally
+    /// resampling the data to match a target sample rate.
+    /// Any problems will throw a std::exception with a suitable error message.
+    AudioFileData loadFileContent (double targetSampleRate = 0,
+                                   uint64_t maxNumFrames = 48000 * 100,
+                                   uint32_t maxNumChannels = 16);
 };
 
 //==============================================================================
@@ -224,22 +247,6 @@ public:
 uint64_t copyAudioData (AudioFileWriter& destWriter,
                         AudioFileReader& sourceReader,
                         uint64_t maxNumFramesToCopy = 0);
-
-//==============================================================================
-/// This is a container for a chunk of audio data with an associated sample rate
-struct AudioFileData
-{
-    choc::buffer::ChannelArrayBuffer<float> frames;
-    double sampleRate = 0;
-
-    /// Attempts to resample the data in this object to match the given target rate.
-    /// If the ratio is too high or some other error occurs, this will
-    /// throw a std::exception with an error message.
-    /// If maxNumFrames is not 0, then any attempts to generate a larger buffer
-    /// will cause a failure.
-    void resample (double requiredRate,
-                   uint64_t maxNumFrames = 0);
-};
 
 
 //==============================================================================
@@ -457,6 +464,36 @@ choc::buffer::ChannelArrayBuffer<SampleType> AudioFileReader::readEntireStream()
     return {};
 }
 
+inline AudioFileData AudioFileReader::loadFileContent (double targetSampleRate,
+                                                       uint64_t maxNumFrames,
+                                                       uint32_t maxNumChannels)
+{
+    const auto& props = getProperties();
+
+    auto rate = props.sampleRate;
+    auto numFrames = props.numFrames;
+    auto numChannels = props.numChannels;
+
+    if (rate <= 0)                      throw std::runtime_error ("Cannot open file");
+    if (numFrames > maxNumFrames)       throw std::runtime_error ("File is too long");
+    if (numChannels > maxNumChannels)   throw std::runtime_error ("File contains too many channels");
+
+    if (numFrames == 0)
+        return {};
+
+    AudioFileData data;
+    data.frames.resize ({ numChannels, static_cast<choc::buffer::FrameCount> (numFrames) });
+    data.sampleRate = rate;
+
+    if (! readFrames (0, data.frames.getView()))
+        throw std::runtime_error ("Failed to read from file");
+
+    if (targetSampleRate > 0)
+        data.resample (targetSampleRate, maxNumFrames);
+
+    return data;
+}
+
 inline uint64_t copyAudioData (AudioFileWriter& dest, AudioFileReader& source, uint64_t maxNumFramesToCopy)
 {
     constexpr uint32_t bufferSize = 2048;
@@ -533,8 +570,9 @@ inline void AudioFileData::resample (double targetSampleRate, uint64_t maxNumFra
 
         if (newFrameCount != frames.getNumFrames())
         {
-            choc::buffer::ChannelArrayBuffer<float> resampled (frames.getNumChannels(), static_cast<uint32_t> (newFrameCount));
-            choc::interpolation::sincInterpolate (resampled, frames);
+            using BufferType = decltype (frames);
+            BufferType resampled (frames.getNumChannels(), static_cast<uint32_t> (newFrameCount));
+            choc::interpolation::sincInterpolate<BufferType&, BufferType, 10> (resampled, frames);
             frames = std::move (resampled);
             sampleRate = targetSampleRate;
         }
@@ -551,30 +589,7 @@ inline AudioFileData AudioFileFormatList::loadFileContent (std::shared_ptr<std::
     if (reader == nullptr)
         throw std::runtime_error ("Cannot open file");
 
-    const auto& props = reader->getProperties();
-
-    auto rate = props.sampleRate;
-    auto numFrames = props.numFrames;
-    auto numChannels = props.numChannels;
-
-    if (rate <= 0)                      throw std::runtime_error ("Cannot open file");
-    if (numFrames > maxNumFrames)       throw std::runtime_error ("File is too long");
-    if (numChannels > maxNumChannels)   throw std::runtime_error ("File contains too many channels");
-
-    if (numFrames == 0)
-        return {};
-
-    AudioFileData data;
-    data.frames.resize ({ numChannels, static_cast<choc::buffer::FrameCount> (numFrames) });
-    data.sampleRate = rate;
-
-    if (! reader->readFrames (0, data.frames.getView()))
-        throw std::runtime_error ("Failed to read from file");
-
-    if (targetSampleRate > 0)
-        data.resample (targetSampleRate, maxNumFrames);
-
-    return data;
+    return reader->loadFileContent (targetSampleRate, maxNumFrames, maxNumChannels);
 }
 
 } // namespace choc::audio
