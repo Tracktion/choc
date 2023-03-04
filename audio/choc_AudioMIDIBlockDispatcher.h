@@ -215,7 +215,6 @@ void AudioMIDIBlockDispatcher::processInChunks (Callback&& process)
     const auto numFrames = nextOutputBlock.getNumFrames();
     CHOC_ASSERT (numFrames == nextInputBlock.getNumFrames());
     fetchMIDIBlockFromFIFO (numFrames);
-    nextOutputBlock.clear();
 
     if (auto totalNumMIDIMessages = static_cast<uint32_t> (midiMessageTimes.size()))
     {
