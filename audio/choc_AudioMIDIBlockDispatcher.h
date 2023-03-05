@@ -70,8 +70,11 @@ struct AudioMIDIBlockDispatcher
     void setAudioBuffers (const float* const* inputData, int numInputChannels,
                           float* const* outputData, int numOutputChannels, int numFrames);
 
+    /// A function prototype which accepts a time-stamped MIDI event.
+    using HandleMIDIMessageFn = std::function<void(uint32_t frame, choc::midi::ShortMessage)>;
+
     /// Before calling processInChunks(), this may be called to receive MIDI output events.
-    void setMidiOutputCallback (std::function<void(uint32_t frame, choc::midi::ShortMessage)>);
+    void setMidiOutputCallback (HandleMIDIMessageFn);
 
     //==============================================================================
     /// This struct is given to a client callback to process.
@@ -80,7 +83,7 @@ struct AudioMIDIBlockDispatcher
         choc::buffer::ChannelArrayView<const float> audioInput;
         choc::buffer::ChannelArrayView<float> audioOutput;
         choc::span<choc::midi::ShortMessage> midiMessages;
-        const std::function<void(uint32_t frame, choc::midi::ShortMessage)>& onMidiOutputMessage;
+        const HandleMIDIMessageFn& onMidiOutputMessage;
     };
 
     /// After calling setAudioBuffers() to provide the audio channel data, call this
@@ -103,7 +106,7 @@ private:
     //==============================================================================
     choc::buffer::ChannelArrayView<float> nextOutputBlock;
     choc::buffer::ChannelArrayView<const float> nextInputBlock;
-    std::function<void(uint32_t frame, choc::midi::ShortMessage)> midiOutputMessageCallback;
+    HandleMIDIMessageFn midiOutputMessageCallback;
 
     using Clock = std::chrono::high_resolution_clock;
     using TimePoint = Clock::time_point;
@@ -194,7 +197,7 @@ inline void AudioMIDIBlockDispatcher::setAudioBuffers (const float* const* input
                                                            static_cast<choc::buffer::FrameCount> (numFrames)));
 }
 
-inline void AudioMIDIBlockDispatcher::setMidiOutputCallback (std::function<void(uint32_t frame, choc::midi::ShortMessage)> callback)
+inline void AudioMIDIBlockDispatcher::setMidiOutputCallback (AudioMIDIBlockDispatcher::HandleMIDIMessageFn callback)
 {
     if (! callback)
     {
