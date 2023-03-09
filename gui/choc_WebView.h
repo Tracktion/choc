@@ -205,9 +205,18 @@ struct choc::ui::WebView::Pimpl
                         auto* stream = g_memory_input_stream_new_from_bytes (streamBytes);
                         g_bytes_unref (streamBytes);
 
-                        webkit_uri_scheme_request_finish (request, stream, static_cast<gint64> (bytes.size()), mimeType.c_str());
+                        auto* response = webkit_uri_scheme_response_new (stream, static_cast<gint64> (bytes.size()));
+                        webkit_uri_scheme_response_set_status (response, 200, nullptr);
+                        webkit_uri_scheme_response_set_content_type (response, mimeType.c_str());
+
+                        auto* headers = soup_message_headers_new (SOUP_MESSAGE_HEADERS_RESPONSE);
+                        soup_message_headers_append (headers, "Cache-Control", "no-store");
+                        webkit_uri_scheme_response_set_http_headers (response, headers); // response takes ownership of the headers
+
+                        webkit_uri_scheme_request_finish_with_response (request, response);
 
                         g_object_unref (stream);
+                        g_object_unref (response);
                     }
                     else
                     {
@@ -405,8 +414,8 @@ private:
                 const auto& [bytes, mimeType] = *resource;
 
                 const auto contentLength = std::to_string (bytes.size());
-                const id headerKeys[] = { getNSString ("Content-Length"), getNSString ("Content-Type") };
-                const id headerObjects[] = { getNSString (contentLength), getNSString (mimeType) };
+                const id headerKeys[] = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control") };
+                const id headerObjects[] = { getNSString (contentLength), getNSString (mimeType), getNSString ("no-store") };
                 const auto headerFields = call<id> (getClass ("NSDictionary"),
                                                     "dictionaryWithObjects:forKeys:count:",
                                                     headerObjects,
@@ -1059,7 +1068,9 @@ private:
                     return E_FAIL;
 
                 const auto mimeTypeHeader = std::string ("Content-Type: ") + mimeType;
-                const auto headers = createUTF16StringFromUTF8 (mimeTypeHeader);
+                const auto cacheControlHeader = "Cache-Control: no-store";
+                const std::vector<std::string> headersToConcatenate { mimeTypeHeader, cacheControlHeader };
+                const auto headers = createUTF16StringFromUTF8 (choc::text::joinStrings (headersToConcatenate, "\n"));
 
                 if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headers.c_str(), std::addressof (response)) != S_OK)
                     return E_FAIL;
