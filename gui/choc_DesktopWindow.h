@@ -592,6 +592,12 @@ struct DesktopWindow::Pimpl
 
     void setContent (void* childHandle)
     {
+        if (auto child = getFirstChildWindow())
+        {
+            ShowWindow (child, SW_HIDE);
+            SetParent (child, nullptr);
+        }
+
         auto child = (HWND) childHandle;
         auto flags = GetWindowLongPtr (child, -16);
         flags = (flags & ~(decltype (flags)) WS_POPUP) | (decltype (flags)) WS_CHILD;
@@ -599,6 +605,7 @@ struct DesktopWindow::Pimpl
 
         SetParent (child, hwnd);
         resizeContentToFit();
+        ShowWindow (child, IsWindowVisible (hwnd) ? SW_SHOW : SW_HIDE);
     }
 
     void setVisible (bool visible)
