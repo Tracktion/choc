@@ -856,7 +856,6 @@ struct WebView::Pimpl
             return;
 
         SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
-        ShowWindow (hwnd, SW_SHOW);
 
         if (createEmbeddedWebView())
         {
@@ -920,6 +919,10 @@ private:
         if (msg == WM_SIZE)
             if (auto w = getPimpl (h))
                 w->resizeContentToFit();
+
+        if (msg == WM_SHOWWINDOW)
+            if (auto w = getPimpl (h); w->coreWebViewController != nullptr)
+                w->coreWebViewController->put_IsVisible (wp != 0);
 
         return DefWindowProcW (h, msg, wp, lp);
     }
