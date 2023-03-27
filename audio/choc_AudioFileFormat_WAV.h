@@ -302,9 +302,8 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_Unknown (std::string type, ChunkRange chunkRange)
         {
-            addMetadata (choc::value::createObject ({},
-                            "type", type,
-                            "content", readIntoBase64 (chunkRange.getEnd() - getPosition())));
+            addMetadata (choc::json::create ("type", type,
+                                             "content", readIntoBase64 (chunkRange.getEnd() - getPosition())));
         }
 
         void readMetadata_BWAV (std::string type, ChunkRange chunkRange)
@@ -321,7 +320,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                 return result;
             };
 
-            auto bwav = choc::value::createObject ({}, "type", type);
+            auto bwav = choc::json::create ("type", type);
 
             bwav.setMember ("description",          readString (256));
             bwav.setMember ("originator",           readString (32));
@@ -344,7 +343,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_SMPL (std::string type, ChunkRange chunkRange)
         {
-            auto smpl = choc::value::createObject ({}, "type", type);
+            auto smpl = choc::json::create ("type", type);
 
             smpl.setMember ("manufacturerCode",   static_cast<int64_t> (readInt<uint32_t>()));
             smpl.setMember ("productID",          static_cast<int64_t> (readInt<uint32_t>()));
@@ -386,7 +385,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_INST (std::string type)
         {
-            auto inst = choc::value::createObject ({}, "type", type);
+            auto inst = choc::json::create ("type", type);
 
             inst.setMember ("baseNote",      static_cast<int32_t> (readInt<uint8_t>()));
             inst.setMember ("fineTuning",    static_cast<int32_t> (readInt<int8_t>()));
@@ -401,7 +400,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_Cue (std::string type, ChunkRange chunkRange)
         {
-            auto cue = choc::value::createObject ({}, "type", type);
+            auto cue = choc::json::create ("type", type);
             auto numCues = readInt<uint32_t>();
 
             if (getPosition() + numCues * 24 > chunkRange.getEnd())
@@ -428,7 +427,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_LIST (std::string type, ChunkRange chunkRange)
         {
-            auto list = choc::value::createObject ({}, "type", type);
+            auto list = choc::json::create ("type", type);
             auto subChunkType = readChunkType();
 
             if (subChunkType == "info" || subChunkType == "INFO")
@@ -440,7 +439,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                     auto infoType = readChunkType();
                     auto subChunkRange = readChunkRange();
                     auto subChunk = readStringToEndOfChunk (subChunkRange);
-                    listInfoItems.addArrayElement (choc::value::createObject ({}, "type", infoType, "value", subChunk));
+                    listInfoItems.addArrayElement (choc::json::create ("type", infoType, "value", subChunk));
                     seek (subChunkRange.getNextChunkStart());
                 }
 
@@ -456,7 +455,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_ACID (std::string type)
         {
-            auto acid = choc::value::createObject ({}, "type", type);
+            auto acid = choc::json::create ("type", type);
 
             auto flags = readInt<uint32_t>();
             acid.setMember ("isOneShot",     (flags & 1) != 0);
@@ -476,16 +475,14 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
         void readMetadata_Trkn (std::string type, ChunkRange chunkRange)
         {
-            addMetadata (choc::value::createObject ({},
-                            "type", type,
-                            "content", readStringToEndOfChunk (chunkRange)));
+            addMetadata (choc::json::create ("type", type,
+                                             "content", readStringToEndOfChunk (chunkRange)));
         }
 
         void readMetadata_AXML (std::string type, ChunkRange chunkRange)
         {
-            addMetadata (choc::value::createObject ({},
-                            "type", type,
-                            "content", readStringToEndOfChunk (chunkRange)));
+            addMetadata (choc::json::create ("type", type,
+                                             "content", readStringToEndOfChunk (chunkRange)));
         }
 
         std::shared_ptr<std::istream> stream;

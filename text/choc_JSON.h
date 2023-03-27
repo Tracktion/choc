@@ -55,6 +55,18 @@ value::Value parse (std::string_view);
 /// Attempts to parse a bare JSON value such as a number, string, object etc
 value::Value parseValue (std::string_view);
 
+/// A helper function to create a JSON-friendly Value object with a set of properties.
+/// The argument list must be contain pairs of names and values, e.g.
+///
+///  auto myObject = choc::json::create ("property1", 1234,
+///                                      "property2", "hello",
+///                                      "property3", 100.0f);
+///
+/// Essentially, this is a shorthand for calling choc::value::createObject()
+/// and passing it an empty type name.
+template <typename... Properties>
+value::Value create (Properties&&... propertyNamesAndValues);
+
 //==============================================================================
 /// Formats a value as a JSON string.
 /// If useLineBreaks is true, it'll be formatted as multi-line JSON, if false it'll
@@ -534,6 +546,13 @@ inline value::Value parse (const char* text, size_t numbytes, bool parseBareValu
 
 inline value::Value parse (std::string_view text)       { return parse (text.data(), text.length(), false); }
 inline value::Value parseValue (std::string_view text)  { return parse (text.data(), text.length(), true); }
+
+template <typename... Properties>
+value::Value create (Properties&&... properties)
+{
+    static_assert ((sizeof...(properties) & 1) == 0, "The arguments must be a sequence of name, value pairs");
+    return choc::value::createObject ({}, std::forward<Properties> (properties)...);
+}
 
 
 } // namespace choc::json
