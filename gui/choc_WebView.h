@@ -695,7 +695,7 @@ public:
     virtual HRESULT STDMETHODCALLTYPE remove_FrameNavigationCompleted(EventRegistrationToken) = 0;
     virtual HRESULT STDMETHODCALLTYPE add_ScriptDialogOpening(void*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_ScriptDialogOpening(EventRegistrationToken) = 0;
-    virtual HRESULT STDMETHODCALLTYPE add_PermissionRequested(void*, EventRegistrationToken*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE add_PermissionRequested(ICoreWebView2PermissionRequestedEventHandler*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_PermissionRequested(EventRegistrationToken) = 0;
     virtual HRESULT STDMETHODCALLTYPE add_ProcessFailed(void*, EventRegistrationToken*) = 0;
     virtual HRESULT STDMETHODCALLTYPE remove_ProcessFailed(EventRegistrationToken) = 0;
