@@ -982,10 +982,15 @@ private:
         return false;
     }
 
-    void environmentCreated (ICoreWebView2Environment* env)
+    bool environmentCreated (ICoreWebView2Environment* env)
     {
+        if (coreWebViewEnvironment != nullptr)
+            return false;
+
         env->AddRef();
         coreWebViewEnvironment = env;
+
+        return true;
     }
 
     void webviewCreated (ICoreWebView2Controller* controller, ICoreWebView2* view)
@@ -1118,7 +1123,9 @@ private:
             if (env == nullptr)
                 return E_FAIL;
 
-            ownerPimpl.environmentCreated (env);
+            if (! ownerPimpl.environmentCreated (env))
+                return E_FAIL;
+
             env->CreateCoreWebView2Controller (ownerPimpl.hwnd, this);
             return S_OK;
         }
