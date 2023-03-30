@@ -1109,7 +1109,7 @@ private:
         EventHandler& operator= (EventHandler&&) = delete;
         virtual ~EventHandler() {}
 
-        HRESULT STDMETHODCALLTYPE QueryInterface (REFIID, LPVOID*) override   { return S_OK; }
+        HRESULT STDMETHODCALLTYPE QueryInterface (REFIID, LPVOID*) override   { return E_NOINTERFACE; }
         ULONG STDMETHODCALLTYPE AddRef() override     { return ++refCount; }
         ULONG STDMETHODCALLTYPE Release() override    { auto newCount = --refCount; if (newCount == 0) delete this; return newCount; }
 
