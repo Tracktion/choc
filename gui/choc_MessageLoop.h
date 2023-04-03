@@ -171,6 +171,8 @@ struct Timer::Pimpl
 #include <objc/objc-runtime.h>
 #include <dispatch/dispatch.h>
 
+#include <type_traits>
+
 namespace choc::objc
 {
     static inline id getClass (const char* s)              { return (id) objc_getClass (s); }
@@ -178,7 +180,23 @@ namespace choc::objc
     template <typename ReturnType, typename... Args>
     static ReturnType call (id target, const char* selector, Args... args)
     {
-        return reinterpret_cast<ReturnType(*)(id, SEL, Args...)> (objc_msgSend) (target, sel_registerName (selector), args...);
+        constexpr const auto msgSend = ([]
+        {
+          #if defined (__x86_64__)
+            if constexpr (std::is_void_v<ReturnType>)
+                return objc_msgSend;
+            else if constexpr (sizeof (ReturnType) > 16)
+                return objc_msgSend_stret;
+            else
+                return objc_msgSend;
+          #elif defined (__arm64__)
+            return objc_msgSend;
+          #else
+            #error "Unknown or unsupported architecture!"
+          #endif
+        })();
+
+        return reinterpret_cast<ReturnType(*)(id, SEL, Args...)> (msgSend) (target, sel_registerName (selector), args...);
     }
 
     static inline id getNSString (const char* s)           { return call<id> (getClass ("NSString"), "stringWithUTF8String:", s); }
