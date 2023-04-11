@@ -389,22 +389,23 @@ inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
 
             switch (pop())
             {
-                case '[':                                 return parseArray();
-                case '{':                                 return parseObject();
-                case '"':                                 return value::createString (parseString());
-                case '-':                                 skipWhitespace(); return parseNumber (true);
-                case '0': case '1': case '2':
-                case '3': case '4': case '5':
-                case '6': case '7': case '8': case '9':   current = startPos; return parseNumber (false);
-                default:                                  break;
+                case '[':    return parseArray();
+                case '{':    return parseObject();
+                case '"':    return value::createString (parseString());
+                case '-':    skipWhitespace(); return parseNumber (true);
+                case 'n':    if (popIf ("ull")) return {}; break;
+                case 't':    if (popIf ("rue"))  return value::createBool (true); break;
+                case 'f':    if (popIf ("alse")) return value::createBool (false); break;
+
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9':
+                    current = startPos;
+                    return parseNumber (false);
+
+                default: break;
             }
 
-            current = startPos;
-            if (popIf ("null"))   return {};
-            if (popIf ("true"))   return value::createBool (true);
-            if (popIf ("false"))  return value::createBool (false);
-
-            throwError ("Syntax error");
+            throwError ("Syntax error", startPos);
         }
 
         value::Value parseNumber (bool negate)

@@ -647,6 +647,7 @@ private:
     template <typename TargetType> TargetType readContentAs() const;
     template <typename TargetType> TargetType castToType (TargetType*) const;
     template <typename PrimitiveType> void setUnchecked (PrimitiveType);
+    void updateStringHandles (StringDictionary&, StringDictionary&);
 
     ValueView operator[] (const void*) const = delete;
     ValueView operator[] (bool) const = delete;
@@ -1335,10 +1336,17 @@ struct Type::ComplexArray
         {
             auto elementSize = g.elementType.getValueDataSize();
 
-            for (uint32_t i = 0; i < g.repetitions; ++i)
+            if (g.elementType.usesStrings())
             {
-                g.elementType.visitStringHandles (offset, visitor);
-                offset += elementSize;
+                for (uint32_t i = 0; i < g.repetitions; ++i)
+                {
+                    g.elementType.visitStringHandles (offset, visitor);
+                    offset += elementSize;
+                }
+            }
+            else
+            {
+                offset += elementSize * g.repetitions;
             }
         }
     }
@@ -2460,50 +2468,28 @@ void ValueView::deserialise (InputData& input, Handler&& handleResult, Allocator
 }
 
 //==============================================================================
+inline void ValueView::updateStringHandles (StringDictionary& oldDic, StringDictionary& newDic)
+{
+    if (type.isType (Type::MainType::string, Type::MainType::object, Type::MainType::primitiveArray, Type::MainType::complexArray))
+    {
+        type.visitStringHandles (0, [&oldDic, &newDic, data = this->data] (size_t offset)
+        {
+            auto oldHandle = StringDictionary::Handle { readUnaligned<decltype(StringDictionary::Handle::handle)> (data + offset) };
+            writeUnaligned (data + offset, newDic.getHandleForString (oldDic.getStringForHandle (oldHandle)).handle);
+        });
+    }
+}
+
 inline void ValueView::setDictionary (StringDictionary* newDictionary)
 {
-    if (stringDictionary == newDictionary)
-        return;
-
-    auto oldDictionary = stringDictionary;
-    stringDictionary = newDictionary;
-
-    if (stringDictionary == nullptr || oldDictionary == nullptr || ! type.usesStrings())
-        return;
-
-    struct Importer
+    if (stringDictionary != newDictionary)
     {
-        const StringDictionary& oldDic;
+        auto oldDictionary = stringDictionary;
+        stringDictionary = newDictionary;
 
-        void importStrings (ValueView& v)
-        {
-            if (v.getType().usesStrings())
-            {
-                if (v.isString())
-                {
-                    auto oldHandle = StringDictionary::Handle { v.readContentAs<decltype (StringDictionary::Handle::handle)>() };
-                    v.setUnchecked (v.stringDictionary->getHandleForString (oldDic.getStringForHandle (oldHandle)));
-                }
-                else if (v.isArray())
-                {
-                    for (auto element : v)
-                        importStrings (element);
-                }
-                else if (v.isObject())
-                {
-                    auto numMembers = v.size();
-
-                    for (uint32_t i = 0; i < numMembers; ++i)
-                    {
-                        auto member = v[i];
-                        importStrings (member);
-                    }
-                }
-            }
-        }
-    };
-
-    Importer { *oldDictionary }.importStrings (*this);
+        if (oldDictionary != nullptr && newDictionary != nullptr)
+            updateStringHandles (*oldDictionary, *newDictionary);
+    }
 }
 
 //==============================================================================
@@ -2604,12 +2590,7 @@ inline Value& Value::operator= (const ValueView& source)
     dictionary.clear();
 
     if (auto sourceDictionary = source.getDictionary())
-    {
-        // this sequence forces an update of the string handles if needed
-        value.setDictionary (nullptr); // reset the dictionary pointer: doesn't change any handles.
-        value.setDictionary (sourceDictionary); // changing dictionary from nullptr, which also does nothing.
-        value.setDictionary (std::addressof (dictionary)); // now will update from the source dictionary to our own
-    }
+        value.updateStringHandles (*sourceDictionary, dictionary);
 
     return *this;
 }
@@ -3187,19 +3168,16 @@ inline SimpleStringDictionary::Handle SimpleStringDictionary::getHandleForString
         std::string_view sv (strings.data() + i);
 
         if (text == sv)
-            return { static_cast<decltype (Handle::handle)> (i + 1) };
+            return { static_cast<decltype(Handle::handle)> (i + 1) };
 
         i += sv.length();
     }
 
-    auto result = SimpleStringDictionary::Handle { static_cast<decltype (Handle::handle)> (strings.size() + 1) };
+    auto newHandle = static_cast<decltype(Handle::handle)> (strings.size() + 1);
     strings.reserve (strings.size() + text.length() + 1);
-
-    for (auto& c : text)
-        strings.push_back (c);
-
+    strings.insert (strings.end(), text.begin(), text.end());
     strings.push_back (0);
-    return result;
+    return { newHandle };
 }
 
 inline std::string_view SimpleStringDictionary::getStringForHandle (Handle handle) const
