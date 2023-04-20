@@ -2596,7 +2596,11 @@ inline Value& Value::operator= (const ValueView& source)
     packedData.resize (source.getType().getValueDataSize());
     value.type = source.type;
     value.data = packedData.data();
-    std::memcpy (value.data, source.getRawData(), getRawDataSize());
+
+    auto dataSize = getRawDataSize();
+    if (dataSize > 0)
+        std::memcpy (value.data, source.getRawData(), dataSize);
+
     dictionary.clear();
 
     if (auto sourceDictionary = source.getDictionary())
