@@ -19,7 +19,7 @@ Basically CHOC is aimed at people (like me) who just want to use some decent lib
 
 ### Highlights
 
-The library is getting quite big now. Some of its many delights include:
+The library is getting quite big now! Some of its many delights include:
 
 #### Miscellaneous
 
@@ -31,6 +31,8 @@ The library is getting quite big now. Some of its many delights include:
 - A tempting-but-probably-perilous [in-memory DLL loader](./platform/choc_MemoryDLL.h) which can load a DLL from memory instead of a file (Windows only).
 - Various maths and bit-twiddling [bits and bobs](./math/choc_MathHelpers.h).
 - A system for easily adding and collecting all the [open-source licenses](./text/choc_OpenSourceLicenseList.h) that your project uses into a single string for displaying to a user (for license compliance).
+- A one-file header-only [encapsulation of zlib](./containers/choc_zlib.h), exposing `std::iostream` compatible classes for compressing and decompressing data.
+- A [Zip file reader](./containers/choc_ZipFile.h) and decompressor class.
 
 #### Text and Files
 

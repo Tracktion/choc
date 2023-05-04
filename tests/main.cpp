@@ -97,7 +97,7 @@ int main (int argc, const char** argv)
             return openDemoWebViewWindow();
 
     choc::test::TestProgress progress;
-    return choc::test::runAllTests (progress) ? 0 : 1;
+    return choc_unit_tests::runAllTests (progress) ? 0 : 1;
 }
 
 //==============================================================================

@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../containers/choc_ZipFile.h"
 #include "../platform/choc_FileWatcher.h"
 #include "../threading/choc_ThreadSafeFunctor.h"
 #include "../threading/choc_TaskThread.h"
@@ -87,16 +88,16 @@
     At some point the library will probably grow to a size where this needs to be refactored into
     smaller modules and done in a more sophisticated way, but we're not there yet!
 */
-namespace choc::test
+namespace choc_unit_tests
 {
 
 /// Just create a TestProgress and pass it to this function to run all the
 /// tests. The TestProgress object contains a callback that will be used
 /// to log its progress.
-bool runAllTests (TestProgress&);
+bool runAllTests (choc::test::TestProgress&);
 
 
-inline void testPlatform (TestProgress& progress)
+inline void testPlatform (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Platform);
 
@@ -224,7 +225,7 @@ inline void testPlatform (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testContainerUtils (TestProgress& progress)
+inline void testContainerUtils (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Containers);
 
@@ -280,7 +281,7 @@ inline void testContainerUtils (TestProgress& progress)
     }
 }
 
-inline void testStringUtilities (TestProgress& progress)
+inline void testStringUtilities (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Strings);
 
@@ -644,7 +645,7 @@ inline void testStringUtilities (TestProgress& progress)
     }
 }
 
-inline void testFileUtilities (TestProgress& progress)
+inline void testFileUtilities (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Files);
 
@@ -663,7 +664,7 @@ inline void testFileUtilities (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testValues (TestProgress& progress)
+inline void testValues (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Values);
 
@@ -957,7 +958,7 @@ inline void testValues (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testJSON (TestProgress& progress)
+inline void testJSON (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (JSON);
 
@@ -1137,7 +1138,7 @@ inline void testJSON (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testMIDI (TestProgress& progress)
+inline void testMIDI (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (MIDI);
 
@@ -1203,7 +1204,7 @@ inline void testMIDI (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testAudioBuffers (TestProgress& progress)
+inline void testAudioBuffers (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (AudioBuffers);
 
@@ -1782,7 +1783,7 @@ inline void testAudioBuffers (TestProgress& progress)
 
 //==============================================================================
 template <typename Format, typename Buffer>
-inline void testIntToFloatBuffer (TestProgress& progress, Buffer& buffer, uint32_t sampleStride)
+inline void testIntToFloatBuffer (choc::test::TestProgress& progress, Buffer& buffer, uint32_t sampleStride)
 {
     std::vector<uint8_t> data;
     data.resize (buffer.getNumChannels() * buffer.getNumFrames() * sampleStride);
@@ -1798,7 +1799,7 @@ inline void testIntToFloatBuffer (TestProgress& progress, Buffer& buffer, uint32
 }
 
 template <typename Format>
-inline void testIntToFloatFormat (TestProgress& progress)
+inline void testIntToFloatFormat (choc::test::TestProgress& progress)
 {
     std::array testValues { 10.0f, 1.1f, 1.0f, 0.99f, 0.8f, 0.6f, 0.5f, 0.3f, 0.2f, 0.01f, 0.0f };
     char data[8];
@@ -1837,7 +1838,7 @@ inline void testIntToFloatFormat (TestProgress& progress)
     }
 }
 
-inline void testIntToFloat (TestProgress& progress)
+inline void testIntToFloat (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (AudioSampleConversion);
 
@@ -1852,7 +1853,7 @@ inline void testIntToFloat (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testFIFOs (TestProgress& progress)
+inline void testFIFOs (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (FIFOs);
 
@@ -1972,7 +1973,7 @@ inline void testFIFOs (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testMIDIFiles (TestProgress& progress)
+inline void testMIDIFiles (choc::test::TestProgress& progress)
 {
     auto simpleHash = [] (const std::string& s)
     {
@@ -2066,7 +2067,7 @@ static bool areValuesEqual (const choc::value::ValueView& v1, const choc::value:
     return false;
 }
 
-inline void testJavascript (TestProgress& progress, std::function<choc::javascript::Context()> createContext, bool isDuktape)
+inline void testJavascript (choc::test::TestProgress& progress, std::function<choc::javascript::Context()> createContext, bool isDuktape)
 {
     {
         CHOC_TEST (Basics)
@@ -2323,7 +2324,7 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
     }
 }
 
-inline void testJavascript (TestProgress& progress)
+inline void testJavascript (choc::test::TestProgress& progress)
 {
    #if CHOC_V8_AVAILABLE
     CHOC_CATEGORY (Javascript_V8);
@@ -2338,7 +2339,7 @@ inline void testJavascript (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testWebview (TestProgress& progress)
+inline void testWebview (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (WebView);
 
@@ -2444,7 +2445,7 @@ fetch (new Request("./hello.txt"))
 }
 
 //==============================================================================
-inline void testCOM (TestProgress& progress)
+inline void testCOM (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (COM);
 
@@ -2493,7 +2494,7 @@ inline void testCOM (TestProgress& progress)
     }
 }
 
-inline void testStableSort (TestProgress& progress)
+inline void testStableSort (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (StableSort);
 
@@ -2538,7 +2539,7 @@ inline void testStableSort (TestProgress& progress)
 
 //==============================================================================
 template <typename FileFormat, typename BufferSampleType>
-inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDepth bitDepth,
+inline void testAudioFileRoundTrip (choc::test::TestProgress& progress, choc::audio::BitDepth bitDepth,
                                     double sampleRate, uint32_t numChannels, uint32_t length,
                                     std::string quality, BufferSampleType maxDiff)
 {
@@ -2575,7 +2576,7 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
     auto source = choc::buffer::ChannelArrayBuffer<BufferSampleType> (numChannels, length);
 
     for (uint32_t i = 0; i < numChannels; ++i)
-        oscillator::render<choc::oscillator::Sine<BufferSampleType>> (source.getChannel (i), 4000.0 + 1000.0 * i, sampleRate);
+        choc::oscillator::render<choc::oscillator::Sine<BufferSampleType>> (source.getChannel (i), 4000.0 + 1000.0 * i, sampleRate);
 
     FileFormat format;
     std::string file1;
@@ -2641,7 +2642,7 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
     CHOC_CATCH_UNEXPECTED_EXCEPTION
 }
 
-inline void testAudioFileFormat (TestProgress& progress)
+inline void testAudioFileFormat (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (AudioFileFormat);
 
@@ -2717,7 +2718,7 @@ inline void testAudioFileFormat (TestProgress& progress)
     }
 }
 
-inline void testTimers (TestProgress& progress)
+inline void testTimers (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (MessageLoop);
 
@@ -2758,7 +2759,7 @@ inline void testTimers (TestProgress& progress)
     }
 }
 
-inline void testThreading (TestProgress& progress)
+inline void testThreading (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (Threading);
 
@@ -2828,7 +2829,7 @@ inline void testThreading (TestProgress& progress)
     }
 }
 
-inline void testFileWatcher (TestProgress& progress)
+inline void testFileWatcher (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (FileWatcher);
 
@@ -2895,8 +2896,184 @@ inline void testFileWatcher (TestProgress& progress)
     CHOC_CATCH_UNEXPECTED_EXCEPTION
 }
 
+static std::string createRandomData (size_t length)
+{
+    std::ostringstream out (std::ios::binary);
+    size_t total = 0;
+
+    while (total < length)
+    {
+        size_t reps = 1;
+
+        if ((rand() & 7) > 4)
+            reps += (size_t) ((rand() & 7) < 5 ? (rand() & 7) : (rand() & 1023));
+
+        auto c = rand() & 255;
+
+        for (size_t i = 0; i < reps; ++i)
+            out << (char) c;
+
+        total += reps;
+    }
+
+    return out.str().substr (0, length);
+}
+
+static void testZLIB (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (zlib);
+
+    {
+        CHOC_TEST (Streams)
+
+        auto performTestWithBits = [&] (size_t dataSize, choc::zlib::DeflaterStream::CompressionLevel compression,
+                                        int windowBits,
+                                        choc::zlib::InflaterStream::FormatType format)
+        {
+            const auto original = createRandomData (dataSize);
+
+            std::string compressed;
+
+            {
+                auto out = std::make_shared<std::ostringstream> (std::ios::binary);
+
+                {
+                    choc::zlib::DeflaterStream deflater (out, compression, windowBits);
+                    deflater.write (original.data(), static_cast<std::streamsize> (original.size()));
+                }
+
+                compressed = out->str();
+            }
+
+            CHOC_ASSERT (! compressed.empty());
+
+            choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary), format);
+
+            auto compareSections = [&] (size_t start, size_t len)
+            {
+                std::vector<char> buffer;
+                buffer.resize (len);
+                in.seekg (static_cast<std::istream::off_type> (start), std::ios_base::beg);
+                CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (start));
+                in.read (buffer.data(), static_cast<std::streamsize> (len));
+                CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (start + len));
+                CHOC_EXPECT_TRUE (std::string (buffer.data(), len) == original.substr (start, len));
+            };
+
+            for (size_t i = 0; i < 50; ++i)
+            {
+                auto p1 = i == 0 ? 0u : ((size_t) rand() % (original.length() + 1u));
+                auto p2 = i == 10 ? original.length() : ((size_t) rand() % (original.length() + 1));
+
+                compareSections (std::min (p1, p2), std::max (p1, p2) - std::min (p1, p2));
+            }
+        };
+
+        auto performTest = [&] (size_t dataSize, choc::zlib::DeflaterStream::CompressionLevel compression)
+        {
+            performTestWithBits (dataSize, compression, 0, choc::zlib::InflaterStream::FormatType::zlib);
+            performTestWithBits (dataSize, compression, -15, choc::zlib::InflaterStream::FormatType::zlib);
+        };
+
+        for (auto compression = choc::zlib::DeflaterStream::CompressionLevel::none;
+             compression <= choc::zlib::DeflaterStream::CompressionLevel::best;
+             compression = (choc::zlib::DeflaterStream::CompressionLevel) (compression + 1))
+        {
+            performTest (0, compression);
+            performTest (1, compression);
+            performTest (2, compression);
+            performTest (3, compression);
+            performTest (128 * 1024, compression);
+
+            for (size_t i = 0; i < 10; ++i)
+                performTest (1 + (size_t) ((rand() & 8191) + (rand() & 7) * 1233), compression);
+        }
+    }
+}
+
+static void testZipFile (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (ZipFile);
+
+    {
+        CHOC_TEST (Decompress)
+
+        try
+        {
+            struct File
+            {
+                std::string name, data;
+            };
+
+            auto generateFile = [] (uint32_t seed)
+            {
+                File file;
+                auto len = std::max (1u, std::min (8192u, seed * 13));
+
+                for (uint32_t i = 0; i < len; ++i)
+                {
+                    seed = ((seed * 3 + seed * 17) ^ seed) + 1;
+                    file.data += (char) seed;
+
+                    if ((seed & 4) == 0)
+                        for (uint32_t n = 0; n < 1 + (seed / 10) % 30; ++n)
+                            file.data += (char) seed;
+                }
+
+                file.name = "zip/folder" + std::to_string (seed % 3) + "/file" + std::to_string (seed);
+                return file;
+            };
+
+            std::vector<File> files;
+
+            for (uint32_t i = 0; i < 10; ++i)
+                files.push_back (generateFile ((1 + (i * 13)) ^ ((i * 17) + i)));
+
+            // for (auto& f : files)
+            //     choc::file::replaceFileWithContent ("/Users/jules/Desktop/" + file.name, file.data);
+
+            auto zipped = choc::file::loadFileAsString ((std::filesystem::path (__FILE__).parent_path() / "test.zip").string());
+            auto stream = std::make_shared<std::istringstream> (zipped, std::ios::binary);
+
+            auto check = [&] (const File& f)
+            {
+                for (auto& original : files)
+                {
+                    if (original.name == f.name)
+                    {
+                        CHOC_EXPECT_EQ (original.data, f.data);
+                        return;
+                    }
+                }
+
+                CHOC_FAIL ("File not found");
+            };
+
+            choc::zip::ZipFile z (stream);
+
+            for (auto& item : z.items)
+            {
+                if (item.isFolder())
+                    continue;
+
+                File f;
+                f.name = item.filename;
+
+                auto reader = item.createReader();
+
+                f.data.resize (item.uncompressedSize);
+                reader->read (static_cast<std::ifstream::char_type*> (f.data.data()),
+                              static_cast<std::streamsize> (item.uncompressedSize));
+                check (f);
+            }
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+}
+
+
 //==============================================================================
-inline bool runAllTests (TestProgress& progress)
+inline bool runAllTests (choc::test::TestProgress& progress)
 {
     choc::threading::TaskThread emergencyKillThread;
     int secondsElapsed = 0;
@@ -2916,6 +3093,8 @@ inline bool runAllTests (TestProgress& progress)
     {
         choc::messageloop::initialise();
 
+        testZLIB (progress);
+        testZipFile (progress);
         testFileWatcher (progress);
         testPlatform (progress);
         testContainerUtils (progress);
