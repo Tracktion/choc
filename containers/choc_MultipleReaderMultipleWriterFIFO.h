@@ -27,6 +27,9 @@ namespace choc::fifo
 //==============================================================================
 /**
     A simple atomic multiple-reader, multiple-writer FIFO.
+
+    This does use some spin-locks, so it's not technically lock-free, although in
+    practice it's very unlikely to cause any issues if used on a realtime thread.
 */
 template <typename Item>
 struct MultipleReaderMultipleWriterFIFO

@@ -30,6 +30,10 @@ namespace choc::fifo
 //==============================================================================
 /**
     A simple atomic single-reader, multiple-writer FIFO.
+
+    Note that the idea with this class is for it to be realtime-safe and lock-free
+    for the reader, but the writers may very briefly block each other if more than
+    one thread attempts to write at the same time.
 */
 template <typename Item>
 struct SingleReaderMultipleWriterFIFO
