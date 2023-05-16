@@ -107,8 +107,9 @@ inline TargetType bit_cast (SourceType source)
 {
     static_assert (sizeof (SourceType) == sizeof (TargetType),
                    "Can only bitcast between objects of the same size");
-    union { SourceType src; TargetType dst; } u = { source };
-    return u.dst;
+    TargetType t;
+    std::memcpy (std::addressof (t), std::addressof (source), sizeof (TargetType));
+    return t;
 }
 
 template <typename Type>
