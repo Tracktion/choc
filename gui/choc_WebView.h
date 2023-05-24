@@ -72,6 +72,11 @@ public:
         /// If supported, this enables developer features in the browser
         bool enableDebugMode = false;
 
+        /// On OSX, setting this to true will allow the first click on a non-focused
+        /// webview to be used as input, rather than the default behaviour, which is
+        /// for the first click to give the webview focus but not trigger any action.
+        bool acceptsFirstMouseClick = false;
+
         /// Serve resources to the browser from a C++ callback function.
         /// This can effectively be used to implement a basic web server,
         /// serving resources to the browser in any way the client code chooses.
@@ -303,8 +308,8 @@ struct choc::ui::WebView::Pimpl
 
 struct choc::ui::WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options& options)
-        : owner (v), fetchResource (options.fetchResource)
+    Pimpl (WebView& v, const Options& optionsToUse)
+        : owner (v), options (optionsToUse)
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
@@ -331,7 +336,8 @@ struct choc::ui::WebView::Pimpl
         if (options.fetchResource)
             call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString ("choc"));
 
-        webview = call<id> (call<id> (getClass ("WKWebView"), "alloc"), "initWithFrame:configuration:", CGRect(), config);
+        webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
+        objc_setAssociatedObject (webview, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
 
         call<void> (config, "release");
 
@@ -343,6 +349,7 @@ struct choc::ui::WebView::Pimpl
     {
         objc::AutoReleasePool autoreleasePool;
         objc_setAssociatedObject (delegate, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
+        objc_setAssociatedObject (webview, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc::call<void> (webview, "release");
         objc::call<void> (manager, "removeScriptMessageHandlerForName:", objc::getNSString ("external"));
         objc::call<void> (manager, "release");
@@ -388,6 +395,12 @@ private:
         return objc::call<id> ((id) dc.delegateClass, "new");
     }
 
+    id allocateWebview()
+    {
+        static WebviewClass c;
+        return objc::call<id> ((id) c.webviewClass, "alloc");
+    }
+
     void onResourceRequested (id task)
     {
         using namespace choc::objc;
@@ -409,7 +422,7 @@ private:
 
             const auto* path = objc::call<const char*> (call<id> (requestUrl, "path"),  "UTF8String");
 
-            if (const auto resource = fetchResource (path))
+            if (const auto resource = options.fetchResource (path))
             {
                 const auto& [bytes, mimeType] = *resource;
 
@@ -443,8 +456,34 @@ private:
     }
 
     WebView& owner;
-    Options::FetchResource fetchResource;
+    Options options;
     id webview = {}, manager = {}, delegate = {};
+
+    struct WebviewClass
+    {
+        WebviewClass()
+        {
+            webviewClass = choc::objc::createDelegateClass ("WKWebView", "CHOCWebView_");
+
+            class_addMethod (webviewClass, sel_registerName ("acceptsFirstMouse:"),
+                            (IMP) (+[](id self, SEL, id) -> BOOL
+                            {
+                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                    return p->options.acceptsFirstMouseClick;
+
+                                return false;
+                            }), "B@:@");
+
+            objc_registerClassPair (webviewClass);
+        }
+
+        ~WebviewClass()
+        {
+            objc_disposeClassPair (webviewClass);
+        }
+
+        Class webviewClass = {};
+    };
 
     struct DelegateClass
     {
