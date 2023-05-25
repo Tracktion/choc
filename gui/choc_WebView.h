@@ -489,7 +489,7 @@ private:
     {
         DelegateClass()
         {
-            delegateClass = choc::objc::createDelegateClass ("NSResponder", "CHOCWebViewDelegate_");
+            delegateClass = choc::objc::createDelegateClass ("NSObject", "CHOCWebViewDelegate_");
 
             class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
                             (IMP) (+[](id self, SEL, id, id msg)

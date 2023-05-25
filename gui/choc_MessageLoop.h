@@ -168,7 +168,8 @@ struct Timer::Pimpl
 #elif CHOC_APPLE
 
 #include <unordered_set>
-#include <objc/objc-runtime.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
 #include <dispatch/dispatch.h>
 
 #include <type_traits>
