@@ -186,7 +186,7 @@ inline Pool::Item& Pool::allocateItem (size_t size)
 
 inline void* Pool::allocateData (size_t size)
 {
-    return allocateItem (size).getItemData();
+    return allocateItem (Item::getSpaceNeeded (size)).getItemData();
 }
 
 inline std::string_view Pool::allocateString (std::string_view s)
