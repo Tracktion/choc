@@ -22,6 +22,7 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 #include "../platform/choc_Platform.h"
 #include "../text/choc_JSON.h"
 
