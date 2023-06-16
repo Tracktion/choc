@@ -371,7 +371,7 @@ struct DesktopWindow::Pimpl
         {
             delegateClass = choc::objc::createDelegateClass ("NSResponder", "CHOCDesktopWindowDelegate_");
 
-            if (auto p = objc_getProtocol ("NSWindowDelegate"))
+            if (auto* p = objc_getProtocol ("NSWindowDelegate"))
                 class_addProtocol (delegateClass, p);
 
             class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
