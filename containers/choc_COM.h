@@ -23,6 +23,15 @@
 #include <string>
 #include "../platform/choc_Assert.h"
 
+#ifdef __clang__
+ #pragma clang diagnostic push
+ #pragma clang diagnostic ignored "-Wnon-virtual-dtor" // COM objects can't have a virtual destructor
+#elif __GNUC__
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wnon-virtual-dtor" // COM objects can't have a virtual destructor
+#endif
+
+
 /*
     The venerable Microsoft "COM" object system is clunky and awful in many ways.
     But if you need to publish a pre-built DLL that exposes an object-oriented API, and you
@@ -345,5 +354,11 @@ inline StringPtr createString (std::string stringToUse)
 }
 
 } // namespace choc::com
+
+#ifdef __clang__
+ #pragma clang diagnostic pop
+#elif __GNUC__
+ #pragma GCC diagnostic pop
+#endif
 
 #endif // CHOC_COM_HELPERS_HEADER_INCLUDED
