@@ -22,6 +22,7 @@
 #include <functional>
 #include "../containers/choc_Span.h"
 #include "../containers/choc_SingleReaderSingleWriterFIFO.h"
+#include "../platform/choc_HighResolutionSteadyClock.h"
 #include "choc_SampleBuffers.h"
 #include "choc_MIDI.h"
 
@@ -108,8 +109,7 @@ private:
     choc::buffer::ChannelArrayView<const float> nextInputBlock;
     HandleMIDIMessageFn midiOutputMessageCallback;
 
-    using Clock = std::chrono::high_resolution_clock;
-    using TimePoint = Clock::time_point;
+    using TimePoint = HighResolutionSteadyClock::time_point;
     using DurationType = std::chrono::duration<double, std::ratio<1, 1>>;
     static constexpr int32_t maxCatchUpFrames = 20000;
 
@@ -154,7 +154,7 @@ inline void AudioMIDIBlockDispatcher::reset (double sampleRate, size_t midiFIFOC
 
 inline void AudioMIDIBlockDispatcher::addMIDIEvent (choc::midi::ShortMessage message)
 {
-    midiFIFO.push ({ Clock::now(), message });
+    midiFIFO.push ({ HighResolutionSteadyClock::now(), message });
 }
 
 inline void AudioMIDIBlockDispatcher::addMIDIEvent (const choc::midi::Message& message)
@@ -272,7 +272,7 @@ inline void AudioMIDIBlockDispatcher::fetchMIDIBlockFromFIFO (uint32_t numFrames
     midiMessageTimes.clear();
 
     auto blockStartTime = lastBlockTime;
-    lastBlockTime = Clock::now();
+    lastBlockTime = HighResolutionSteadyClock::now();
 
     if (midiFIFO.getUsedSlots() != 0)
     {
