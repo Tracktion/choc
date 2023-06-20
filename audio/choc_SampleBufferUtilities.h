@@ -31,7 +31,7 @@ namespace choc::buffer
 template <typename SampleType>
 struct InterleavingScratchBuffer
 {
-    InterleavedView<SampleType> getInterleavedBuffer (choc::buffer::Size size)
+    [[nodiscard]] InterleavedView<SampleType> getInterleavedBuffer (choc::buffer::Size size)
     {
         auto spaceNeeded = size.numChannels * size.numFrames;
 
@@ -42,7 +42,7 @@ struct InterleavingScratchBuffer
     }
 
     template <typename SourceBufferType>
-    InterleavedView<SampleType> interleave (const SourceBufferType& source)
+    [[nodiscard]] InterleavedView<SampleType> interleave (const SourceBufferType& source)
     {
         auto dest = getInterleavedBuffer (source.getSize());
         copy (dest, source);
@@ -58,18 +58,20 @@ private:
 template <typename SampleType>
 struct DeinterleavingScratchBuffer
 {
-    ChannelArrayView<SampleType> getDeinterleavedBuffer (choc::buffer::Size size)
+    [[nodiscard]] ChannelArrayView<SampleType> getDeinterleavedBuffer (choc::buffer::Size size)
     {
-        auto spaceNeeded = size.numChannels * size.numFrames;
+        if (buffer.getNumChannels() < size.numChannels || buffer.getNumFrames() < size.numFrames)
+        {
+            buffer.resize (size);
+            return buffer.getView();
+        }
 
-        if (spaceNeeded > buffer.size())
-            buffer.resize (spaceNeeded);
-
-        return createChannelArrayView (buffer.data(), size.numChannels, size.numFrames);
+        return buffer.getSection ({ 0, size.numChannels },
+                                  { 0, size.numFrames });
     }
 
     template <typename SourceBufferType>
-    ChannelArrayView<SampleType> deinterleave (const SourceBufferType& source)
+    [[nodiscard]] ChannelArrayView<SampleType> deinterleave (const SourceBufferType& source)
     {
         auto dest = getDeinterleavedBuffer (source.getSize());
         copy (dest, source);
@@ -77,7 +79,7 @@ struct DeinterleavingScratchBuffer
     }
 
 private:
-    std::vector<SampleType> buffer;
+    ChannelArrayBuffer<SampleType> buffer;
 };
 
 

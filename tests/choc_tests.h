@@ -1646,7 +1646,7 @@ inline void testAudioBuffers (TestProgress& progress)
     }
 
     {
-        CHOC_TEST (Interleaving)
+        CHOC_TEST (InterleavingScratchBufferRoundTrip)
 
         choc::buffer::InterleavingScratchBuffer<float> ib;
         choc::buffer::DeinterleavingScratchBuffer<float> db;
@@ -1671,6 +1671,78 @@ inline void testAudioBuffers (TestProgress& progress)
         test (2, 100);
         test (3, 50);
         test (5, 120);
+    }
+
+    {
+        CHOC_TEST (InterleavingScratchBufferReusedWithDifferentChannelCounts)
+
+        choc::buffer::InterleavingScratchBuffer<float> scratch;
+
+        // start by copying a stereo channel array, then check the underlying storage
+        {
+            constexpr const uint32_t frameCount = 4;
+            const std::array<float, frameCount> left {{ -0.1f, -0.2f, -0.3f, -0.4f }};
+            const std::array<float, frameCount> right {{ 0.1f, 0.2f, 0.3f, 0.4f }};
+            const std::array<const float*, 2> channels {{ left.data(), right.data() }};
+
+            const auto channelCount = static_cast<uint32_t> (channels.size());
+            const auto view = choc::buffer::createChannelArrayView (channels.data(), channelCount, frameCount);
+
+            auto interleaved = scratch.interleave (view);
+
+            CHOC_EXPECT_NEAR (interleaved.data.data[0], -0.1f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[1],  0.1f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[2], -0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[3],  0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[4], -0.3f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[5],  0.3f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[6], -0.4f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[7],  0.4f, 0.0001f);
+        }
+
+        // re-use scratch to copy from a smaller channel view. data is stored according to latest channel count.
+        {
+            constexpr const uint32_t frameCount = 4;
+            const std::array<float, frameCount> left {{ -0.1f, -0.2f, -0.3f, -0.4f }};
+            const std::array<const float*, 1> channels {{ left.data() }};
+
+            const auto channelCount = static_cast<uint32_t> (channels.size());
+            const auto view = choc::buffer::createChannelArrayView (channels.data(), channelCount, frameCount);
+
+            const auto interleaved = scratch.interleave (view);
+
+            CHOC_EXPECT_NEAR (interleaved.data.data[0], -0.1f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[1], -0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[2], -0.3f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[3], -0.4f, 0.0001f);
+        }
+
+        // re-use scratch to copy from a larger channel view. data is stored according to latest channel count.
+        {
+            constexpr const uint32_t frameCount = 4;
+            const std::array<float, frameCount> one {{ -0.1f, -0.2f, -0.3f, -0.4f }};
+            const std::array<float, frameCount> two {{ 0.1f, 0.2f, 0.3f, 0.4f }};
+            const std::array<float, frameCount> three {{ 0.2f, 0.4f, 0.6f, 0.8f }};
+            const std::array<const float*, 3> channels {{ one.data(), two.data(), three.data() }};
+
+            const auto channelCount = static_cast<uint32_t> (channels.size());
+            const auto view = choc::buffer::createChannelArrayView (channels.data(), channelCount, frameCount);
+
+            const auto interleaved = scratch.interleave (view);
+
+            CHOC_EXPECT_NEAR (interleaved.data.data[0], -0.1f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[1],  0.1f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[2],  0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[3], -0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[4],  0.2f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[5],  0.4f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[6], -0.3f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[7],  0.3f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[8],  0.6f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[9], -0.4f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[10], 0.4f, 0.0001f);
+            CHOC_EXPECT_NEAR (interleaved.data.data[11], 0.8f, 0.0001f);
+        }
     }
 
     {
