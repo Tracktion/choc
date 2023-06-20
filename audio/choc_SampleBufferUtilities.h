@@ -31,18 +31,14 @@ namespace choc::buffer
 template <typename SampleType>
 struct InterleavingScratchBuffer
 {
-    InterleavedBuffer<SampleType> buffer;
-
     InterleavedView<SampleType> getInterleavedBuffer (choc::buffer::Size size)
     {
-        if (buffer.getNumChannels() < size.numChannels || buffer.getNumFrames() < size.numFrames)
-        {
-            buffer.resize (size);
-            return buffer.getView();
-        }
+        auto spaceNeeded = size.numChannels * size.numFrames;
 
-        return buffer.getSection ({ 0, size.numChannels },
-                                  { 0, size.numFrames });
+        if (spaceNeeded > buffer.size())
+            buffer.resize (spaceNeeded);
+
+        return createInterleavedView (buffer.data(), size.numChannels, size.numFrames);
     }
 
     template <typename SourceBufferType>
@@ -52,6 +48,9 @@ struct InterleavingScratchBuffer
         copy (dest, source);
         return dest;
     }
+
+private:
+    std::vector<SampleType> buffer;
 };
 
 /// Helper class which holds a ChannelArrayBuffer which it re-uses as intermediate
@@ -59,18 +58,14 @@ struct InterleavingScratchBuffer
 template <typename SampleType>
 struct DeinterleavingScratchBuffer
 {
-    ChannelArrayBuffer<SampleType> buffer;
-
     ChannelArrayView<SampleType> getDeinterleavedBuffer (choc::buffer::Size size)
     {
-        if (buffer.getNumChannels() < size.numChannels || buffer.getNumFrames() < size.numFrames)
-        {
-            buffer.resize (size);
-            return buffer.getView();
-        }
+        auto spaceNeeded = size.numChannels * size.numFrames;
 
-        return buffer.getSection ({ 0, size.numChannels },
-                                  { 0, size.numFrames });
+        if (spaceNeeded > buffer.size())
+            buffer.resize (spaceNeeded);
+
+        return createChannelArrayView (buffer.data(), size.numChannels, size.numFrames);
     }
 
     template <typename SourceBufferType>
@@ -80,6 +75,9 @@ struct DeinterleavingScratchBuffer
         copy (dest, source);
         return dest;
     }
+
+private:
+    std::vector<SampleType> buffer;
 };
 
 
