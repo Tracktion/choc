@@ -207,6 +207,7 @@ public:
     bool operator!= (const Type&) const;
 
     //==============================================================================
+    static Type createVoid()            { return Type (MainType::void_); }
     static Type createInt32()           { return Type (MainType::int32); }
     static Type createInt64()           { return Type (MainType::int64); }
     static Type createFloat32()         { return Type (MainType::float32); }
