@@ -1574,6 +1574,21 @@ inline void Type::modifyNumElements (uint32_t newNumElements)
         content.vector.numElements = newNumElements;
     else if (isType (MainType::primitiveArray))
         content.primitiveArray.numElements = newNumElements;
+    else if (isType (MainType::complexArray))
+    {
+        uint32_t previousElements = 0;
+
+        for (auto& group : content.complexArray->groups)
+        {
+            if (previousElements + group.repetitions >= newNumElements)
+            {
+                group.repetitions = newNumElements - previousElements;
+                break;
+            }
+
+            previousElements += group.repetitions;
+        }
+    }
     else
         throwError ("This type is not a uniform array or vector");
 }
