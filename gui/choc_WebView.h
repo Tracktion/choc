@@ -265,7 +265,11 @@ struct choc::ui::WebView::Pimpl
 
     void evaluateJavascript (const std::string& js)
     {
+       #if WEBKIT_CHECK_VERSION (2, 40, 0)
+        webkit_web_view_evaluate_javascript (WEBKIT_WEB_VIEW (webview), js.c_str(), static_cast<gssize> (js.length()), nullptr, nullptr, nullptr, nullptr, nullptr);
+       #else
         webkit_web_view_run_javascript (WEBKIT_WEB_VIEW (webview), js.c_str(), nullptr, nullptr, nullptr);
+       #endif
     }
 
     void navigate (const std::string& url)
