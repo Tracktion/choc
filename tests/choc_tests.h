@@ -2284,7 +2284,9 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
     }
 
     {
-        auto in = std::make_shared<std::istringstream> (file1);
+        std::string padding = "1234567";
+        auto in = std::make_shared<std::istringstream> (padding + file1);
+        in->seekg (static_cast<std::streamoff> (padding.length()));
 
         choc::audio::AudioFileFormatList formats;
         formats.addFormat<choc::audio::OggAudioFileFormat<false>>();
