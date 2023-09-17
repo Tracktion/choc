@@ -233,18 +233,14 @@ inline std::string_view trimEnd   (const char* text)    { return trimEnd   (std:
 
 inline std::string trimStart (std::string text)
 {
-    auto i = text.begin();
+    if (text.empty() || ! isWhitespace (text.front())) return text;
 
-    if (i == text.end())        return {};
-    if (! isWhitespace (*i))    return text;
-
-    for (;;)
+    for (auto i = text.begin(); i != text.end(); ++i)
     {
-        ++i;
-
-        if (i == text.end())        return {};
-        if (! isWhitespace (*i))    return { i, text.end() };
+        if (! isWhitespace (*i)) return { i, text.end() };
     }
+    
+    return {};
 }
 
 inline std::string_view trimStart (std::string_view text)
@@ -267,19 +263,16 @@ inline std::string_view trimStart (std::string_view text)
 
 inline std::string trimEnd (std::string text)
 {
-    for (auto i = text.end();;)
+    for (auto i = text.end(); i == text.begin(); --i)
     {
-        if (i == text.begin())
-            return {};
-
-        --i;
-
         if (! isWhitespace (*i))
         {
             text.erase (i + 1, text.end());
             return text;
         }
     }
+    
+    return {};
 }
 
 inline std::string_view trimEnd (std::string_view text)
