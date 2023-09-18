@@ -23,6 +23,7 @@
 #include <string>
 #include <functional>
 #include <mutex>
+#include <chrono>
 #include "../platform/choc_Platform.h"
 #include "../platform/choc_Assert.h"
 

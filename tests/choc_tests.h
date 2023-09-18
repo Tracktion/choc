@@ -69,6 +69,7 @@
 #include "../audio/choc_SampleBufferUtilities.h"
 #include "../audio/choc_AudioMIDIBlockDispatcher.h"
 #include "../javascript/choc_javascript.h"
+#include "../javascript/choc_javascript_Timer.h"
 
 #include "choc_UnitTest.h"
 
@@ -2100,6 +2101,49 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
             CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", std::string ("abc")).getString()));
             CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", "abc").getString()));
             CHOC_EXPECT_EQ ("truexx", std::string (context.invoke ("appendStuff", true).getString()));
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (Timers)
+
+        try
+        {
+            auto context = createContext();
+            choc::javascript::registerTimerFunctions (context);
+            int result = 0;
+            context.registerFunction ("testDone", [&] (choc::javascript::ArgumentList args) -> choc::value::Value
+                                                   {
+                                                       result = args.get<int> (0);
+                                                       choc::messageloop::stop();
+                                                       return {};
+                                                   });
+
+            context.evaluate (R"(
+                var result = 0;
+                var intID;
+
+                function i()
+                {
+                    if (result == 5)
+                        clearInterval (intID);
+                    else
+                        ++result;
+                }
+
+                function t()
+                {
+                    clearInterval (intID);
+                    testDone (result);
+                }
+
+                setTimeout (t, 250);
+                intID = setInterval (i, 30);
+            )");
+
+            choc::messageloop::run();
+            CHOC_EXPECT_EQ (5, result);
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }

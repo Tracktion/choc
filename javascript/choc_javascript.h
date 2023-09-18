@@ -250,7 +250,7 @@ inline choc::value::Value Context::evaluate (const std::string& javascriptCode)
 #ifdef CHOC_JAVASCRIPT_IMPLEMENTATION
  // The way the javascript classes work has changed: instead of
  // setting CHOC_JAVASCRIPT_IMPLEMENTATION in one of your source files, just
- // include the actual engine that you want to use, e.g. choc_javasscript_QuickJS.h
+ // include the actual engine that you want to use, e.g. choc_javascript_QuickJS.h
  // in (only!) one of your source files, and use that to create instances of that engine.
  #error "CHOC_JAVASCRIPT_IMPLEMENTATION is deprecated"
 #endif
