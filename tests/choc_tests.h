@@ -70,6 +70,7 @@
 #include "../audio/choc_AudioMIDIBlockDispatcher.h"
 #include "../javascript/choc_javascript.h"
 #include "../javascript/choc_javascript_Timer.h"
+#include "../javascript/choc_javascript_Console.h"
 
 #include "choc_UnitTest.h"
 
@@ -2014,7 +2015,7 @@ inline void testMIDIFiles (TestProgress& progress)
 }
 
 //==============================================================================
-inline void testJavascript (TestProgress& progress, std::function<choc::javascript::Context()> createContext)
+inline void testJavascript (TestProgress& progress, std::function<choc::javascript::Context()> createContext, bool isDuktape)
 {
     {
         CHOC_TEST (Basics)
@@ -2111,7 +2112,7 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
         try
         {
             auto context = createContext();
-            choc::javascript::registerTimerFunctions (context);
+            registerTimerFunctions (context);
             int result = 0;
             context.registerFunction ("testDone", [&] (choc::javascript::ArgumentList args) -> choc::value::Value
                                                    {
@@ -2147,15 +2148,44 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
+
+    if (! isDuktape)
+    {
+        CHOC_TEST (Console)
+
+        try
+        {
+            auto context = createContext();
+
+            std::string output;
+
+            registerConsoleFunctions (context, [&] (std::string_view text, auto level)
+            {
+                output += text;
+                output += std::to_string (static_cast<int> (level));
+            });
+
+            context.evaluate (R"(
+                console.log ("log");
+                console.info ("infoa", "infob");
+                console.warn ("warn");
+                console.error ("error");
+                console.debug ("debug");
+            )");
+
+            CHOC_EXPECT_EQ ("log0infoa1infob1warn2error3debug4", output);
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
 }
 
 inline void testJavascript (TestProgress& progress)
 {
     CHOC_CATEGORY (Javascript_Duktape);
-    testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); });
+    testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); }, true);
 
     CHOC_CATEGORY (Javascript_QuickJS);
-    testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); });
+    testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); }, false);
 }
 
 
