@@ -19,6 +19,8 @@
 #ifndef CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 #define CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 
+#include "../platform/choc_Platform.h"
+
 
 //==============================================================================
 namespace choc::ui
@@ -752,7 +754,7 @@ private:
 } // namespace choc::ui
 
 #else
- #error "choc WebView only supports OSX, Windows or Linux!"
+ #error "choc DesktopWindow only supports OSX, Windows or Linux!"
 #endif
 
 namespace choc::ui
