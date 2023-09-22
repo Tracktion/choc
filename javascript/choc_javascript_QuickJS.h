@@ -64081,9 +64081,30 @@ struct QuickJSContext  : public Context::Pimpl
     void pushArg (double v) override                                  { functionArgs.push_back (JS_NewFloat64 (context, v)); }
     void pushArg (bool v) override                                    { functionArgs.push_back (JS_NewBool    (context, v)); }
 
-    choc::value::Value evaluate (const std::string& code) override
+    choc::value::Value evaluate (const std::string& code, Context::ReadModuleContentFn* resolveModule) override
     {
+        if (resolveModule != nullptr)
+        {
+            JS_SetModuleLoaderFunc (runtime, nullptr, moduleLoaderFunc, resolveModule);
+            auto result = takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_MODULE)).toChocValue();
+            JS_SetModuleLoaderFunc (runtime, nullptr, nullptr, nullptr);
+            return result;
+        }
+
         return takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_GLOBAL)).toChocValue();
+    }
+
+    static JSModuleDef* moduleLoaderFunc (JSContext* ctx, const char* module_name, void* resolveModule)
+    {
+        if (auto content = (*static_cast<Context::ReadModuleContentFn*> (resolveModule)) (std::string_view (module_name)); ! content.empty())
+        {
+            auto result = ValuePtr (JS_Eval (ctx, content.data(), content.length(), module_name,
+                                             JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY), ctx);
+            result.throwIfError();
+            return static_cast<JSModuleDef*> (JS_VALUE_GET_PTR (result.get()));
+        }
+
+        return {};
     }
 
     void prepareForCall (std::string_view functionName, uint32_t) override
