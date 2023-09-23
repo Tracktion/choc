@@ -21,9 +21,10 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -Wint-conversion -Woverloaded-virtual -Wshorten-64-to-32 -Wconditional-uninitialized -Wconstant-conversion -Wunused-private-field -Wbool-conversion -Wextra-semi -Wshadow-uncaptured-local")
     endif()
 
-    # Disable warnings about ABI changes
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # Disable warnings about ABI changes
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
+        set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++")
     endif()
 
     if (WARNINGS_AS_ERRORS)

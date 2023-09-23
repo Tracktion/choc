@@ -20,8 +20,7 @@
 #include "../gui/choc_WebView.h"
 #include "../gui/choc_DesktopWindow.h"
 
-
-static int openDemoWebViewWindow()
+inline int openDemoWebViewWindow()
 {
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
 

@@ -2139,8 +2139,8 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
                     testDone (result);
                 }
 
-                setTimeout (t, 250);
-                intID = setInterval (i, 30);
+                setTimeout (t, 500);
+                intID = setInterval (i, 60);
             )");
 
             choc::messageloop::run();
@@ -2326,6 +2326,7 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
     FileFormat format;
     std::string file1;
 
+    try
     {
         auto out = std::make_shared<std::ostringstream>();
         CHOC_EXPECT_FALSE (out->fail());
@@ -2356,7 +2357,9 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
         writer.reset();
         file1 = out->str();
     }
+    CHOC_CATCH_UNEXPECTED_EXCEPTION
 
+    try
     {
         std::string padding = "1234567";
         auto in = std::make_shared<std::istringstream> (padding + file1);
@@ -2381,6 +2384,7 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
 
         compareBuffers (reloaded, source);
     }
+    CHOC_CATCH_UNEXPECTED_EXCEPTION
 }
 
 inline void testAudioFileFormat (TestProgress& progress)
@@ -2564,10 +2568,11 @@ inline void testThreading (TestProgress& progress)
     }
 }
 
-static void testFileWatcher (TestProgress& progress)
+inline void testFileWatcher (TestProgress& progress)
 {
     CHOC_CATEGORY (FileWatcher);
 
+    try
     {
         CHOC_TEST (Watch)
 
@@ -2627,6 +2632,7 @@ static void testFileWatcher (TestProgress& progress)
         std::filesystem::remove_all (testFile);
         waitFor ("destroyed file test1.txt");
     }
+    CHOC_CATCH_UNEXPECTED_EXCEPTION
 }
 
 //==============================================================================
@@ -2646,24 +2652,28 @@ inline bool runAllTests (TestProgress& progress)
          return true;
     });
 
-    testFileWatcher (progress);
-    testPlatform (progress);
-    testContainerUtils (progress);
-    testStringUtilities (progress);
-    testFileUtilities (progress);
-    testValues (progress);
-    testJSON (progress);
-    testMIDI (progress);
-    testAudioBuffers (progress);
-    testIntToFloat (progress);
-    testFIFOs (progress);
-    testMIDIFiles (progress);
-    testJavascript (progress);
-    testCOM (progress);
-    testStableSort (progress);
-    testAudioFileFormat (progress);
-    testTimers (progress);
-    testThreading (progress);
+    try
+    {
+        testFileWatcher (progress);
+        testPlatform (progress);
+        testContainerUtils (progress);
+        testStringUtilities (progress);
+        testFileUtilities (progress);
+        testValues (progress);
+        testJSON (progress);
+        testMIDI (progress);
+        testAudioBuffers (progress);
+        testIntToFloat (progress);
+        testFIFOs (progress);
+        testMIDIFiles (progress);
+        testJavascript (progress);
+        testCOM (progress);
+        testStableSort (progress);
+        testAudioFileFormat (progress);
+        testTimers (progress);
+        testThreading (progress);
+    }
+    CHOC_CATCH_UNEXPECTED_EXCEPTION
 
     progress.printReport();
     return progress.numFails == 0;

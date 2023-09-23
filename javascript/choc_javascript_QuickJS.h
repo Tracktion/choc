@@ -8746,7 +8746,7 @@ JSValue js_string_codePointRange(JSContext *ctx, JSValueConst this_val,
 
 void *js_malloc_rt(JSRuntime *rt, size_t size);
 void js_free_rt(JSRuntime *rt, void *ptr);
-void *js_realloc_rt(JSRuntime *rt, void *ptr, size_t size);
+void *js_realloc_rt(void *rt, void *ptr, size_t size);
 size_t js_malloc_usable_size_rt(JSRuntime *rt, const void *ptr);
 void *js_mallocz_rt(JSRuntime *rt, size_t size);
 
@@ -11247,9 +11247,9 @@ void js_free_rt(JSRuntime *rt, void *ptr)
     rt->mf.js_free(&rt->malloc_state, ptr);
 }
 
-void *js_realloc_rt(JSRuntime *rt, void *ptr, size_t size)
+void *js_realloc_rt(void *rt, void *ptr, size_t size)
 {
-    return rt->mf.js_realloc(&rt->malloc_state, ptr, size);
+    return ((JSRuntime*) rt)->mf.js_realloc(&((JSRuntime*) rt)->malloc_state, ptr, size);
 }
 
 size_t js_malloc_usable_size_rt(JSRuntime *rt, const void *ptr)
