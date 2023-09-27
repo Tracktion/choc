@@ -146,22 +146,42 @@ inline void postMessage (std::function<void()>&& fn)
 
 struct Timer::Pimpl
 {
-    Pimpl (Callback&& c, uint32_t interval) : callback (std::move (c))
+    Pimpl (Callback&& c, uint32_t interval)
     {
+        sharedState = std::make_shared<SharedState>();
+        sharedState->callback = std::move (c);
         handle = g_timeout_add (interval, staticCallback, this);
     }
 
     ~Pimpl()
     {
-        g_source_remove (handle);
+        if (sharedState->isInCallback)
+            sharedState->isRemoved = true;
+        else
+            g_source_remove (handle);
     }
 
     static gboolean staticCallback (gpointer context)
     {
-        return static_cast<Pimpl*> (context)->callback();
+        auto callback = static_cast<Pimpl*> (context)->sharedState; // keep a local shared_ptr
+        return callback->handleCallback();
     }
 
-    Callback callback;
+    struct SharedState
+    {
+        Callback callback;
+        bool isInCallback = false, isRemoved = false;
+
+        bool handleCallback()
+        {
+            isInCallback = true;
+            bool result = callback();
+            isInCallback = false;
+            return result && ! isRemoved;
+        }
+    };
+
+    std::shared_ptr<SharedState> sharedState;
     guint handle;
 };
 
@@ -395,14 +415,14 @@ struct LockedMessageWindow
     std::unique_lock<std::mutex> lock;
 };
 
-static LockedMessageWindow getSharedMessageWindow (bool reacreateIfWrongThread = false)
+static LockedMessageWindow getSharedMessageWindow (bool recreateIfWrongThread = false)
 {
     static std::unique_ptr<MessageWindow> window;
     static std::mutex lock;
 
     std::unique_lock<std::mutex> l (lock);
 
-    if (window == nullptr || (reacreateIfWrongThread && window->threadID != GetCurrentThreadId()))
+    if (window == nullptr || (recreateIfWrongThread && window->threadID != GetCurrentThreadId()))
         window = std::make_unique<MessageWindow>();
 
     return LockedMessageWindow { window->hwnd, std::move (l) };

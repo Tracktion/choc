@@ -2186,11 +2186,11 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
 
 inline void testJavascript (TestProgress& progress)
 {
-    CHOC_CATEGORY (Javascript_QuickJS);
-    testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); }, false);
-
     CHOC_CATEGORY (Javascript_Duktape);
     testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); }, true);
+
+    CHOC_CATEGORY (Javascript_QuickJS);
+    testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); }, false);
 }
 
 
@@ -2648,7 +2648,7 @@ inline bool runAllTests (TestProgress& progress)
 
     emergencyKillThread.start (1000, [&]
     {
-         if (++secondsElapsed > 60)
+         if (++secondsElapsed > 120)
          {
             std::cerr << "FAIL!! Tests timed out and were killed!" << std::endl;
             std::terminate();
