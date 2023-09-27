@@ -78,6 +78,10 @@ public:
         /// for the first click to give the webview focus but not trigger any action.
         bool acceptsFirstMouseClick = false;
 
+        /// Optional user-agent string which can be used to override the default. Leave
+        // this empty for default behaviour.
+        std::string customUserAgent;
+
         /// Serve resources to the browser from a C++ callback function.
         /// This can effectively be used to implement a basic web server,
         /// serving resources to the browser in any way the client code chooses.
@@ -194,6 +198,9 @@ struct choc::ui::WebView::Pimpl
             webkit_settings_set_enable_write_console_messages_to_stdout (settings, true);
             webkit_settings_set_enable_developer_extras (settings, true);
         }
+
+        if (! options.customUserAgent.empty())
+            webkit_settings_set_user_agent (settings, options.customUserAgent.c_str());
 
         if (options.fetchResource)
         {
@@ -343,6 +350,9 @@ struct choc::ui::WebView::Pimpl
 
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
         objc_setAssociatedObject (webview, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
+
+        if ( options.customUserAgent.empty())
+            call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
 
         call<void> (config, "release");
 
@@ -886,7 +896,7 @@ namespace choc::ui
 struct WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& options)
-        : owner (v), fetchResource (options.fetchResource)
+        : owner (v), fetchResource (options.fetchResource), customUserAgent (options.customUserAgent)
     {
         // You cam define this macro to provide a custom way of getting a
         // choc::file::DynamicLibrary that contains the redistributable
@@ -1113,20 +1123,24 @@ private:
                     return fn ? fn (data, length) : nullptr;
                 };
 
-                const auto& [bytes, mimeType] = *resource;
+                auto* stream = makeMemoryStream (reinterpret_cast<const BYTE*> (resource->data.data()),
+                                                 static_cast<UINT> (resource->data.size()));
 
-                auto* stream = makeMemoryStream (reinterpret_cast<const BYTE*> (bytes.data()), static_cast<UINT> (bytes.size()));
-                const auto cleanupStream = ScopedExit (makeCleanupIUnknown (stream));
-
-                if (! stream)
+                if (stream == nullptr)
                     return E_FAIL;
 
-                const auto mimeTypeHeader = std::string ("Content-Type: ") + mimeType;
-                const auto cacheControlHeader = "Cache-Control: no-store";
-                const std::vector<std::string> headersToConcatenate { mimeTypeHeader, cacheControlHeader };
-                const auto headers = createUTF16StringFromUTF8 (choc::text::joinStrings (headersToConcatenate, "\n"));
+                const auto cleanupStream = ScopedExit (makeCleanupIUnknown (stream));
 
-                if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headers.c_str(), std::addressof (response)) != S_OK)
+                std::vector<std::string> headers;
+                headers.emplace_back ("Content-Type: " + resource->mimeType);
+                headers.emplace_back ("Cache-Control: no-store");
+
+                if (! customUserAgent.empty())
+                    headers.emplace_back ("User-Agent: " + customUserAgent);
+
+                const auto headerString = createUTF16StringFromUTF8 (choc::text::joinStrings (headers, "\n"));
+
+                if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headerString.c_str(), std::addressof (response)) != S_OK)
                     return E_FAIL;
             }
             else
@@ -1225,6 +1239,7 @@ private:
     ICoreWebView2* coreWebView = nullptr;
     ICoreWebView2Controller* coreWebViewController = nullptr;
     std::atomic_flag webviewInitialising = ATOMIC_FLAG_INIT;
+    std::string customUserAgent;
 
     //==============================================================================
     static std::wstring getUserDataFolder()
