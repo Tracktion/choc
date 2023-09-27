@@ -2133,14 +2133,19 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
                         ++result;
                 }
 
-                function t()
+                function stop() { testDone (result); }
+
+                function t1() {}
+
+                function t2()
                 {
                     clearInterval (intID);
-                    testDone (result);
+                    setTimeout (stop, 0);
                 }
 
-                setTimeout (t, 500);
-                intID = setInterval (i, 60);
+                setTimeout (t2, 500.1);
+                setTimeout (t1, 100);
+                intID = setInterval (i, 60.2);
             )");
 
             choc::messageloop::run();
@@ -2181,11 +2186,11 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
 
 inline void testJavascript (TestProgress& progress)
 {
-    CHOC_CATEGORY (Javascript_Duktape);
-    testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); }, true);
-
     CHOC_CATEGORY (Javascript_QuickJS);
     testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); }, false);
+
+    CHOC_CATEGORY (Javascript_Duktape);
+    testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); }, true);
 }
 
 
@@ -2666,11 +2671,11 @@ inline bool runAllTests (TestProgress& progress)
         testIntToFloat (progress);
         testFIFOs (progress);
         testMIDIFiles (progress);
+        testTimers (progress);
         testJavascript (progress);
         testCOM (progress);
         testStableSort (progress);
         testAudioFileFormat (progress);
-        testTimers (progress);
         testThreading (progress);
     }
     CHOC_CATCH_UNEXPECTED_EXCEPTION

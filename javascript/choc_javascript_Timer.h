@@ -19,6 +19,8 @@
 #ifndef CHOC_JAVASCRIPT_TIMER_HEADER_INCLUDED
 #define CHOC_JAVASCRIPT_TIMER_HEADER_INCLUDED
 
+#include <unordered_map>
+
 #include "choc_javascript.h"
 #include "../gui/choc_MessageLoop.h"
 
@@ -64,131 +66,118 @@ void registerTimerFunctions (choc::javascript::Context&);
 
 inline void registerTimerFunctions (Context& context)
 {
-    struct State
+    struct TimerList
     {
-        choc::messageloop::Timer timer;
-        int64_t lastCallback = 0;
-    };
+        TimerList (Context& c) : context (c) {}
 
-    context.registerFunction ("choc_setIntervalForNextTimerCallback",
-                              [state = std::make_shared<State>(), &context] (ArgumentList args) mutable -> choc::value::Value
-    {
-        if (auto interval = args.get<int> (0); interval > 0)
+        Context& context;
+        std::unordered_map<int64_t, choc::messageloop::Timer> activeTimers;
+        int64_t nextTimerID = 0;
+
+        int64_t setTimeout (uint32_t interval)
         {
-            state->timer = choc::messageloop::Timer (static_cast<uint32_t> (interval), [&]
+            auto timerID = ++nextTimerID;
+
+            activeTimers[timerID] = choc::messageloop::Timer (interval, [this, timerID]
             {
-                auto now = std::chrono::steady_clock::now().time_since_epoch();
-                auto millisecsNow = std::chrono::duration_cast<std::chrono::milliseconds> (now).count();
-                auto millisSinceLastCall = state->lastCallback != 0 ? std::max (0, static_cast<int> (millisecsNow - state->lastCallback)) : 0;
-                state->lastCallback = millisecsNow;
+                auto timeIDCopy = timerID; // local copy as this lambda will get deleted..
+                activeTimers.erase (timeIDCopy);
+                context.invoke ("_choc_invokeTimeout", timeIDCopy);
+                return false;
+            });
 
-                context.invoke ("_choc_invokeTimers", millisSinceLastCall);
+            return timerID;
+        }
 
+        int64_t setInterval (uint32_t interval)
+        {
+            auto timerID = ++nextTimerID;
+
+            activeTimers[timerID] = choc::messageloop::Timer (interval, [this, timerID]
+            {
+                context.invoke ("_choc_invokeInterval", timerID);
                 return true;
             });
+
+            return timerID;
         }
-        else
+
+        void clearInterval (int64_t timerID)
         {
-            state->timer = {};
+            activeTimers.erase (timerID);
         }
+    };
+
+    auto timerList = std::make_shared<TimerList> (context);
+
+    context.registerFunction ("_choc_setTimeout", [timerList] (ArgumentList args) -> choc::value::Value
+    {
+        if (auto interval = args.get<int> (0); interval >= 0)
+            return choc::value::Value (timerList->setTimeout (static_cast<uint32_t> (interval)));
+
+        return {};
+    });
+
+    context.registerFunction ("_choc_setInterval", [timerList] (ArgumentList args) -> choc::value::Value
+    {
+        if (auto interval = args.get<int> (0); interval >= 0)
+            return choc::value::Value (timerList->setInterval (static_cast<uint32_t> (interval)));
+
+        return {};
+    });
+
+    context.registerFunction ("_choc_clearInterval", [timerList] (ArgumentList args) -> choc::value::Value
+    {
+        if (auto timerID = args.get<int> (0))
+            timerList->clearInterval (timerID);
 
         return {};
     });
 
     context.evaluate (R"(
-var choc_activeTimers = [];
-var choc_currentTimerInterval = -1;
-var choc_nextTimerID = 1;
+var _choc_activeTimers = {};
 
-function _choc_addTimer (callback, milliseconds, interval)
+function _choc_invokeTimeout (timerID)
 {
-    const timer = {
-        remaining: milliseconds,
-        interval: interval,
-        callback: callback,
-        timerID: choc_nextTimerID++
-    };
+    var t = _choc_activeTimers[timerID];
+    _choc_activeTimers[timerID] = undefined;
 
-    choc_activeTimers.push (timer);
-
-    if (choc_currentTimerInterval < 0 || milliseconds < choc_currentTimerInterval)
-    {
-        choc_currentTimerInterval = milliseconds;
-        choc_setIntervalForNextTimerCallback (milliseconds);
-    }
-
-    return timer.timerID;
+    if (t)
+        t();
 }
 
-function _choc_invokeTimers (millisecsElapsed)
+function _choc_invokeInterval (timerID)
 {
-    var next = -1;
+    var t = _choc_activeTimers[timerID];
 
-    for (var i = choc_activeTimers.length; --i >= 0;)
-    {
-        var t = choc_activeTimers[i];
-
-        if (t.removed)
-        {
-            choc_activeTimers.splice (i, 1);
-        }
-        else
-        {
-            t.remaining -= millisecsElapsed;
-
-            if (t.remaining <= 0)
-            {
-                var timerID = t.timerID;
-
-                t.callback();
-
-                if (t.removed)
-                    continue;
-
-                if (t.interval <= 0)
-                {
-                    choc_activeTimers.splice (i, 1);
-                }
-                else
-                {
-                    t.remaining = t.interval;
-
-                    if (t.remaining < 1)
-                        t.remaining = 1;
-                }
-            }
-
-            if (next < 0 || t.remaining < next)
-                next = t.remaining;
-        }
-    }
-
-    choc_currentTimerInterval = next;
-    choc_setIntervalForNextTimerCallback (next);
+    if (t)
+        t();
 }
 
 function setInterval (callback, milliseconds)
 {
-    return _choc_addTimer (callback, milliseconds, milliseconds);
+    var timerID = _choc_setInterval ((milliseconds >= 1 ? milliseconds : 1) | 0);
+
+    if (timerID)
+        _choc_activeTimers[timerID] = callback;
+
+    return timerID;
 }
 
 function setTimeout (callback, milliseconds)
 {
-    return _choc_addTimer (callback, milliseconds, 0);
+    var timerID = _choc_setTimeout ((milliseconds >= 1 ? milliseconds : 1) | 0);
+
+    if (timerID)
+        _choc_activeTimers[timerID] = callback;
+
+    return timerID;
 }
 
 function clearInterval (timerID)
 {
-    for (var i = 0; i < choc_activeTimers.length; ++i)
-    {
-        if (choc_activeTimers[i].timerID === timerID)
-        {
-            choc_activeTimers[i].interval = 0;
-            choc_activeTimers[i].remaining = 0;
-            choc_activeTimers[i].removed = true;
-            break;
-        }
-    }
+    _choc_activeTimers[timerID] = undefined;
+    _choc_clearInterval (timerID | 0);
 }
 )");
 }
