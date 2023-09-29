@@ -17586,7 +17586,7 @@ struct FLACAudioFileFormat<supportWriting>::Implementation
             properties.sampleRate  = static_cast<double> (info.sample_rate);
             properties.bitDepth    = getIntegerBitDepth (static_cast<uint16_t> (info.bits_per_sample));
 
-            intToFloatScaleFactor = 1.0 / ((1u << (31u - info.bits_per_sample)) - 1);
+            intToFloatScaleFactor = 1.0 / ((1u << static_cast<uint16_t> (info.bits_per_sample - 1)) - 1);
 
             setCacheSize (static_cast<uint32_t> (info.max_blocksize));
         }
