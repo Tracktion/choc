@@ -351,7 +351,7 @@ struct choc::ui::WebView::Pimpl
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
         objc_setAssociatedObject (webview, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
 
-        if ( options.customUserAgent.empty())
+        if (! options.customUserAgent.empty())
             call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
 
         call<void> (config, "release");
