@@ -221,6 +221,7 @@ namespace choc::objc
         return reinterpret_cast<ReturnType(*)(id, SEL, Args...)> (msgSend) (target, sel_registerName (selector), args...);
     }
 
+    static inline std::string getString (id nsString)      { return std::string (call<const char*> (nsString, "UTF8String")); }
     static inline id getNSString (const char* s)           { return call<id> (getClass ("NSString"), "stringWithUTF8String:", s); }
     static inline id getNSString (const std::string& s)    { return getNSString (s.c_str()); }
     static inline id getNSNumberBool (bool b)              { return call<id> (getClass ("NSNumber"), "numberWithBool:", (BOOL) b); }

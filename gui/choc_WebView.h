@@ -423,51 +423,94 @@ private:
 
         try
         {
-            const auto requestUrl = call<id> (call<id> (task, "request"), "URL");
+            auto requestUrl = call<id> (call<id> (task, "request"), "URL");
 
-            const auto makeResponse = [&](auto responseCode, id headerFields = nullptr)
+            auto makeResponse = [&] (auto responseCode, id headerFields)
             {
                 return call<id> (call<id> (call<id> (getClass ("NSHTTPURLResponse"), "alloc"),
                                            "initWithURL:statusCode:HTTPVersion:headerFields:",
                                            requestUrl,
                                            responseCode,
                                            getNSString ("HTTP/1.1"),
-                                           headerFields), "autorelease");
+                                           headerFields),
+                                 "autorelease");
             };
 
-            const auto* path = objc::call<const char*> (call<id> (requestUrl, "path"),  "UTF8String");
+            auto path = objc::getString (call<id> (requestUrl, "path"));
 
-            if (const auto resource = options.fetchResource (path))
+            if (auto resource = options.fetchResource (path))
             {
                 const auto& [bytes, mimeType] = *resource;
 
-                const auto contentLength = std::to_string (bytes.size());
-                const id headerKeys[] = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control") };
-                const id headerObjects[] = { getNSString (contentLength), getNSString (mimeType), getNSString ("no-store") };
-                const auto headerFields = call<id> (getClass ("NSDictionary"),
-                                                    "dictionaryWithObjects:forKeys:count:",
-                                                    headerObjects,
-                                                    headerKeys,
-                                                    sizeof (headerObjects) / sizeof (id));
+                auto contentLength = std::to_string (bytes.size());
+                id headerKeys[]    = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control") };
+                id headerObjects[] = { getNSString (contentLength),    getNSString (mimeType),       getNSString ("no-store") };
+
+                auto headerFields = call<id> (getClass ("NSDictionary"), "dictionaryWithObjects:forKeys:count:",
+                                              headerObjects, headerKeys, sizeof (headerObjects) / sizeof (id));
 
                 call<void> (task, "didReceiveResponse:", makeResponse (200, headerFields));
 
-                const auto data = call<id> (getClass ("NSData"), "dataWithBytes:length:", bytes.data(), bytes.size());
+                auto data = call<id> (getClass ("NSData"), "dataWithBytes:length:", bytes.data(), bytes.size());
                 call<void> (task, "didReceiveData:", data);
             }
             else
             {
-                call<void> (task, "didReceiveResponse:", makeResponse (404));
+                call<void> (task, "didReceiveResponse:", makeResponse (404, nullptr));
             }
 
             call<void> (task, "didFinish");
         }
         catch (...)
         {
-            const auto error = call<id> (getClass ("NSError"), "errorWithDomain:code:userInfo:",
-                                         getNSString ("NSURLErrorDomain"), -1, nullptr);
+            auto error = call<id> (getClass ("NSError"), "errorWithDomain:code:userInfo:",
+                                   getNSString ("NSURLErrorDomain"), -1, nullptr);
+
             call<void> (task, "didFailWithError:", error);
         }
+    }
+
+    BOOL sendAppAction (id self, const char* action)
+    {
+        objc::call<void> (objc::getSharedNSApplication(), "sendAction:to:from:",
+                          sel_registerName (action), (id) nullptr, self);
+        return true;
+    }
+
+    BOOL performKeyEquivalent (id self, id e)
+    {
+        enum
+        {
+            NSEventTypeKeyDown = 10,
+
+            NSEventModifierFlagShift    = 1 << 17,
+            NSEventModifierFlagControl  = 1 << 18,
+            NSEventModifierFlagOption   = 1 << 19,
+            NSEventModifierFlagCommand  = 1 << 20
+        };
+
+        if (objc::call<int> (e, "type") == NSEventTypeKeyDown)
+        {
+            auto flags = objc::call<int> (e, "modifierFlags") & (NSEventModifierFlagShift | NSEventModifierFlagCommand
+                                                                 | NSEventModifierFlagControl | NSEventModifierFlagOption);
+
+            auto path = objc::getString (objc::call<id> (e, "charactersIgnoringModifiers"));
+
+            if (flags == NSEventModifierFlagCommand)
+            {
+                if (path == "c") return sendAppAction (self, "copy:");
+                if (path == "x") return sendAppAction (self, "cut:");
+                if (path == "v") return sendAppAction (self, "paste:");
+                if (path == "z") return sendAppAction (self, "undo:");
+                if (path == "a") return sendAppAction (self, "selectAll:");
+            }
+            else if (flags == (NSEventModifierFlagShift | NSEventModifierFlagCommand))
+            {
+                if (path == "Z") return sendAppAction (self, "redo:");
+            }
+        }
+
+        return false;
     }
 
     WebView& owner;
@@ -485,6 +528,15 @@ private:
                             {
                                 if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
                                     return p->options.acceptsFirstMouseClick;
+
+                                return false;
+                            }), "B@:@");
+
+            class_addMethod (webviewClass, sel_registerName ("performKeyEquivalent:"),
+                            (IMP) (+[](id self, SEL, id e) -> BOOL
+                            {
+                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                    return p->performKeyEquivalent (self, e);
 
                                 return false;
                             }), "B@:@");
@@ -513,8 +565,7 @@ private:
                             {
                                 if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
                                 {
-                                    auto body = objc::call<id> (msg, "body");
-                                    p->owner.invokeBinding (objc::call<const char*> (body, "UTF8String"));
+                                    p->owner.invokeBinding (objc::getString (objc::call<id> (msg, "body")));
                                 }
                             }),
                             "v@:@@");
