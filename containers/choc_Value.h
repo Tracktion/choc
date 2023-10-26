@@ -2488,10 +2488,10 @@ inline void ValueView::updateStringHandles (StringDictionary& oldDic, StringDict
 {
     if (type.isType (Type::MainType::string, Type::MainType::object, Type::MainType::primitiveArray, Type::MainType::complexArray))
     {
-        type.visitStringHandles (0, [&oldDic, &newDic, data = this->data] (size_t offset)
+        type.visitStringHandles (0, [&oldDic, &newDic, d = this->data] (size_t offset)
         {
-            auto oldHandle = StringDictionary::Handle { readUnaligned<decltype(StringDictionary::Handle::handle)> (data + offset) };
-            writeUnaligned (data + offset, newDic.getHandleForString (oldDic.getStringForHandle (oldHandle)).handle);
+            auto oldHandle = StringDictionary::Handle { readUnaligned<decltype(StringDictionary::Handle::handle)> (d + offset) };
+            writeUnaligned (d + offset, newDic.getHandleForString (oldDic.getStringForHandle (oldHandle)).handle);
         });
     }
 }
