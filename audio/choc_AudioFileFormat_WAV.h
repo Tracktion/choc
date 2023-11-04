@@ -810,9 +810,9 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                 uint8_t bytes[64] = {};
 
                 if (umid.length() == 128)
-                    for (size_t i = 0; i < umid.length(); ++i)
-                        bytes[i / 2] = static_cast<uint8_t> (choc::text::hexDigitToInt (static_cast<uint32_t> (umid[i])) * 16
-                                                           + choc::text::hexDigitToInt (static_cast<uint32_t> (umid[i + 1])));
+                    for (size_t i = 0; i < 64; ++i)
+                        bytes[i] = static_cast<uint8_t> (choc::text::hexDigitToInt (static_cast<uint32_t> (umid[i * 2])) * 16
+                                                       + choc::text::hexDigitToInt (static_cast<uint32_t> (umid[i * 2 + 1])));
 
                 stream->write (reinterpret_cast<char*> (bytes), 64);
             };
