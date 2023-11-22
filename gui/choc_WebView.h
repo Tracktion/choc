@@ -996,22 +996,26 @@ struct WebView::Pimpl
 
     void navigate (const std::string& url)
     {
-        coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str());
+        if (coreWebView != nullptr)
+            coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str());
     }
 
     void addInitScript (const std::string& script)
     {
-        coreWebView->AddScriptToExecuteOnDocumentCreated (createUTF16StringFromUTF8 (script).c_str(), nullptr);
+        if (coreWebView != nullptr)
+            coreWebView->AddScriptToExecuteOnDocumentCreated (createUTF16StringFromUTF8 (script).c_str(), nullptr);
     }
 
     void evaluateJavascript (const std::string& script)
     {
-        coreWebView->ExecuteScript (createUTF16StringFromUTF8 (script).c_str(), nullptr);
+        if (coreWebView != nullptr)
+            coreWebView->ExecuteScript (createUTF16StringFromUTF8 (script).c_str(), nullptr);
     }
 
     void setHTML (const std::string& html)
     {
-        coreWebView->NavigateToString (createUTF16StringFromUTF8 (html).c_str());
+        if (coreWebView != nullptr)
+            coreWebView->NavigateToString (createUTF16StringFromUTF8 (html).c_str());
     }
 
 private:
@@ -1068,6 +1072,9 @@ private:
                         DispatchMessage (std::addressof (msg));
                     }
 
+                    if (coreWebView == nullptr)
+                        return false;
+
                     addInitScript ("window.external = { invoke: function(s) { window.chrome.webview.postMessage(s); } }");
 
                     if (fetchResource)
@@ -1096,16 +1103,19 @@ private:
 
         env->AddRef();
         coreWebViewEnvironment = env;
-
         return true;
     }
 
     void webviewCreated (ICoreWebView2Controller* controller, ICoreWebView2* view)
     {
-        controller->AddRef();
-        view->AddRef();
-        coreWebViewController = controller;
-        coreWebView = view;
+        if (controller != nullptr && view != nullptr)
+        {
+            controller->AddRef();
+            view->AddRef();
+            coreWebViewController = controller;
+            coreWebView = view;
+        }
+
         webviewInitialising.clear();
     }
 
@@ -1147,6 +1157,9 @@ private:
 
         try
         {
+            if (coreWebViewEnvironment == nullptr)
+                return E_FAIL;
+
             ICoreWebView2WebResourceRequest* request = {};
             const auto cleanupRequest = ScopedExit (makeCleanupIUnknown (request));
 
@@ -1243,8 +1256,15 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (HRESULT, ICoreWebView2Controller* controller) override
         {
+            if (controller == nullptr)
+                return E_FAIL;
+
             ICoreWebView2* view = {};
             controller->get_CoreWebView2 (std::addressof (view));
+
+            if (view == nullptr)
+                return E_FAIL;
+
             EventRegistrationToken token;
             view->add_WebMessageReceived (this, std::addressof (token));
             view->add_PermissionRequested (this, std::addressof (token));
@@ -1254,6 +1274,9 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args) override
         {
+            if (sender == nullptr)
+                return E_FAIL;
+
             LPWSTR message = {};
             args->TryGetWebMessageAsString (std::addressof (message));
             ownerPimpl.owner.invokeBinding (createUTF8FromUTF16 (message));
