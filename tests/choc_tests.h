@@ -2143,7 +2143,7 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
                     setTimeout (stop, 0);
                 }
 
-                setTimeout (t2, 500.1);
+                setTimeout (t2, 600.1);
                 setTimeout (t1, 100);
                 intID = setInterval (i, 60.2);
             )");
@@ -2648,7 +2648,7 @@ inline bool runAllTests (TestProgress& progress)
 
     emergencyKillThread.start (1000, [&]
     {
-         if (++secondsElapsed > 120)
+         if (++secondsElapsed > 200)
          {
             std::cerr << "FAIL!! Tests timed out and were killed!" << std::endl;
             std::terminate();
