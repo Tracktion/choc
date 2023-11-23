@@ -197,6 +197,9 @@ struct choc::ui::WebView::Pimpl
         {
             webkit_settings_set_enable_write_console_messages_to_stdout (settings, true);
             webkit_settings_set_enable_developer_extras (settings, true);
+
+            if (auto inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector (WEBKIT_WEB_VIEW (webview))))
+                webkit_web_inspector_show (inspector);
         }
 
         if (! options.customUserAgent.empty())
@@ -1059,10 +1062,10 @@ private:
             auto handler = new EventHandler (*this);
             webviewInitialising.test_and_set();
 
-            if (auto createWebView = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
-                                        webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
+            if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
+                                                                   webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
             {
-                if (createWebView (nullptr, userDataFolder.c_str(), nullptr, handler) == S_OK)
+                if (createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, handler) == S_OK)
                 {
                     MSG msg;
 
@@ -1141,19 +1144,8 @@ private:
             Fn onExit;
         };
 
-        const auto makeCleanup = [](auto*& ptr, auto cleanup)
-        {
-            return [&ptr, cleanup]
-            {
-                if (ptr)
-                    cleanup (ptr);
-            };
-        };
-
-        const auto makeCleanupIUnknown = [=](auto*& ptr)
-        {
-            return makeCleanup (ptr, [](auto* p) { p->Release(); });
-        };
+        auto makeCleanup          = [](auto*& ptr, auto cleanup) { return [&ptr, cleanup] { if (ptr) cleanup (ptr); }; };
+        auto makeCleanupIUnknown  = [](auto*& ptr)               { return [&ptr]          { if (ptr) ptr->Release(); }; };
 
         try
         {
@@ -1161,13 +1153,13 @@ private:
                 return E_FAIL;
 
             ICoreWebView2WebResourceRequest* request = {};
-            const auto cleanupRequest = ScopedExit (makeCleanupIUnknown (request));
+            ScopedExit cleanupRequest (makeCleanupIUnknown (request));
 
             if (args->get_Request (std::addressof (request)) != S_OK)
                 return E_FAIL;
 
             LPWSTR uri = {};
-            const auto cleanupUri = ScopedExit (makeCleanup (uri, CoTaskMemFree));
+            ScopedExit cleanupUri (makeCleanup (uri, CoTaskMemFree));
 
             if (request->get_Uri (std::addressof (uri)) != S_OK)
                 return E_FAIL;
@@ -1175,7 +1167,7 @@ private:
             const auto path = createUTF8FromUTF16 (uri).substr (resourceRequestFilterUriPrefix.size() - 1);
 
             ICoreWebView2WebResourceResponse* response = {};
-            const auto cleanupResponse = ScopedExit (makeCleanupIUnknown (response));
+            ScopedExit cleanupResponse (makeCleanupIUnknown (response));
 
             if (const auto resource = fetchResource (path))
             {
@@ -1193,7 +1185,7 @@ private:
                 if (stream == nullptr)
                     return E_FAIL;
 
-                const auto cleanupStream = ScopedExit (makeCleanupIUnknown (stream));
+                ScopedExit cleanupStream (makeCleanupIUnknown (stream));
 
                 std::vector<std::string> headers;
                 headers.emplace_back ("Content-Type: " + resource->mimeType);
