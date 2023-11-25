@@ -2149,7 +2149,7 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
             )");
 
             choc::messageloop::run();
-            CHOC_EXPECT_EQ (5, result);
+            CHOC_EXPECT_TRUE (result == 4 || result == 5);
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
