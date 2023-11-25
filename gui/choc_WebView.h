@@ -1055,9 +1055,7 @@ private:
 
     bool createEmbeddedWebView()
     {
-        auto userDataFolder = getUserDataFolder();
-
-        if (! userDataFolder.empty())
+        if (auto userDataFolder = getUserDataFolder(); ! userDataFolder.empty())
         {
             auto handler = new EventHandler (*this);
             webviewInitialising.test_and_set();
@@ -1068,12 +1066,18 @@ private:
                 if (createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, handler) == S_OK)
                 {
                     MSG msg;
+                    auto timeoutTimer = SetTimer ({}, {}, 6000, {});
 
                     while (webviewInitialising.test_and_set() && GetMessage (std::addressof (msg), nullptr, 0, 0))
                     {
                         TranslateMessage (std::addressof (msg));
                         DispatchMessage (std::addressof (msg));
+
+                        if (msg.message == WM_TIMER && msg.hwnd == nullptr && msg.wParam == timeoutTimer)
+                            break;
                     }
+
+                    KillTimer ({}, timeoutTimer);
 
                     if (coreWebView == nullptr)
                         return false;
