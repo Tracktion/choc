@@ -185,8 +185,10 @@ inline void replaceFileWithContent (const std::filesystem::path& path, std::stri
     {
         throw Error ("Failed to write to file: " + path.string() + ": " + e.what());
     }
-
-    throw Error ("Failed to open file: " + path.string());
+    catch (...)
+    {
+        throw Error ("Failed to open file: " + path.string());
+    }
 }
 
 //==============================================================================
