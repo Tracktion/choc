@@ -77,8 +77,11 @@ namespace choc::javascript
         registerFunction(), and call evaluate() or invoke() to execute code or call
         functions directly.
 
-        These contexts are not thread safe, so it's up to the caller to handle thread
-        synchronisation issues.
+        These contexts are not thread-safe, so it's up to the caller to handle thread
+        synchronisation if using a single context from multiple threads.
+
+        They're also definitely not realtime-safe: any of the methods may allocate,
+        block, or make system calls.
     */
     class Context
     {
@@ -99,17 +102,26 @@ namespace choc::javascript
         /// If the engine supports modules, then providing a value for the resolveModuleContent
         /// function will treat the code as a module and will call your function to read the
         /// content of any dependencies.
+        /// None of the methods in this class are either thread-safe or realtime-safe, so you'll
+        /// need to organise your own locking if you're calling into a single Context from
+        /// multiple threads.
         choc::value::Value evaluate (const std::string& javascriptCode,
                                      ReadModuleContentFn* resolveModuleContent = nullptr);
 
         /// Attempts to invoke a global function with no arguments.
         /// Any errors will throw a choc::javascript::Error exception.
+        /// None of the methods in this class are either thread-safe or realtime-safe, so you'll
+        /// need to organise your own locking if you're calling into a single Context from
+        /// multiple threads.
         choc::value::Value invoke (std::string_view functionName);
 
         /// Attempts to invoke a global function with the arguments provided.
         /// The arguments can be primitives, strings, choc::value::ValueView or
         /// choc::value::Value types.
         /// Any errors will throw a choc::javascript::Error exception.
+        /// None of the methods in this class are either thread-safe or realtime-safe, so you'll
+        /// need to organise your own locking if you're calling into a single Context from
+        /// multiple threads.
         template <typename... Args>
         choc::value::Value invoke (std::string_view functionName, Args&&... args);
 
@@ -117,6 +129,9 @@ namespace choc::javascript
         /// The objects in the argument list can be primitives, strings, choc::value::ValueView
         /// or choc::value::Value types.
         /// Any errors will throw a choc::javascript::Error exception.
+        /// None of the methods in this class are either thread-safe or realtime-safe, so you'll
+        /// need to organise your own locking if you're calling into a single Context from
+        /// multiple threads.
         template <typename ArgList>
         choc::value::Value invokeWithArgList (std::string_view functionName, const ArgList& args);
 

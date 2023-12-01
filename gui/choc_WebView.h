@@ -116,7 +116,11 @@ public:
     /// Directly sets the HTML content of the browser
     void setHTML (const std::string& html);
 
-    /// Directly evaluates some javascript
+    /// Directly evaluates some javascript.
+    /// This call isn't guaranteed to be thread-safe, so calling it on
+    /// threads other than the main message thread could lead to problems.
+    /// It also goes without saying this this is not realtime-safe, and the
+    /// call may block, allocate or make system calls.
     void evaluateJavascript (const std::string& script);
 
     /// Sends the browser to this URL
