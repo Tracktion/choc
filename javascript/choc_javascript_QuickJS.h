@@ -64096,15 +64096,15 @@ struct QuickJSContext  : public Context::Pimpl
 
     static JSModuleDef* moduleLoaderFunc (JSContext* ctx, const char* module_name, void* resolveModule)
     {
-        if (auto content = (*static_cast<Context::ReadModuleContentFn*> (resolveModule)) (std::string_view (module_name)); ! content.empty())
-        {
-            auto result = ValuePtr (JS_Eval (ctx, content.data(), content.length(), module_name,
-                                             JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY), ctx);
-            result.throwIfError();
-            return static_cast<JSModuleDef*> (JS_VALUE_GET_PTR (result.get()));
-        }
+        auto content = (*static_cast<Context::ReadModuleContentFn*> (resolveModule)) (std::string_view (module_name));
 
-        return {};
+        if (! content)
+            throw Error ("Cannot find module '" + std::string (module_name) + "'");
+
+        auto result = ValuePtr (JS_Eval (ctx, content->data(), content->length(), module_name,
+                                         JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY), ctx);
+        result.throwIfError();
+        return static_cast<JSModuleDef*> (JS_VALUE_GET_PTR (result.get()));
     }
 
     void prepareForCall (std::string_view functionName, uint32_t) override

@@ -21,6 +21,7 @@
 
 #include <stdexcept>
 #include <functional>
+#include <optional>
 #include "../containers/choc_Value.h"
 #include "../text/choc_JSON.h"
 
@@ -93,8 +94,8 @@ namespace choc::javascript
         ~Context();
 
         /// When parsing modules, this function is expected to take a path to a module, and
-        /// to return the content of that module.
-        using ReadModuleContentFn = std::function<std::string(std::string_view)>;
+        /// to return the content of that module, or an empty optional if not found.
+        using ReadModuleContentFn = std::function<std::optional<std::string>(std::string_view)>;
 
         //==============================================================================
         /// Evaluates the given chunk of javascript.
