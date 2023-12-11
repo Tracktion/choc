@@ -589,6 +589,14 @@ public:
     void visitObjectMembers (Visitor&&) const;
 
     //==============================================================================
+    /// Performs a comparison between two values, where only a bit-for-bit match is
+    /// considered to be true.
+    bool operator== (const ValueView&) const;
+    /// Performs a comparison between two values, where only a bit-for-bit match is
+    /// considered to be true.
+    bool operator!= (const ValueView&) const;
+
+    //==============================================================================
     /// Gets a pointer to the string dictionary that the view is using, or nullptr
     /// if it doesn't have one.
     StringDictionary* getDictionary() const     { return stringDictionary; }
@@ -814,6 +822,15 @@ public:
     /// will return a view onto a range of its elements.
     /// Throws an error exception if the object is not a vector or the range is invalid.
     ValueView getElementRange (uint32_t startIndex, uint32_t length) const      { return value.getElementRange (startIndex, length); }
+
+    //==============================================================================
+    /// Performs a comparison between two values, where only a bit-for-bit match is
+    /// considered to be true.
+    bool operator== (const ValueView& other) const                      { return value == other; }
+
+    /// Performs a comparison between two values, where only a bit-for-bit match is
+    /// considered to be true.
+    bool operator!= (const ValueView& other) const                      { return value != other; }
 
     //==============================================================================
     /// Iterating a Value is only valid for an array, vector or object.
@@ -2361,6 +2378,15 @@ struct ValueView::Iterator
 };
 
 inline ValueView::Iterator ValueView::begin() const   { return ValueView::Iterator (*this); }
+
+//==============================================================================
+inline bool ValueView::operator== (const ValueView& other) const
+{
+    return type == other.type
+             && (isVoid() || std::memcmp (getRawData(), other.getRawData(), type.getValueDataSize()) == 0);
+}
+
+inline bool ValueView::operator!= (const ValueView& other) const { return ! operator== (other); }
 
 //==============================================================================
 inline Value SerialisedData::deserialise() const        { auto i = getInputData(); return Value::deserialise (i); }
