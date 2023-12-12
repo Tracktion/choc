@@ -75,6 +75,7 @@ inline int openDemoWebViewWindow()
           <p>This is a demo of a choc::webview::WebView window</p>
           <p><button onclick="sendEvent()">Click to invoke an event callback</button></p>
           <p><button onclick="loadCHOCWebsite()">Click to visit the CHOC github repo</button></p>
+          <p><input type="file" /></p>
           <p id="eventResultDisplay"></p>
         </body>
       </html>

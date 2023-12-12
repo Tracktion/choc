@@ -360,6 +360,8 @@ struct choc::ui::WebView::Pimpl
         if (! options.customUserAgent.empty())
             call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
 
+        call<void> (webview, "setUIDelegate:", delegate);
+
         call<void> (config, "release");
 
         if (options.fetchResource)
@@ -587,6 +589,33 @@ private:
                             "v@:@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:stopURLSchemeTask:"), (IMP) (+[](id, SEL, id, id) {}), "v@:@@");
+
+            class_addMethod (delegateClass, sel_registerName ("webView:runOpenPanelWithParameters:initiatedByFrame:completionHandler:"),
+                             (IMP) (+[](id, SEL, id wkwebview, id params, id /*frame*/, void (^completionHandler)(id))
+                             {
+                                using namespace choc::objc;
+                                AutoReleasePool autoreleasePool;
+
+                                auto panel = call<id> (getClass ("NSOpenPanel"), "openPanel");
+
+                                auto allowsMultipleSelection = call<BOOL> (params, "allowsMultipleSelection");
+                                auto allowedFileExtensions = call<id> (params, "_allowedFileExtensions");
+                                auto window = call<id> (wkwebview, "window");
+
+                                call<void> (panel, "setAllowsMultipleSelection:", allowsMultipleSelection);
+                                call<void> (panel, "setAllowedFileTypes:", allowedFileExtensions);
+
+                                call<void> (panel, "beginSheetModalForWindow:completionHandler:", window,
+                                            ^(long result)
+                                            {
+                                                AutoReleasePool pool;
+
+                                                if (result == 1) // NSModalResponseOK
+                                                    completionHandler (call<id> (panel, "URLs"));
+                                                else
+                                                    completionHandler (nil);
+                                            });
+                             }), "v@:@@@@");
 
             objc_registerClassPair (delegateClass);
         }
