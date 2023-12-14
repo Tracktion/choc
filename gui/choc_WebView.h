@@ -361,6 +361,7 @@ struct choc::ui::WebView::Pimpl
             call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
 
         call<void> (webview, "setUIDelegate:", delegate);
+        call<void> (webview, "setNavigationDelegate:", delegate);
 
         call<void> (config, "release");
 
@@ -523,6 +524,19 @@ private:
         return false;
     }
 
+    void handleError (id error)
+    {
+        auto errorString = objc::getString (objc::call<id> (error, "localizedDescription"));
+
+        setHTML ("<!DOCTYPE html><html><head><title>Error</title></head>"
+                 "<body><h2>" + errorString + "</h2></body></html>");
+    }
+
+    static Pimpl* getPimpl (id self)
+    {
+        return reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview"));
+    }
+
     WebView& owner;
     Options options;
     id webview = {}, manager = {}, delegate = {};
@@ -536,7 +550,7 @@ private:
             class_addMethod (webviewClass, sel_registerName ("acceptsFirstMouse:"),
                             (IMP) (+[](id self, SEL, id) -> BOOL
                             {
-                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                if (auto p = getPimpl (self))
                                     return p->options.acceptsFirstMouseClick;
 
                                 return false;
@@ -545,7 +559,7 @@ private:
             class_addMethod (webviewClass, sel_registerName ("performKeyEquivalent:"),
                             (IMP) (+[](id self, SEL, id e) -> BOOL
                             {
-                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                if (auto p = getPimpl (self))
                                     return p->performKeyEquivalent (self, e);
 
                                 return false;
@@ -568,32 +582,38 @@ private:
     {
         DelegateClass()
         {
-            delegateClass = choc::objc::createDelegateClass ("NSObject", "CHOCWebViewDelegate_");
+            using namespace choc::objc;
+            delegateClass = createDelegateClass ("NSObject", "CHOCWebViewDelegate_");
 
             class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
                             (IMP) (+[](id self, SEL, id, id msg)
                             {
-                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
-                                {
-                                    p->owner.invokeBinding (objc::getString (objc::call<id> (msg, "body")));
-                                }
+                                if (auto p = getPimpl (self))
+                                    p->owner.invokeBinding (objc::getString (call<id> (msg, "body")));
                             }),
                             "v@:@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:startURLSchemeTask:"),
                             (IMP) (+[](id self, SEL, id, id task)
                             {
-                                if (auto p = reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview")))
+                                if (auto p = getPimpl (self))
                                     p->onResourceRequested (task);
                             }),
                             "v@:@@");
+
+            class_addMethod (delegateClass, sel_registerName ("webView:didFailProvisionalNavigation:withError:"),
+                            (IMP) (+[](id self, SEL, id, id, id error)
+                            {
+                                if (auto p = getPimpl (self))
+                                    p->handleError (error);
+                            }),
+                            "v@:@@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:stopURLSchemeTask:"), (IMP) (+[](id, SEL, id, id) {}), "v@:@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:runOpenPanelWithParameters:initiatedByFrame:completionHandler:"),
                              (IMP) (+[](id, SEL, id wkwebview, id params, id /*frame*/, void (^completionHandler)(id))
                              {
-                                using namespace choc::objc;
                                 AutoReleasePool autoreleasePool;
 
                                 auto panel = call<id> (getClass ("NSOpenPanel"), "openPanel");
