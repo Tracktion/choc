@@ -160,6 +160,11 @@ namespace choc::javascript
     /// Creates a Duktape-based context. If you call this, then you'll need to
     /// include choc_javascript_Duktape.h in one (and only one!) of your source files.
     Context createDuktapeContext();
+
+    /// Creates a V8-based context. If you call this, then you'll need to
+    /// make sure that your project also has the V8 header folder in its
+    /// search path, and that you statically link the appropriate V8 libs.
+    Context createV8Context();
 }
 
 

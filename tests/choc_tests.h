@@ -2058,7 +2058,8 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
         catch (const choc::javascript::Error& e)
         {
             CHOC_EXPECT_TRUE (choc::text::contains (e.what(), "unexpected token in expression:")
-                                || choc::text::contains (e.what(), "SyntaxError: parse error"));
+                                || choc::text::contains (e.what(), "SyntaxError: parse error")
+                                || choc::text::contains (e.what(), "Unexpected token '}'"));
         }
     }
 
@@ -2108,6 +2109,41 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
             CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", std::string ("abc")).getString()));
             CHOC_EXPECT_EQ ("abcxx",  std::string (context.invoke ("appendStuff", "abc").getString()));
             CHOC_EXPECT_EQ ("truexx", std::string (context.invoke ("appendStuff", true).getString()));
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    if (! isDuktape)
+    {
+        CHOC_TEST (CustomModules)
+
+        try
+        {
+            choc::javascript::Context::ReadModuleContentFn fetchModule
+                = [] (std::string_view name) -> std::optional<std::string>
+            {
+                if (name == "test_module")
+                    return "export function wasOK() { return true; }";
+
+                return {};
+            };
+
+            auto context = createContext();
+            bool worked = false;
+
+            context.registerFunction ("success", [&] (choc::javascript::ArgumentList) -> choc::value::Value
+                                                 {
+                                                     worked = true;
+                                                     return {};
+                                                 });
+
+            context.evaluate (R"(
+                import * as XX from "test_module";
+                if (XX.wasOK()) success();
+            )",
+            std::addressof (fetchModule));
+
+            CHOC_EXPECT_TRUE (worked);
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
@@ -2192,6 +2228,11 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
 
 inline void testJavascript (TestProgress& progress)
 {
+   #if CHOC_V8_AVAILABLE
+    CHOC_CATEGORY (Javascript_V8);
+    testJavascript (progress, [] { return choc::javascript::createV8Context(); }, false);
+   #endif
+
     CHOC_CATEGORY (Javascript_Duktape);
     testJavascript (progress, [] { return choc::javascript::createDuktapeContext(); }, true);
 

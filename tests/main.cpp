@@ -102,3 +102,7 @@ int main (int argc, const char** argv)
 // that gets dragged in..
 #include "../javascript/choc_javascript_Duktape.h"
 #include "../javascript/choc_javascript_QuickJS.h"
+
+#if CHOC_V8_AVAILABLE
+ #include "../javascript/choc_javascript_V8.h"
+#endif
