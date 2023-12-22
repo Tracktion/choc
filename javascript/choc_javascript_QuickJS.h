@@ -64195,7 +64195,7 @@ struct QuickJSContext  : public Context::Pimpl
             if (JS_IsObject (value))
             {
                 std::vector<std::string> propNames;
-                std::string className;
+                bool hasClassName = false;
 
                 for (auto obj = takeValue (JS_DupValue (context, value));;)
                 {
@@ -64213,7 +64213,7 @@ struct QuickJSContext  : public Context::Pimpl
                         auto nameString = std::string (name);
 
                         if (nameString == objectNameAttribute)
-                            className = std::move (nameString);
+                            hasClassName = true;
                         else
                             propNames.push_back (std::move (nameString));
 
@@ -64232,7 +64232,8 @@ struct QuickJSContext  : public Context::Pimpl
                     obj = std::move (proto);
                 }
 
-                auto o = choc::value::createObject (std::move (className));
+                auto o = choc::value::createObject (hasClassName ? (*this)[objectNameAttribute].toChocValue().toString()
+                                                                 : std::string());
 
                 for (auto& propName : propNames)
                     o.setMember (propName, (*this)[propName.c_str()].toChocValue());

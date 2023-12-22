@@ -2036,6 +2036,12 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
 
             context.evaluate ("const b = [1, 2, 3, { x: 123, y: 4.3, z: [2, 3], s: \"abc\" }, [4, 5], {}]");
             CHOC_EXPECT_EQ ("[1, 2, 3, {\"x\": 123, \"y\": 4.3, \"z\": [2, 3], \"s\": \"abc\"}, [4, 5], {}]", choc::json::toString (context.evaluate ("b")));
+
+            auto namedChocObj = choc::value::createObject ("foo", "a", 123);
+            context.evaluate ("var c = {}; function setValue (n) { c = n; } ");
+            context.invoke ("setValue", namedChocObj);
+            CHOC_EXPECT_EQ (json::toString (context.evaluate ("c")), json::toString (namedChocObj));
+            CHOC_EXPECT_EQ (std::string (context.evaluate ("c").getObjectClassName()), std::string (namedChocObj.getObjectClassName()));
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
