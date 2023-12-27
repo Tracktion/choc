@@ -586,28 +586,36 @@ private:
             delegateClass = createDelegateClass ("NSObject", "CHOCWebViewDelegate_");
 
             class_addMethod (delegateClass, sel_registerName ("userContentController:didReceiveScriptMessage:"),
-                            (IMP) (+[](id self, SEL, id, id msg)
-                            {
-                                if (auto p = getPimpl (self))
-                                    p->owner.invokeBinding (objc::getString (call<id> (msg, "body")));
-                            }),
-                            "v@:@@");
+                             (IMP) (+[](id self, SEL, id, id msg)
+                             {
+                                 if (auto p = getPimpl (self))
+                                     p->owner.invokeBinding (objc::getString (call<id> (msg, "body")));
+                             }),
+                             "v@:@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:startURLSchemeTask:"),
-                            (IMP) (+[](id self, SEL, id, id task)
-                            {
-                                if (auto p = getPimpl (self))
-                                    p->onResourceRequested (task);
-                            }),
-                            "v@:@@");
+                             (IMP) (+[](id self, SEL, id, id task)
+                             {
+                                 if (auto p = getPimpl (self))
+                                     p->onResourceRequested (task);
+                             }),
+                             "v@:@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:didFailProvisionalNavigation:withError:"),
-                            (IMP) (+[](id self, SEL, id, id, id error)
-                            {
-                                if (auto p = getPimpl (self))
-                                    p->handleError (error);
-                            }),
-                            "v@:@@@");
+                             (IMP) (+[](id self, SEL, id, id, id error)
+                             {
+                                 if (auto p = getPimpl (self))
+                                     p->handleError (error);
+                             }),
+                             "v@:@@@");
+
+            class_addMethod (delegateClass, sel_registerName ("webView:didFailNavigation:withError:"),
+                             (IMP) (+[](id self, SEL, id, id, id error)
+                             {
+                                 if (auto p = getPimpl (self))
+                                     p->handleError (error);
+                             }),
+                             "v@:@@@");
 
             class_addMethod (delegateClass, sel_registerName ("webView:stopURLSchemeTask:"), (IMP) (+[](id, SEL, id, id) {}), "v@:@@");
 
