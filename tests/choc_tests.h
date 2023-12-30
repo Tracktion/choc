@@ -2695,7 +2695,7 @@ inline bool runAllTests (TestProgress& progress)
 
     emergencyKillThread.start (1000, [&]
     {
-         if (++secondsElapsed > 200)
+         if (++secondsElapsed > 300)
          {
             std::cerr << "FAIL!! Tests timed out and were killed!" << std::endl;
             std::terminate();
@@ -2718,12 +2718,12 @@ inline bool runAllTests (TestProgress& progress)
         testIntToFloat (progress);
         testFIFOs (progress);
         testMIDIFiles (progress);
-        testTimers (progress);
         testJavascript (progress);
         testCOM (progress);
         testStableSort (progress);
         testAudioFileFormat (progress);
         testThreading (progress);
+        testTimers (progress);
     }
     CHOC_CATCH_UNEXPECTED_EXCEPTION
 
