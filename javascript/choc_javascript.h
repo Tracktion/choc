@@ -142,6 +142,9 @@ namespace choc::javascript
         /// Binds a lambda function to a global name so that javascript code can invoke it.
         void registerFunction (const std::string& name, NativeFunction fn);
 
+        /// Pumps the message loop in an engine-specific way - may have no effect on some platforms.
+        void pumpMessageLoop();
+
         //==============================================================================
         /// @internal
         struct Pimpl;
@@ -207,6 +210,7 @@ struct Context::Pimpl
     virtual void pushArg (uint32_t) = 0;
     virtual void pushArg (double) = 0;
     virtual void pushArg (bool) = 0;
+    virtual void pumpMessageLoop() = 0;
 
     void pushArg (const std::string& v)   { pushArg (std::string_view (v)); }
     void pushArg (const char* v)          { pushArg (std::string_view (v)); }
@@ -270,6 +274,12 @@ inline choc::value::Value Context::evaluate (const std::string& javascriptCode, 
 {
     CHOC_ASSERT (pimpl != nullptr); // cannot call this on a moved-from context!
     return pimpl->evaluate (javascriptCode, resolveModule);
+}
+
+inline void Context::pumpMessageLoop()
+{
+    CHOC_ASSERT (pimpl != nullptr); // cannot call this on a moved-from context!
+    pimpl->pumpMessageLoop();
 }
 
 } // namespace choc::javascript

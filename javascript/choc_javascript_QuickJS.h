@@ -64073,6 +64073,8 @@ struct QuickJSContext  : public Context::Pimpl
         JS_SetContextOpaque (context, this);
     }
 
+    void pumpMessageLoop() override {}
+
     void pushObjectOrArray (const choc::value::ValueView& v) override { functionArgs.push_back (valueToJS (v).release()); }
     void pushArg (std::string_view v) override                        { functionArgs.push_back (stringToJS (v).release()); }
     void pushArg (int32_t v) override                                 { functionArgs.push_back (JS_NewInt32   (context, v)); }

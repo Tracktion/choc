@@ -58,6 +58,7 @@
 #include "v8-proxy.h"
 #include "v8-exception.h"
 #include "v8-template.h"
+#include "v8-typed-array.h"
 
 #include "../platform/choc_ReenableAllWarnings.h"
 
@@ -81,6 +82,12 @@ struct V8Initialiser
     }
 
     std::unique_ptr<v8::Platform> platform;
+
+    static V8Initialiser& get()
+    {
+        static V8Initialiser i;
+        return i;
+    }
 };
 
 //==============================================================================
@@ -88,7 +95,7 @@ struct V8Context  : public Context::Pimpl
 {
     V8Context()
     {
-        static V8Initialiser initialiser;
+        (void) V8Initialiser::get();
 
         createParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
         isolate = v8::Isolate::New (createParams);
@@ -271,6 +278,22 @@ struct V8Context  : public Context::Pimpl
         {
             auto a = v8::Local<v8::Array>::Cast (value);
             auto len = a->Length();
+
+            return choc::value::createArray (len, [&] (uint32_t index)
+            {
+                auto item = a->Get (c, index);
+
+                if (item.IsEmpty())
+                    return choc::value::Value();
+
+                return v8ToChoc (c, item.ToLocalChecked());
+            });
+        }
+
+        if (value->IsArrayBuffer() || value->IsArrayBufferView())
+        {
+            auto a = v8::Local<v8::TypedArray>::Cast (value);
+            auto len = static_cast<uint32_t> (a->Length());
 
             return choc::value::createArray (len, [&] (uint32_t index)
             {
@@ -507,6 +530,12 @@ struct V8Context  : public Context::Pimpl
         v8::MaybeLocal<v8::Promise> promise (resolver->GetPromise());
         (void) resolver->Resolve (c, ns);
         return promise;
+    }
+
+    void pumpMessageLoop() override
+    {
+        v8::platform::PumpMessageLoop (V8Initialiser::get().platform.get(), isolate);
+        isolate->PerformMicrotaskCheckpoint();
     }
 
     //==============================================================================
