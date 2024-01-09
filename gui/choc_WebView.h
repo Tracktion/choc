@@ -526,6 +526,11 @@ private:
 
     void handleError (id error)
     {
+        static constexpr int NSURLErrorCancelled = -999;
+
+        if (objc::call<int> (error, "code") == NSURLErrorCancelled)
+            return;
+
         auto errorString = objc::getString (objc::call<id> (error, "localizedDescription"));
 
         setHTML ("<!DOCTYPE html><html><head><title>Error</title></head>"
