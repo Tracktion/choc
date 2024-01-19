@@ -1442,7 +1442,8 @@ inline void WebView::bind (const std::string& functionName, CallbackFn&& fn)
           id: messageID,
           fn: "FUNCTION_NAME",
           params: Array.prototype.slice.call(arguments),
-        }));
+        },
+        (key, value) => typeof value === 'bigint' ? value.toString() : value));
         return promise;
       }
     })())";
