@@ -8906,8 +8906,8 @@ static void byteSwapX16(FLAC__uint32 *buf)
     x = *buf; x = ((x << 8) & 0xff00ff00) | ((x >> 8) & 0x00ff00ff); *buf   = (x >> 16) | (x << 16);
 }
 #else
-#define byteSwap(buf, words)
-#define byteSwapX16(buf)
+static void byteSwap(FLAC__uint32*, unsigned) {}
+static void byteSwapX16(FLAC__uint32*) {}
 #endif
 
 /*
