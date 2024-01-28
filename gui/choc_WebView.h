@@ -334,9 +334,9 @@ struct choc::ui::WebView::Pimpl
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
 
-        auto config = call<id> (getClass ("WKWebViewConfiguration"), "new");
+        id config = call<id> (getClass ("WKWebViewConfiguration"), "new");
 
-        auto prefs = call<id> (config, "preferences");
+        id prefs = call<id> (config, "preferences");
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("fullScreenEnabled"));
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("DOMPasteAllowed"));
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("javaScriptCanAccessClipboard"));
@@ -388,7 +388,7 @@ struct choc::ui::WebView::Pimpl
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
-        auto s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
+        id s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
                                      getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1);
         call<void> (manager, "addUserScript:", s);
         call<void> (s, "release");
@@ -398,7 +398,7 @@ struct choc::ui::WebView::Pimpl
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
-        auto nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url));
+        id nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url));
         call<void> (webview, "loadRequest:", call<id> (getClass ("NSURLRequest"), "requestWithURL:", nsURL));
     }
 
@@ -434,7 +434,7 @@ private:
 
         try
         {
-            auto requestUrl = call<id> (call<id> (task, "request"), "URL");
+            id requestUrl = call<id> (call<id> (task, "request"), "URL");
 
             auto makeResponse = [&] (auto responseCode, id headerFields)
             {
@@ -457,12 +457,12 @@ private:
                 id headerKeys[]    = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control") };
                 id headerObjects[] = { getNSString (contentLength),    getNSString (mimeType),       getNSString ("no-store") };
 
-                auto headerFields = call<id> (getClass ("NSDictionary"), "dictionaryWithObjects:forKeys:count:",
+                id headerFields = call<id> (getClass ("NSDictionary"), "dictionaryWithObjects:forKeys:count:",
                                               headerObjects, headerKeys, sizeof (headerObjects) / sizeof (id));
 
                 call<void> (task, "didReceiveResponse:", makeResponse (200, headerFields));
 
-                auto data = call<id> (getClass ("NSData"), "dataWithBytes:length:", bytes.data(), bytes.size());
+                id data = call<id> (getClass ("NSData"), "dataWithBytes:length:", bytes.data(), bytes.size());
                 call<void> (task, "didReceiveData:", data);
             }
             else
@@ -474,7 +474,7 @@ private:
         }
         catch (...)
         {
-            auto error = call<id> (getClass ("NSError"), "errorWithDomain:code:userInfo:",
+            id error = call<id> (getClass ("NSError"), "errorWithDomain:code:userInfo:",
                                    getNSString ("NSURLErrorDomain"), -1, nullptr);
 
             call<void> (task, "didFailWithError:", error);
@@ -629,11 +629,11 @@ private:
                              {
                                 AutoReleasePool autoreleasePool;
 
-                                auto panel = call<id> (getClass ("NSOpenPanel"), "openPanel");
+                                id panel = call<id> (getClass ("NSOpenPanel"), "openPanel");
 
                                 auto allowsMultipleSelection = call<BOOL> (params, "allowsMultipleSelection");
-                                auto allowedFileExtensions = call<id> (params, "_allowedFileExtensions");
-                                auto window = call<id> (wkwebview, "window");
+                                id allowedFileExtensions = call<id> (params, "_allowedFileExtensions");
+                                id window = call<id> (wkwebview, "window");
 
                                 call<void> (panel, "setAllowsMultipleSelection:", allowsMultipleSelection);
                                 call<void> (panel, "setAllowedFileTypes:", allowedFileExtensions);
