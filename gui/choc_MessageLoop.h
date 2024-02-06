@@ -260,19 +260,22 @@ inline void run()
 
 inline void stop()
 {
-    using namespace choc::objc;
-    static constexpr long NSEventTypeApplicationDefined = 15;
+    postMessage ([]
+    {
+        using namespace choc::objc;
+        static constexpr long NSEventTypeApplicationDefined = 15;
 
-    AutoReleasePool autoreleasePool;
+        AutoReleasePool autoreleasePool;
 
-    call<void> (getSharedNSApplication(), "stop:", (id) nullptr);
+        call<void> (getSharedNSApplication(), "stop:", (id) nullptr);
 
-    // After sending the stop message, we need to post a dummy event to
-    // kick the message loop, otherwise it can just sit there and hang
-    struct NSPoint { double x = 0, y = 0; };
-    id dummyEvent = call<id> (getClass ("NSEvent"), "otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:",
-                              NSEventTypeApplicationDefined, NSPoint(), 0, 0, 0, nullptr, (short) 0, 0, 0);
-    call<void> (getSharedNSApplication(), "postEvent:atStart:", dummyEvent, YES);
+        // After sending the stop message, we need to post a dummy event to
+        // kick the message loop, otherwise it can just sit there and hang
+        struct NSPoint { double x = 0, y = 0; };
+        id dummyEvent = call<id> (getClass ("NSEvent"), "otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:",
+                                  NSEventTypeApplicationDefined, NSPoint(), 0, 0, 0, nullptr, (short) 0, 0, 0);
+        call<void> (getSharedNSApplication(), "postEvent:atStart:", dummyEvent, YES);
+    });
 }
 
 inline void postMessage (std::function<void()>&& fn)
