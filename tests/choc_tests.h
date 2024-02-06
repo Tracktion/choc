@@ -23,6 +23,7 @@
 #include "../threading/choc_ThreadSafeFunctor.h"
 #include "../threading/choc_TaskThread.h"
 #include "../gui/choc_MessageLoop.h"
+#include "../gui/choc_WebView.h"
 #include "../text/choc_OpenSourceLicenseList.h"
 #include "../audio/choc_AudioFileFormat_MP3.h"
 #include "../audio/choc_AudioFileFormat_FLAC.h"
@@ -2163,32 +2164,37 @@ inline void testJavascript (TestProgress& progress, std::function<choc::javascri
                                                        return {};
                                                    });
 
-            context.evaluate (R"(
-                var result = 0;
-                var intID;
+            auto t = choc::messageloop::Timer (100, [&]
+            {
+                context.evaluate (R"(
+                    var result = 0;
+                    var intID;
 
-                function i()
-                {
-                    if (result == 5)
+                    function i()
+                    {
+                        if (result == 5)
+                            clearInterval (intID);
+                        else
+                            ++result;
+                    }
+
+                    function stop() { testDone (result); }
+
+                    function t1() {}
+
+                    function t2()
+                    {
                         clearInterval (intID);
-                    else
-                        ++result;
-                }
+                        setTimeout (stop, 0);
+                    }
 
-                function stop() { testDone (result); }
+                    setTimeout (t2, 600.1);
+                    setTimeout (t1, 100);
+                    intID = setInterval (i, 60.2);
+                )");
 
-                function t1() {}
-
-                function t2()
-                {
-                    clearInterval (intID);
-                    setTimeout (stop, 0);
-                }
-
-                setTimeout (t2, 600.1);
-                setTimeout (t1, 100);
-                intID = setInterval (i, 60.2);
-            )");
+                return false;
+            });
 
             choc::messageloop::run();
             CHOC_EXPECT_TRUE (result == 4 || result == 5);
@@ -2240,6 +2246,40 @@ inline void testJavascript (TestProgress& progress)
     testJavascript (progress, [] { return choc::javascript::createQuickJSContext(); }, false);
 }
 
+//==============================================================================
+inline void testWebview (TestProgress& progress)
+{
+    CHOC_CATEGORY (WebView);
+    CHOC_TEST (Javascript)
+
+    choc::ui::WebView::Options opts;
+    opts.enableDebugMode = true;
+    choc::ui::WebView webview (opts);
+
+    if (! webview.loadedOK())
+    {
+        std::cout << "WebView was unavailable" << std::endl;
+        return;
+    }
+
+    std::string result;
+
+    webview.bind ("succeeded", [&] (const choc::value::ValueView& args)
+    {
+        result = choc::json::toString (args);
+        choc::messageloop::stop();
+        return choc::value::Value();
+    });
+
+    auto t1 = choc::messageloop::Timer (100, [&]
+    {
+        webview.evaluateJavascript ("succeeded (1234, 5678);");
+        return false;
+    });
+
+    choc::messageloop::run();
+    CHOC_EXPECT_EQ (result, "[1234, 5678]");
+}
 
 //==============================================================================
 inline void testCOM (TestProgress& progress)
@@ -2519,8 +2559,6 @@ inline void testTimers (TestProgress& progress)
 {
     CHOC_CATEGORY (MessageLoop);
 
-    choc::messageloop::initialise();
-
     {
         CHOC_TEST (Timers)
 
@@ -2706,6 +2744,8 @@ inline bool runAllTests (TestProgress& progress)
 
     try
     {
+        choc::messageloop::initialise();
+
         testFileWatcher (progress);
         testPlatform (progress);
         testContainerUtils (progress);
@@ -2719,6 +2759,7 @@ inline bool runAllTests (TestProgress& progress)
         testFIFOs (progress);
         testMIDIFiles (progress);
         testJavascript (progress);
+        testWebview (progress);
         testCOM (progress);
         testStableSort (progress);
         testAudioFileFormat (progress);
