@@ -458,7 +458,7 @@ inline void run()
 
 inline void stop()
 {
-    PostQuitMessage (0);
+    postMessage ([] { PostQuitMessage (0); });
 }
 
 inline void postMessage (std::function<void()>&& fn)
