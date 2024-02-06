@@ -419,7 +419,7 @@ struct LockedMessageWindow
     std::unique_lock<std::mutex> lock;
 };
 
-static LockedMessageWindow getSharedMessageWindow (bool recreateIfWrongThread = false)
+inline LockedMessageWindow getSharedMessageWindow (bool recreateIfWrongThread = false)
 {
     static std::unique_ptr<MessageWindow> window;
     static std::mutex lock;
