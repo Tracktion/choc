@@ -113,29 +113,33 @@ public:
     WebView& operator= (WebView&&) = default;
     ~WebView();
 
+    /// Returns true if the webview has been successfully initialised. This could
+    /// fail on some systems if the OS doesn't provide a suitable component.
+    bool loadedOK() const;
+
     /// Directly sets the HTML content of the browser
-    void setHTML (const std::string& html);
+    bool setHTML (const std::string& html);
 
     /// Directly evaluates some javascript.
     /// This call isn't guaranteed to be thread-safe, so calling it on
     /// threads other than the main message thread could lead to problems.
     /// It also goes without saying this this is not realtime-safe, and the
     /// call may block, allocate or make system calls.
-    void evaluateJavascript (const std::string& script);
+    bool evaluateJavascript (const std::string& script);
 
     /// Sends the browser to this URL
-    void navigate (const std::string& url);
+    bool navigate (const std::string& url);
 
     /// A callback function which can be passed to bind().
     using CallbackFn = std::function<choc::value::Value(const choc::value::ValueView& args)>;
     /// Binds a C++ function to a named javascript function that can be called
     /// by code running in the browser.
-    void bind (const std::string& functionName, CallbackFn&& function);
+    bool bind (const std::string& functionName, CallbackFn&& function);
     /// Removes a previously-bound function.
-    void unbind (const std::string& functionName);
+    bool unbind (const std::string& functionName);
 
     /// Adds a script to run when the browser loads a page
-    void addInitScript (const std::string& script);
+    bool addInitScript (const std::string& script);
 
     /// Returns a platform-specific handle for this view
     void* getViewHandle() const;
@@ -276,34 +280,43 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
+    bool loadedOK() const           { return getViewHandle() != nullptr; }
     void* getViewHandle() const     { return (void*) webview; }
 
-    void evaluateJavascript (const std::string& js)
+    bool evaluateJavascript (const std::string& js)
     {
        #if WEBKIT_CHECK_VERSION (2, 40, 0)
         webkit_web_view_evaluate_javascript (WEBKIT_WEB_VIEW (webview), js.c_str(), static_cast<gssize> (js.length()), nullptr, nullptr, nullptr, nullptr, nullptr);
        #else
         webkit_web_view_run_javascript (WEBKIT_WEB_VIEW (webview), js.c_str(), nullptr, nullptr, nullptr);
        #endif
+        return true;
     }
 
-    void navigate (const std::string& url)
+    bool navigate (const std::string& url)
     {
         webkit_web_view_load_uri (WEBKIT_WEB_VIEW (webview), url.c_str());
+        return true;
     }
 
-    void setHTML (const std::string& html)
+    bool setHTML (const std::string& html)
     {
         webkit_web_view_load_html (WEBKIT_WEB_VIEW (webview), html.c_str(), nullptr);
+        return true;
     }
 
-    void addInitScript (const std::string& js)
+    bool addInitScript (const std::string& js)
     {
         if (manager != nullptr)
+        {
             webkit_user_content_manager_add_script (manager, webkit_user_script_new (js.c_str(),
                                                                                      WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
                                                                                      WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
                                                                                      nullptr, nullptr));
+            return true;
+        }
+
+        return false;
     }
 
     void invokeCallback (WebKitJavascriptResult* r)
@@ -382,36 +395,47 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
+    bool loadedOK() const           { return getViewHandle() != nullptr; }
     void* getViewHandle() const     { return (void*) webview; }
 
-    void addInitScript (const std::string& script)
+    bool addInitScript (const std::string& script)
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
-        id s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
-                                   getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1);
-        call<void> (manager, "addUserScript:", s);
-        call<void> (s, "release");
+
+        if (id s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
+                                       getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1))
+        {
+            call<void> (manager, "addUserScript:", s);
+            call<void> (s, "release");
+            return true;
+        }
+
+        return false;
     }
 
-    void navigate (const std::string& url)
+    bool navigate (const std::string& url)
     {
         using namespace choc::objc;
         AutoReleasePool autoreleasePool;
-        id nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url));
-        call<void> (webview, "loadRequest:", call<id> (getClass ("NSURLRequest"), "requestWithURL:", nsURL));
+
+        if (id nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url)))
+            return call<id> (webview, "loadRequest:", call<id> (getClass ("NSURLRequest"), "requestWithURL:", nsURL)) != nullptr;
+
+        return false;
     }
 
-    void setHTML (const std::string& html)
+    bool setHTML (const std::string& html)
     {
         objc::AutoReleasePool autoreleasePool;
-        objc::call<void> (webview, "loadHTMLString:baseURL:", objc::getNSString (html), (id) nullptr);
+        return objc::call<id> (webview, "loadHTMLString:baseURL:", objc::getNSString (html), (id) nullptr) != nullptr;
     }
 
-    void evaluateJavascript (const std::string& script)
+    bool evaluateJavascript (const std::string& script)
     {
         objc::AutoReleasePool autoreleasePool;
         objc::call<void> (webview, "evaluateJavaScript:completionHandler:", objc::getNSString (script), (id) nullptr);
+        return true;
     }
 
 private:
@@ -1064,30 +1088,31 @@ struct WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.chrome.webview.postMessage";
 
+    bool loadedOK() const           { return coreWebView != nullptr; }
     void* getViewHandle() const     { return (void*) hwnd.hwnd; }
 
-    void navigate (const std::string& url)
+    bool navigate (const std::string& url)
     {
-        if (coreWebView != nullptr)
-            coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str());
+        CHOC_ASSERT (coreWebView != nullptr);
+        return coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str()) == S_OK;
     }
 
-    void addInitScript (const std::string& script)
+    bool addInitScript (const std::string& script)
     {
-        if (coreWebView != nullptr)
-            coreWebView->AddScriptToExecuteOnDocumentCreated (createUTF16StringFromUTF8 (script).c_str(), nullptr);
+        CHOC_ASSERT (coreWebView != nullptr);
+        return coreWebView->AddScriptToExecuteOnDocumentCreated (createUTF16StringFromUTF8 (script).c_str(), nullptr) == S_OK;
     }
 
-    void evaluateJavascript (const std::string& script)
+    bool evaluateJavascript (const std::string& script)
     {
-        if (coreWebView != nullptr)
-            coreWebView->ExecuteScript (createUTF16StringFromUTF8 (script).c_str(), nullptr);
+        CHOC_ASSERT (coreWebView != nullptr);
+        return coreWebView->ExecuteScript (createUTF16StringFromUTF8 (script).c_str(), nullptr) == S_OK;
     }
 
-    void setHTML (const std::string& html)
+    bool setHTML (const std::string& html)
     {
-        if (coreWebView != nullptr)
-            coreWebView->NavigateToString (createUTF16StringFromUTF8 (html).c_str());
+        CHOC_ASSERT (coreWebView != nullptr);
+        return coreWebView->NavigateToString (createUTF16StringFromUTF8 (html).c_str()) == S_OK;
     }
 
 private:
@@ -1416,52 +1441,73 @@ namespace choc::ui
 
 //==============================================================================
 inline WebView::WebView() : WebView (Options()) {}
-inline WebView::WebView (const Options& options)  { pimpl = std::make_unique<Pimpl> (*this, options); }
+
+inline WebView::WebView (const Options& options)
+{
+    pimpl = std::make_unique<Pimpl> (*this, options);
+
+    if (! pimpl->loadedOK())
+        pimpl.reset();
+}
 
 inline WebView::~WebView()
 {
     pimpl.reset();
 }
 
-inline void WebView::navigate (const std::string& url)               { pimpl->navigate (url.empty() ? "about:blank" : url); }
-inline void WebView::setHTML (const std::string& html)               { pimpl->setHTML (html); }
-inline void WebView::addInitScript (const std::string& script)       { pimpl->addInitScript (script); }
-inline void WebView::evaluateJavascript (const std::string& script)  { pimpl->evaluateJavascript (script); }
-inline void* WebView::getViewHandle() const                          { return pimpl->getViewHandle(); }
+inline bool WebView::loadedOK() const                                { return pimpl != nullptr; }
+inline bool WebView::navigate (const std::string& url)               { return pimpl != nullptr && pimpl->navigate (url.empty() ? "about:blank" : url); }
+inline bool WebView::setHTML (const std::string& html)               { return pimpl != nullptr && pimpl->setHTML (html); }
+inline bool WebView::addInitScript (const std::string& script)       { return pimpl != nullptr && pimpl->addInitScript (script); }
+inline bool WebView::evaluateJavascript (const std::string& script)  { return pimpl != nullptr && pimpl->evaluateJavascript (script); }
+inline void* WebView::getViewHandle() const                          { return pimpl != nullptr ? pimpl->getViewHandle() : nullptr; }
 
-inline void WebView::bind (const std::string& functionName, CallbackFn&& fn)
+inline bool WebView::bind (const std::string& functionName, CallbackFn&& fn)
 {
-    std::string script = R"((function() {
-      var fnBinding = window._fnBindings = (window._fnBindings || { messageID: 1 });
-      window["FUNCTION_NAME"] = function() {
-        var messageID = ++fnBinding.messageID;
-        var promise = new Promise(function(resolve, reject) {
-          fnBinding[messageID] = { resolve: resolve, reject: reject, };
-        });
-        INVOKE_BINDING(JSON.stringify({
-          id: messageID,
-          fn: "FUNCTION_NAME",
-          params: Array.prototype.slice.call(arguments),
-        },
-        (key, value) => typeof value === 'bigint' ? value.toString() : value));
-        return promise;
-      }
-    })())";
+    if (pimpl == nullptr)
+        return false;
 
-    script = choc::text::replace (script, "FUNCTION_NAME", functionName,
-                                          "INVOKE_BINDING", Pimpl::postMessageFn);
-    addInitScript (script);
-    evaluateJavascript (script);
-    bindings[functionName] = std::move (fn);
+    static constexpr std::string_view scriptTemplate = R"((function() {
+const fnBinding = window._fnBindings = (window._fnBindings || { messageID: 1 });
+
+window["FUNCTION_NAME"] = function()
+{
+  const messageID = ++fnBinding.messageID;
+  const promise = new Promise((resolve, reject) => { fnBinding[messageID] = { resolve, reject }; });
+
+  const args = JSON.stringify ({ id: messageID,
+                                 fn: "FUNCTION_NAME",
+                                 params: Array.prototype.slice.call (arguments)
+                               },
+                               (key, value) => typeof value === 'bigint' ? value.toString() : value);
+  INVOKE_BINDING (args);
+  return promise;
+}
+})())";
+
+    auto script = choc::text::replace (scriptTemplate, "FUNCTION_NAME", functionName,
+                                                       "INVOKE_BINDING", Pimpl::postMessageFn);
+
+    if (addInitScript (script)
+         && evaluateJavascript (script))
+    {
+        bindings[functionName] = std::move (fn);
+        return true;
+    }
+
+    return false;
 }
 
-inline void WebView::unbind (const std::string& functionName)
+inline bool WebView::unbind (const std::string& functionName)
 {
     if (auto found = bindings.find (functionName); found != bindings.end())
     {
         evaluateJavascript ("delete window[\"" + functionName + "\"];");
         bindings.erase (found);
+        return true;
     }
+
+    return false;
 }
 
 inline void WebView::invokeBinding (const std::string& msg)
