@@ -16140,7 +16140,7 @@ unsigned find_best_partition_order_(
                     residual,
 #endif
                     abs_residual_partition_sums+sum,
-                    raw_bits_per_partition+sum,
+                    raw_bits_per_partition ? (raw_bits_per_partition + sum) : nullptr,
                     residual_samples,
                     predictor_order,
                     rice_parameter,
