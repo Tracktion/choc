@@ -20,6 +20,7 @@
 #define CHOC_JAVASCRIPT_TIMER_HEADER_INCLUDED
 
 #include <unordered_map>
+#include <iostream>
 
 #include "choc_javascript.h"
 #include "../gui/choc_MessageLoop.h"
@@ -82,7 +83,16 @@ inline void registerTimerFunctions (Context& context)
             {
                 auto timeIDCopy = timerID; // local copy as this lambda will get deleted..
                 activeTimers.erase (timeIDCopy);
-                context.invoke ("_choc_invokeTimeout", timeIDCopy);
+
+                try
+                {
+                    context.invoke ("_choc_invokeTimeout", timeIDCopy);
+                }
+                catch (const choc::javascript::Error& e)
+                {
+                    std::cerr << e.what() << std::endl;
+                }
+
                 return false;
             });
 
@@ -95,7 +105,15 @@ inline void registerTimerFunctions (Context& context)
 
             activeTimers[timerID] = choc::messageloop::Timer (interval, [this, timerID]
             {
-                context.invoke ("_choc_invokeInterval", timerID);
+                try
+                {
+                    context.invoke ("_choc_invokeInterval", timerID);
+                }
+                catch (const choc::javascript::Error& e)
+                {
+                    std::cerr << e.what() << std::endl;
+                }
+
                 return true;
             });
 
