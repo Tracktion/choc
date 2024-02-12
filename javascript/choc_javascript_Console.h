@@ -95,34 +95,21 @@ inline void registerConsoleFunctions (choc::javascript::Context& context,
                 case 4: level = LoggingLevel::debug; break;
             }
 
-            auto toString = [] (const choc::value::ValueView& v)
-            {
-                return v.isString() ? v.toString() : choc::json::toString (v);
-            };
-
-            if (content->isArray())
-            {
-                for (auto arg : *content)
-                    handleOutput (toString (arg), level);
-            }
-            else
-            {
-                handleOutput (toString (*content), level);
-            }
+            handleOutput (content->isString() ? content->toString()
+                                              : choc::json::toString (*content), level);
         }
 
         return {};
     });
 
     context.evaluate (R"(
-
-    console = {
-        log:   function()     { for (let a of arguments) _choc_console_log (a, 0); },
-        info:  function()     { for (let a of arguments) _choc_console_log (a, 1); },
-        warn:  function()     { for (let a of arguments) _choc_console_log (a, 2); },
-        error: function()     { for (let a of arguments) _choc_console_log (a, 3); },
-        debug: function()     { for (let a of arguments) _choc_console_log (a, 4); }
-    };
+console = {
+    log:   function()     { for (let a of arguments) _choc_console_log (a, 0); },
+    info:  function()     { for (let a of arguments) _choc_console_log (a, 1); },
+    warn:  function()     { for (let a of arguments) _choc_console_log (a, 2); },
+    error: function()     { for (let a of arguments) _choc_console_log (a, 3); },
+    debug: function()     { for (let a of arguments) _choc_console_log (a, 4); }
+};
 )");
 }
 
