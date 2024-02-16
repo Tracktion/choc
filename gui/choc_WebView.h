@@ -1112,13 +1112,21 @@ struct WebView::Pimpl
     bool setHTML (const std::string& html)
     {
         CHOC_ASSERT (coreWebView != nullptr);
-        return coreWebView->NavigateToString (createUTF16StringFromUTF8 (html).c_str()) == S_OK;
+
+        pageHTML.data.clear();
+        std::copy (html.begin(), html.end(), std::back_inserter (pageHTML.data));
+        pageHTML.mimeType = "text/html";
+
+        navigate (setHTMLUri);
+        return true;
     }
 
 private:
     WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
     HWNDHolder hwnd;
     const std::string resourceRequestFilterUriPrefix = "https://choc.localhost/";
+    const std::string setHTMLUri                     = "https://choc.localhost/setHTML";
+    WebView::Options::Resource pageHTML;
 
     static Pimpl* getPimpl (HWND h)     { return (Pimpl*) GetWindowLongPtr (h, GWLP_USERDATA); }
 
@@ -1176,16 +1184,14 @@ private:
                     if (coreWebView == nullptr)
                         return false;
 
+                    const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestFilterUriPrefix.c_str()) + L"*";
+                    coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+                    EventRegistrationToken token;
+                    coreWebView->add_WebResourceRequested (handler, std::addressof (token));
+
                     if (fetchResource)
-                    {
-                        const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestFilterUriPrefix.c_str()) + L"*";
-                        coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-
-                        EventRegistrationToken token;
-                        coreWebView->add_WebResourceRequested (handler, std::addressof (token));
-
                         navigate (resourceRequestFilterUriPrefix);
-                    }
 
                     return true;
                 }
@@ -1216,6 +1222,14 @@ private:
         }
 
         webviewInitialising.clear();
+    }
+
+    std::optional<WebView::Options::Resource> fetchResourceOrPageHTML (const std::string& uri)
+    {
+        if (uri == setHTMLUri)
+            return pageHTML;
+
+        return fetchResource (uri.substr (resourceRequestFilterUriPrefix.size() - 1));
     }
 
     HRESULT onResourceRequested (ICoreWebView2WebResourceRequestedEventArgs* args)
@@ -1260,12 +1274,10 @@ private:
             if (request->get_Uri (std::addressof (uri)) != S_OK)
                 return E_FAIL;
 
-            const auto path = createUTF8FromUTF16 (uri).substr (resourceRequestFilterUriPrefix.size() - 1);
-
             ICoreWebView2WebResourceResponse* response = {};
             ScopedExit cleanupResponse (makeCleanupIUnknown (response));
 
-            if (const auto resource = fetchResource (path))
+            if (const auto resource = fetchResourceOrPageHTML (createUTF8FromUTF16 (uri)))
             {
                 const auto makeMemoryStream = [](const auto* data, auto length) -> IStream*
                 {
