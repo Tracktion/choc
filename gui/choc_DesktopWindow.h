@@ -741,7 +741,7 @@ private:
         switch (msg)
         {
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
-            case WM_SIZE:            if (auto w = getPimpl (h)) w->resizeContentToFit(); break;
+            case WM_SIZE:            if (auto w = getPimpl (h)) { w->resizeContentToFit(); if (w->owner.windowResized != nullptr) w->owner.windowResized(); } break;
             case WM_CLOSE:           if (auto w = getPimpl (h)) if (w->owner.windowClosed != nullptr) w->owner.windowClosed(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
             default:                 break;
