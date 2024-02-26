@@ -656,7 +656,12 @@ struct DesktopWindow::Pimpl
 
     void centreWithSize (int w, int h)
     {
-        setBounds ({ 0, 0, w, h }, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
+        auto dpi = static_cast<int> (getWindowDPI());
+        auto screenW = (GetSystemMetrics(SM_CXSCREEN) * 96) / dpi;
+        auto screenH = (GetSystemMetrics(SM_CYSCREEN) * 96) / dpi;
+        auto x = (screenW - w) / 2;
+        auto y = (screenH - h) / 2;
+        setBounds ({ x, y, w, h }, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     }
 
     void setBounds (Bounds b)
@@ -720,6 +725,20 @@ private:
         }
     }
 
+    void handleClose()
+    {
+        if (owner.windowClosed != nullptr)
+            owner.windowClosed();
+    }
+
+    void handleSizeChange()
+    {
+        resizeContentToFit();
+
+        if (owner.windowResized != nullptr)
+            owner.windowResized();
+    }
+
     static void enableNonClientDPIScaling (HWND h)
     {
         if (auto fn = getUser32Function<BOOL(__stdcall*)(HWND)> ("EnableNonClientDpiScaling"))
@@ -741,8 +760,8 @@ private:
         switch (msg)
         {
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
-            case WM_SIZE:            if (auto w = getPimpl (h)) w->resizeContentToFit(); break;
-            case WM_CLOSE:           if (auto w = getPimpl (h)) if (w->owner.windowClosed != nullptr) w->owner.windowClosed(); return 0;
+            case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
+            case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
             default:                 break;
         }
