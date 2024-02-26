@@ -656,7 +656,9 @@ struct DesktopWindow::Pimpl
 
     void centreWithSize (int w, int h)
     {
-        setBounds ({ 0, 0, w, h }, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
+        int screenW = (GetSystemMetrics(SM_CXSCREEN) * 96) / getWindowDPI();
+        int screenH = (GetSystemMetrics(SM_CYSCREEN) * 96) / getWindowDPI();
+        setBounds ({ (screenW - w) / 2, (screenH - h) / 2, w, h }, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     }
 
     void setBounds (Bounds b)
