@@ -346,7 +346,7 @@ struct choc::ui::WebView::Pimpl
         : owner (v), options (optionsToUse)
     {
         using namespace choc::objc;
-        AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
 
         id config = call<id> (getClass ("WKWebViewConfiguration"), "new");
 
@@ -359,7 +359,7 @@ struct choc::ui::WebView::Pimpl
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
         delegate = createDelegate();
-        objc_setAssociatedObject (delegate, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
+        objc_setAssociatedObject (delegate, "choc_webview", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
 
         manager = call<id> (config, "userContentController");
         call<void> (manager, "retain");
@@ -369,7 +369,7 @@ struct choc::ui::WebView::Pimpl
             call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString ("choc"));
 
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
-        objc_setAssociatedObject (webview, "choc_webview", (id) this, OBJC_ASSOCIATION_ASSIGN);
+        objc_setAssociatedObject (webview, "choc_webview", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
 
         if (! options.customUserAgent.empty())
             call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
@@ -381,28 +381,31 @@ struct choc::ui::WebView::Pimpl
 
         if (options.fetchResource)
             navigate ("choc://choc.choc/");
+
+        CHOC_AUTORELEASE_END
     }
 
     ~Pimpl()
     {
-        objc::AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
         objc_setAssociatedObject (delegate, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc_setAssociatedObject (webview, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc::call<void> (webview, "release");
         objc::call<void> (manager, "removeScriptMessageHandlerForName:", objc::getNSString ("external"));
         objc::call<void> (manager, "release");
         objc::call<void> (delegate, "release");
+        CHOC_AUTORELEASE_END
     }
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
     bool loadedOK() const           { return getViewHandle() != nullptr; }
-    void* getViewHandle() const     { return (void*) webview; }
+    void* getViewHandle() const     { return (CHOC_OBJC_CAST_BRIDGED void*) webview; }
 
     bool addInitScript (const std::string& script)
     {
         using namespace choc::objc;
-        AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
 
         if (id s = call<id> (call<id> (getClass ("WKUserScript"), "alloc"), "initWithSource:injectionTime:forMainFrameOnly:",
                                        getNSString (script), WKUserScriptInjectionTimeAtDocumentStart, (BOOL) 1))
@@ -412,31 +415,35 @@ struct choc::ui::WebView::Pimpl
             return true;
         }
 
+        CHOC_AUTORELEASE_END
         return false;
     }
 
     bool navigate (const std::string& url)
     {
         using namespace choc::objc;
-        AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
 
         if (id nsURL = call<id> (getClass ("NSURL"), "URLWithString:", getNSString (url)))
             return call<id> (webview, "loadRequest:", call<id> (getClass ("NSURLRequest"), "requestWithURL:", nsURL)) != nullptr;
 
+        CHOC_AUTORELEASE_END
         return false;
     }
 
     bool setHTML (const std::string& html)
     {
-        objc::AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
         return objc::call<id> (webview, "loadHTMLString:baseURL:", objc::getNSString (html), (id) nullptr) != nullptr;
+        CHOC_AUTORELEASE_END
     }
 
     bool evaluateJavascript (const std::string& script)
     {
-        objc::AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
         objc::call<void> (webview, "evaluateJavaScript:completionHandler:", objc::getNSString (script), (id) nullptr);
         return true;
+        CHOC_AUTORELEASE_END
     }
 
 private:
@@ -455,7 +462,7 @@ private:
     void onResourceRequested (id task)
     {
         using namespace choc::objc;
-        AutoReleasePool autoreleasePool;
+        CHOC_AUTORELEASE_BEGIN
 
         try
         {
@@ -504,6 +511,8 @@ private:
 
             call<void> (task, "didFailWithError:", error);
         }
+
+        CHOC_AUTORELEASE_END
     }
 
     BOOL sendAppAction (id self, const char* action)
@@ -564,7 +573,7 @@ private:
 
     static Pimpl* getPimpl (id self)
     {
-        return reinterpret_cast<Pimpl*> (objc_getAssociatedObject (self, "choc_webview"));
+        return (CHOC_OBJC_CAST_BRIDGED Pimpl*) (objc_getAssociatedObject (self, "choc_webview"));
     }
 
     WebView& owner;
@@ -652,8 +661,7 @@ private:
             class_addMethod (delegateClass, sel_registerName ("webView:runOpenPanelWithParameters:initiatedByFrame:completionHandler:"),
                              (IMP) (+[](id, SEL, id wkwebview, id params, id /*frame*/, void (^completionHandler)(id))
                              {
-                                AutoReleasePool autoreleasePool;
-
+                                CHOC_AUTORELEASE_BEGIN
                                 id panel = call<id> (getClass ("NSOpenPanel"), "openPanel");
 
                                 auto allowsMultipleSelection = call<BOOL> (params, "allowsMultipleSelection");
@@ -666,13 +674,14 @@ private:
                                 call<void> (panel, "beginSheetModalForWindow:completionHandler:", window,
                                             ^(long result)
                                             {
-                                                AutoReleasePool pool;
-
+                                                CHOC_AUTORELEASE_BEGIN
                                                 if (result == 1) // NSModalResponseOK
                                                     completionHandler (call<id> (panel, "URLs"));
                                                 else
                                                     completionHandler (nil);
+                                                CHOC_AUTORELEASE_END
                                             });
+                                CHOC_AUTORELEASE_END
                              }), "v@:@@@@");
 
             objc_registerClassPair (delegateClass);

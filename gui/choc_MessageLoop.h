@@ -238,6 +238,11 @@ namespace choc::objc
         return c;
     }
 
+   #if __has_feature(objc_arc)
+    #define CHOC_AUTORELEASE_BEGIN @autoreleasepool {
+    #define CHOC_AUTORELEASE_END }
+    #define CHOC_OBJC_CAST_BRIDGED __bridge
+   #else
     struct AutoReleasePool
     {
         AutoReleasePool()  { pool = call<id> (getClass ("NSAutoreleasePool"), "new"); }
@@ -245,6 +250,13 @@ namespace choc::objc
 
         id pool;
     };
+
+    #define CHOC_MAKE_AR_NAME2(line)  autoreleasePool_ ## line
+    #define CHOC_MAKE_AR_NAME1(line)  CHOC_MAKE_AR_NAME2(line)
+    #define CHOC_AUTORELEASE_BEGIN { choc::objc::AutoReleasePool CHOC_MAKE_AR_NAME1(__LINE__);
+    #define CHOC_AUTORELEASE_END }
+    #define CHOC_OBJC_CAST_BRIDGED
+   #endif
 }
 
 namespace choc::messageloop
@@ -254,8 +266,9 @@ inline void initialise() {}
 
 inline void run()
 {
-    objc::AutoReleasePool autoreleasePool;
+    CHOC_AUTORELEASE_BEGIN
     objc::call<void> (objc::getSharedNSApplication(), "run");
+    CHOC_AUTORELEASE_END
 }
 
 inline void stop()
@@ -265,8 +278,7 @@ inline void stop()
         using namespace choc::objc;
         static constexpr long NSEventTypeApplicationDefined = 15;
 
-        AutoReleasePool autoreleasePool;
-
+        CHOC_AUTORELEASE_BEGIN
         call<void> (getSharedNSApplication(), "stop:", (id) nullptr);
 
         // After sending the stop message, we need to post a dummy event to
@@ -275,6 +287,7 @@ inline void stop()
         id dummyEvent = call<id> (getClass ("NSEvent"), "otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:",
                                   NSEventTypeApplicationDefined, NSPoint(), 0, 0, 0, nullptr, (short) 0, 0, 0);
         call<void> (getSharedNSApplication(), "postEvent:atStart:", dummyEvent, YES);
+        CHOC_AUTORELEASE_END
     });
 }
 
@@ -284,9 +297,10 @@ inline void postMessage (std::function<void()>&& fn)
                       new std::function<void()> (std::move (fn)),
                       (dispatch_function_t) (+[](void* arg)
                       {
-                          objc::AutoReleasePool autoReleasePool;
+                          CHOC_AUTORELEASE_BEGIN
                           std::unique_ptr<std::function<void()>> f (static_cast<std::function<void()>*> (arg));
                           (*f)();
+                          CHOC_AUTORELEASE_END
                       }));
 }
 
@@ -307,8 +321,9 @@ struct Timer::Pimpl
     {
         if (getList().invokeIfStillAlive (static_cast<Pimpl*> (context)))
         {
-            objc::AutoReleasePool autoReleasePool;
+            CHOC_AUTORELEASE_BEGIN
             static_cast<Pimpl*> (context)->dispatch();
+            CHOC_AUTORELEASE_END
         }
     }
 
