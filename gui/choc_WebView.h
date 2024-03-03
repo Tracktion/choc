@@ -234,6 +234,7 @@ struct choc::ui::WebView::Pimpl
 
                         auto* headers = soup_message_headers_new (SOUP_MESSAGE_HEADERS_RESPONSE);
                         soup_message_headers_append (headers, "Cache-Control", "no-store");
+                        soup_message_headers_append (headers, "Access-Control-Allow-Origin", "*");
                         webkit_uri_scheme_response_set_http_headers (response, headers); // response takes ownership of the headers
 
                         webkit_uri_scheme_request_finish_with_response (request, response);
@@ -478,8 +479,8 @@ private:
                 const auto& [bytes, mimeType] = *resource;
 
                 auto contentLength = std::to_string (bytes.size());
-                id headerKeys[]    = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control") };
-                id headerObjects[] = { getNSString (contentLength),    getNSString (mimeType),       getNSString ("no-store") };
+                id headerKeys[]    = { getNSString ("Content-Length"), getNSString ("Content-Type"), getNSString ("Cache-Control"), getNSString ("Access-Control-Allow-Origin") };
+                id headerObjects[] = { getNSString (contentLength),    getNSString (mimeType),       getNSString ("no-store") ,     getNSString ("*") };
 
                 id headerFields = call<id> (getClass ("NSDictionary"), "dictionaryWithObjects:forKeys:count:",
                                             headerObjects, headerKeys, sizeof (headerObjects) / sizeof (id));
@@ -1298,6 +1299,7 @@ private:
                 std::vector<std::string> headers;
                 headers.emplace_back ("Content-Type: " + resource->mimeType);
                 headers.emplace_back ("Cache-Control: no-store");
+                headers.emplace_back ("Access-Control-Allow-Origin: *");
 
                 if (! customUserAgent.empty())
                     headers.emplace_back ("User-Agent: " + customUserAgent);
