@@ -343,7 +343,7 @@ struct choc::ui::WebView::Pimpl
 struct choc::ui::WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& optionsToUse)
-        : owner (v), options (optionsToUse)
+        : owner (v), options (std::make_unique<Options> (optionsToUse))
     {
         using namespace choc::objc;
         CHOC_AUTORELEASE_BEGIN
@@ -355,7 +355,7 @@ struct choc::ui::WebView::Pimpl
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("DOMPasteAllowed"));
         call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("javaScriptCanAccessClipboard"));
 
-        if (options.enableDebugMode)
+        if (options->enableDebugMode)
             call<id> (prefs, "setValue:forKey:", getNSNumberBool (true), getNSString ("developerExtrasEnabled"));
 
         delegate = createDelegate();
@@ -365,21 +365,21 @@ struct choc::ui::WebView::Pimpl
         call<void> (manager, "retain");
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
 
-        if (options.fetchResource)
+        if (options->fetchResource)
             call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString ("choc"));
 
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
         objc_setAssociatedObject (webview, "choc_webview", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
 
-        if (! options.customUserAgent.empty())
-            call<void> (webview, "setValue:forKey:", getNSString (options.customUserAgent), getNSString ("customUserAgent"));
+        if (! options->customUserAgent.empty())
+            call<void> (webview, "setValue:forKey:", getNSString (options->customUserAgent), getNSString ("customUserAgent"));
 
         call<void> (webview, "setUIDelegate:", delegate);
         call<void> (webview, "setNavigationDelegate:", delegate);
 
         call<void> (config, "release");
 
-        if (options.fetchResource)
+        if (options->fetchResource)
             navigate ("choc://choc.choc/");
 
         CHOC_AUTORELEASE_END
@@ -481,7 +481,7 @@ private:
 
             auto path = objc::getString (call<id> (requestUrl, "path"));
 
-            if (auto resource = options.fetchResource (path))
+            if (auto resource = options->fetchResource (path))
             {
                 const auto& [bytes, mimeType] = *resource;
 
@@ -577,7 +577,9 @@ private:
     }
 
     WebView& owner;
-    Options options;
+    // NB: this is a pointer because making it a member forces the alignment of this Pimpl class
+    // to 16, which then conflicts with obj-C pointer alignment...
+    std::unique_ptr<Options> options;
     id webview = {}, manager = {}, delegate = {};
 
     struct WebviewClass
@@ -590,7 +592,7 @@ private:
                             (IMP) (+[](id self, SEL, id) -> BOOL
                             {
                                 if (auto p = getPimpl (self))
-                                    return p->options.acceptsFirstMouseClick;
+                                    return p->options->acceptsFirstMouseClick;
 
                                 return false;
                             }), "B@:@");
