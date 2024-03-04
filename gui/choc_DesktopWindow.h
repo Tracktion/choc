@@ -72,6 +72,9 @@ struct DesktopWindow
     /// Enables/disables user resizing of the window
     void setResizable (bool);
 
+    /// Enables/disables the close button of the window
+    void setClosable (bool);
+
     /// Changes the window's position
     void setBounds (Bounds);
 
@@ -188,6 +191,11 @@ struct choc::ui::DesktopWindow::Pimpl
     void setResizable (bool b)
     {
         gtk_window_set_resizable (GTK_WINDOW (window), b);
+    }
+
+    void setClosable (bool b)
+    {
+        gtk_window_set_deletable (GTK_WINDOW (window), b);
     }
 
     void setMinimumSize (int w, int h)
@@ -326,6 +334,16 @@ struct DesktopWindow::Pimpl
 
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
         CHOC_AUTORELEASE_END
+    }
+    
+    void setClosable (bool closable)
+    {
+        objc::AutoReleasePool autoreleasePool;
+
+        auto style = objc::call<unsigned long> (window, "styleMask");
+        style = closable ? (style | NSWindowStyleMaskClosable)
+                         : (style & ~NSWindowStyleMaskClosable);
+        objc::call<void> (window, "setStyleMask:", (unsigned long) style);
     }
 
     void setMinimumSize (int w, int h) { CHOC_AUTORELEASE_BEGIN objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); CHOC_AUTORELEASE_END }
@@ -641,6 +659,11 @@ struct DesktopWindow::Pimpl
         SetWindowLong (hwnd, GWL_STYLE, style);
     }
 
+    void setClosable (bool b)
+    {
+        enabledCloseButton = b;
+    }
+
     void setMinimumSize (int w, int h)
     {
         minimumSize.x = w;
@@ -698,6 +721,8 @@ private:
     HWNDHolder hwnd;
     POINT minimumSize = {}, maximumSize = {};
     WindowClass windowClass { L"CHOCWindow", (WNDPROC) wndProc };
+
+    bool enabledCloseButton = true;
 
     Bounds scaleBounds (Bounds b, double scale)
     {
@@ -772,7 +797,7 @@ private:
         {
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
             case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
-            case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
+            case WM_CLOSE:           if (auto w = getPimpl (h)) if (w->enabledCloseButton) if (w->owner.windowClosed != nullptr) w->owner.windowClosed(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
             default:                 break;
         }
@@ -801,6 +826,7 @@ inline void DesktopWindow::setWindowTitle (const std::string& title)       { pim
 inline void DesktopWindow::setMinimumSize (int w, int h)                   { pimpl->setMinimumSize (w, h); }
 inline void DesktopWindow::setMaximumSize (int w, int h)                   { pimpl->setMaximumSize (w, h); }
 inline void DesktopWindow::setResizable (bool b)                           { pimpl->setResizable (b); }
+inline void DesktopWindow::setClosable (bool b)                            { pimpl->setClosable (b); }
 inline void DesktopWindow::setBounds (Bounds b)                            { pimpl->setBounds (b); }
 inline void DesktopWindow::centreWithSize (int w, int h)                   { pimpl->centreWithSize (w, h); }
 inline void DesktopWindow::toFront()                                       { pimpl->toFront(); }
