@@ -338,12 +338,14 @@ struct DesktopWindow::Pimpl
     
     void setClosable (bool closable)
     {
+        CHOC_AUTORELEASE_BEGIN
         objc::AutoReleasePool autoreleasePool;
 
         auto style = objc::call<unsigned long> (window, "styleMask");
         style = closable ? (style | NSWindowStyleMaskClosable)
                          : (style & ~NSWindowStyleMaskClosable);
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
+        CHOC_AUTORELEASE_END
     }
 
     void setMinimumSize (int w, int h) { CHOC_AUTORELEASE_BEGIN objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); CHOC_AUTORELEASE_END }
