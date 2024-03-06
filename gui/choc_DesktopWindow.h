@@ -663,8 +663,11 @@ struct DesktopWindow::Pimpl
 
     void setClosable (bool b)
     {
-        enabledCloseButton = b;
-    }
+        if (b) 
+            EnableMenuItem(GetSystemMenu(hwnd, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_ENABLED);           
+        else
+            EnableMenuItem(GetSystemMenu(hwnd, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
+    } 
 
     void setMinimumSize (int w, int h)
     {
@@ -723,8 +726,6 @@ private:
     HWNDHolder hwnd;
     POINT minimumSize = {}, maximumSize = {};
     WindowClass windowClass { L"CHOCWindow", (WNDPROC) wndProc };
-
-    bool enabledCloseButton = true;
 
     Bounds scaleBounds (Bounds b, double scale)
     {
@@ -799,7 +800,7 @@ private:
         {
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
             case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
-            case WM_CLOSE:           if (auto w = getPimpl (h)) if (w->enabledCloseButton) if (w->owner.windowClosed != nullptr) w->owner.windowClosed(); return 0;
+            case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
             default:                 break;
         }
