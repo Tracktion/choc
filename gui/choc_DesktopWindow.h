@@ -331,9 +331,7 @@ struct DesktopWindow::Pimpl
         CHOC_AUTORELEASE_BEGIN
         objc::AutoReleasePool autoreleasePool;
         auto style = objc::call<unsigned long> (window, "styleMask");
-        style = style | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-                      | (b ? NSWindowStyleMaskResizable : 0);
-
+        style = style | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | (b ? NSWindowStyleMaskResizable : 0);
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
         CHOC_AUTORELEASE_END
     }
@@ -342,10 +340,8 @@ struct DesktopWindow::Pimpl
     {
         CHOC_AUTORELEASE_BEGIN
         objc::AutoReleasePool autoreleasePool;
-
         auto style = objc::call<unsigned long> (window, "styleMask");
-        style = closable ? (style | NSWindowStyleMaskClosable)
-                         : (style & ~NSWindowStyleMaskClosable);
+        style = closable ? (style | NSWindowStyleMaskClosable) : (style & ~NSWindowStyleMaskClosable);
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
         CHOC_AUTORELEASE_END
     }
