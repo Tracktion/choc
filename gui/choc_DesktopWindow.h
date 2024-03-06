@@ -281,7 +281,7 @@ struct DesktopWindow::Pimpl
                            NSWindowStyleMaskTitled, NSBackingStoreBuffered, (int) 0);
 
         delegate = createDelegate();
-        objc_setAssociatedObject (delegate, "choc_window", (id) this, OBJC_ASSOCIATION_ASSIGN);
+        objc_setAssociatedObject (delegate, "choc_window", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
         call<void> (window, "setDelegate:", delegate);
         CHOC_AUTORELEASE_END
     }
@@ -295,7 +295,7 @@ struct DesktopWindow::Pimpl
         CHOC_AUTORELEASE_END
     }
 
-    void* getWindowHandle() const     { return (void*) window; }
+    void* getWindowHandle() const     { return (CHOC_OBJC_CAST_BRIDGED void*) window; }
 
     void setWindowTitle (const std::string& newTitle)
     {
@@ -307,7 +307,7 @@ struct DesktopWindow::Pimpl
     void setContent (void* view)
     {
         CHOC_AUTORELEASE_BEGIN
-        objc::call<void> (window, "setContentView:", (id) view);
+        objc::call<void> (window, "setContentView:", (CHOC_OBJC_CAST_BRIDGED id) view);
         CHOC_AUTORELEASE_END
     }
 
@@ -361,7 +361,7 @@ struct DesktopWindow::Pimpl
 
     static Pimpl& getPimplFromContext (id self)
     {
-        auto view = (Pimpl*) objc_getAssociatedObject (self, "choc_window");
+        auto view = (CHOC_OBJC_CAST_BRIDGED Pimpl*) objc_getAssociatedObject (self, "choc_window");
         CHOC_ASSERT (view != nullptr);
         return *view;
     }
