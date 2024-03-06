@@ -329,8 +329,10 @@ struct DesktopWindow::Pimpl
     void setResizable (bool b)
     {
         CHOC_AUTORELEASE_BEGIN
-        auto style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-                        | (b ? NSWindowStyleMaskResizable : 0);
+        objc::AutoReleasePool autoreleasePool;
+        auto style = objc::call<unsigned long> (window, "styleMask");
+        style = style | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
+                      | (b ? NSWindowStyleMaskResizable : 0);
 
         objc::call<void> (window, "setStyleMask:", (unsigned long) style);
         CHOC_AUTORELEASE_END
