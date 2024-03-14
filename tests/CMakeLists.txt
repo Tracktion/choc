@@ -13,7 +13,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
 
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
     set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DDEBUG")
-    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wshadow -Wno-missing-field-initializers -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wreorder -Wsign-conversion -Wno-ignored-qualifiers -Wunreachable-code")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wshadow -Wno-missing-field-initializers -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wreorder -Wsign-conversion -Wno-ignored-qualifiers -Wunreachable-code -Wdeprecated-copy -Wdeprecated-copy-dtor ")
     set(CMAKE_C_FLAGS           "${CMAKE_C_FLAGS} -Wno-unused-result")
 
     if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
