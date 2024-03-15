@@ -93,6 +93,9 @@ namespace choc::javascript
         Context& operator= (Context&&);
         ~Context();
 
+        /// Returns true if the context is valid.
+        operator bool() const                               { return pimpl != nullptr; }
+
         /// When parsing modules, this function is expected to take a path to a module, and
         /// to return the content of that module, or an empty optional if not found.
         using ReadModuleContentFn = std::function<std::optional<std::string>(std::string_view)>;
