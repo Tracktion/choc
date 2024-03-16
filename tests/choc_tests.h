@@ -2583,8 +2583,16 @@ inline void testTimers (TestProgress& progress)
             return false;
         });
 
+        bool messageThread1 = false, messageThread2 = false;
+        choc::messageloop::postMessage ([&] { messageThread1 = choc::messageloop::callerIsOnMessageThread(); });
+        auto t = std::thread ([&] { messageThread2 = ! choc::messageloop::callerIsOnMessageThread(); });
+
         choc::messageloop::run();
+
+        t.join();
         CHOC_EXPECT_EQ (messageCount, 13);
+        CHOC_EXPECT_TRUE (messageThread1);
+        CHOC_EXPECT_TRUE (messageThread2);
     }
 }
 
