@@ -1328,7 +1328,7 @@ private:
     {
         COMPtr (const COMPtr&) = delete;
         COMPtr (COMPtr&&) = delete;
-        COMPtr (Type* o) : object (o) { object->AddRef(); }
+        COMPtr (Type* o) : object (o) { if (object) object->AddRef(); }
         ~COMPtr() { if (object) object->Release(); }
 
         Type* object = nullptr;
