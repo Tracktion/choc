@@ -2250,59 +2250,121 @@ inline void testJavascript (TestProgress& progress)
 inline void testWebview (TestProgress& progress)
 {
     CHOC_CATEGORY (WebView);
-    CHOC_TEST (Javascript)
 
-    choc::ui::WebView::Options opts;
-    opts.enableDebugMode = true;
-    choc::ui::WebView webview (opts);
-
-    if (! webview.loadedOK())
     {
-        std::cout << "WebView was unavailable" << std::endl;
-        return;
+        CHOC_TEST (Javascript)
+
+        choc::ui::WebView::Options opts;
+        opts.enableDebugMode = true;
+        choc::ui::WebView webview (opts);
+
+        if (! webview.loadedOK())
+        {
+            std::cout << "WebView was unavailable" << std::endl;
+            return;
+        }
+
+        std::string result;
+
+        webview.bind ("succeeded", [&] (const choc::value::ValueView& args)
+        {
+            result = choc::json::toString (args);
+            choc::messageloop::stop();
+            return choc::value::Value();
+        });
+
+        auto t1 = choc::messageloop::Timer (100, [&]
+        {
+            webview.evaluateJavascript ("succeeded (1234, 5678);");
+            return false;
+        });
+
+        std::string error1, error2, error3;
+        choc::value::Value value1, value2, value3;
+
+        webview.evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
+        {
+            error1 = error; value1 = value;
+        });
+
+        webview.evaluateJavascript ("return 1234;", [&] (const std::string& error, const choc::value::ValueView& value)
+        {
+            error2 = error; value2 = value;
+        });
+
+        webview.evaluateJavascript ("", [&] (const std::string& error, const choc::value::ValueView& value)
+        {
+            error3 = error; value3 = value;
+        });
+
+        choc::messageloop::run();
+        CHOC_EXPECT_EQ (result, "[1234, 5678]");
+        CHOC_EXPECT_TRUE (error1.empty());
+        CHOC_EXPECT_EQ (choc::json::toString (value1), R"({"x": [1, 2, 3], "y": 987, "z": true})");
+        CHOC_EXPECT_TRUE (! error2.empty());
+        CHOC_EXPECT_TRUE (value2.isVoid());
+        CHOC_EXPECT_TRUE (error3.empty());
+        CHOC_EXPECT_TRUE (value3.isVoid());
     }
 
-    std::string result;
-
-    webview.bind ("succeeded", [&] (const choc::value::ValueView& args)
     {
-        result = choc::json::toString (args);
-        choc::messageloop::stop();
-        return choc::value::Value();
-    });
+        CHOC_TEST (CustomResource);
 
-    auto t1 = choc::messageloop::Timer (100, [&]
-    {
-        webview.evaluateJavascript ("succeeded (1234, 5678);");
-        return false;
-    });
+        choc::ui::WebView::Options opts;
+        opts.enableDebugMode = true;
 
-    std::string error1, error2, error3;
-    choc::value::Value value1, value2, value3;
+        opts.fetchResource = [&] (const std::string& path)
+        {
+            choc::ui::WebView::Options::Resource result;
+            std::string text;
 
-    webview.evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
-    {
-        error1 = error; value1 = value;
-    });
+            if (path == "/")
+            {
+                text = R"(
+<!DOCTYPE html> <html>
 
-    webview.evaluateJavascript ("return 1234;", [&] (const std::string& error, const choc::value::ValueView& value)
-    {
-        error2 = error; value2 = value;
-    });
+<script>
+fetch (new Request("./hello.txt"))
+   .then (response => response.text())
+   .then (text => succeeded (text));
+</script>
 
-    webview.evaluateJavascript ("", [&] (const std::string& error, const choc::value::ValueView& value)
-    {
-        error3 = error; value3 = value;
-    });
+</html>
+)";
+                result.mimeType = "text/html";
+            }
+            else
+            {
+                text = path;
+                result.mimeType = "text/plain";
+            }
 
-    choc::messageloop::run();
-    CHOC_EXPECT_EQ (result, "[1234, 5678]");
-    CHOC_EXPECT_TRUE (error1.empty());
-    CHOC_EXPECT_EQ (choc::json::toString (value1), R"({"x": [1, 2, 3], "y": 987, "z": true})");
-    CHOC_EXPECT_TRUE (! error2.empty());
-    CHOC_EXPECT_TRUE (value2.isVoid());
-    CHOC_EXPECT_TRUE (error3.empty());
-    CHOC_EXPECT_TRUE (value3.isVoid());
+            for (auto c : text)
+                result.data.push_back ((uint8_t) c);
+
+            return result;
+        };
+
+        choc::ui::WebView webview (opts);
+
+        if (! webview.loadedOK())
+        {
+            std::cout << "WebView was unavailable" << std::endl;
+            return;
+        }
+
+        std::string result;
+
+        webview.bind ("succeeded", [&] (const choc::value::ValueView& args)
+        {
+            result = choc::json::toString (args);
+            choc::messageloop::stop();
+            return choc::value::Value();
+        });
+
+        choc::messageloop::run();
+        CHOC_EXPECT_TRUE (choc::text::contains (result, "hello.txt"));
+    }
 }
 
 //==============================================================================

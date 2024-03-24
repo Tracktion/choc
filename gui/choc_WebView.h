@@ -82,25 +82,37 @@ public:
         // this empty for default behaviour.
         std::string customUserAgent;
 
-        /// Serve resources to the browser from a C++ callback function.
-        /// This can effectively be used to implement a basic web server,
-        /// serving resources to the browser in any way the client code chooses.
-        /// Given the path URL component (i.e. starting from "/"), the client should
-        /// return some bytes, and the associated MIME type, for that resource.
-        /// When provided, this function will initially be called with the root path
-        /// ("/") in order to serve the initial content for the page.
-        /// (i.e. the client should return some HTML with a "text/html" MIME type).
-        /// Subsequent relative requests made from the page (i.e. via `img` tags,
-        /// `fetch` calls from javascript etc) will result in subsequent calls here.
+        /// If you provide a fetchResource function, it is expected to return this
+        /// object, which is simply the raw content of the resource, and its MIME type.
         struct Resource
         {
             std::vector<uint8_t> data;
             std::string mimeType;
         };
 
-        using Path = std::string;
-        using FetchResource = std::function<std::optional<Resource>(const Path&)>;
+        using FetchResource = std::function<std::optional<Resource>(const std::string& path)>;
+
+        /// Serve resources to the browser from a C++ callback function.
+        /// This can effectively be used to implement a basic web server,
+        /// serving resources to the browser in any way the client code chooses.
+        /// Given the path URL component (i.e. starting from "/"), the client should
+        /// return some bytes, and the associated MIME type, for that resource.
+        /// When provided, this function will initially be called with the root path
+        /// ("/") in order to serve the initial content for the page (or if the
+        /// customSchemeURI property is also set, it will navigate to that URI).
+        /// When this happens, the client should return some HTML with a "text/html"
+        /// MIME type.
+        /// Subsequent relative requests made from the page (e.g. via `img` tags,
+        /// `fetch` calls from javascript etc) will all invoke calls to this callback
+        /// with the requested path as their argument.
         FetchResource fetchResource;
+
+        /// If fetchResource is being used to serve custom data, you can choose to
+        /// override the default URI scheme by providing a home URI here, e.g. if
+        /// you wanted a scheme called `foo:`, you might set this to `foo://myname.com`
+        /// and the view will navigate to that address when launched.
+        /// Leave blank for a default.
+        std::string customSchemeURI;
     };
 
     /// Creates a WebView with default options
@@ -156,6 +168,8 @@ private:
 
     std::unordered_map<std::string, CallbackFn> bindings;
     void invokeBinding (const std::string&);
+    static std::string getURIScheme (const Options&);
+    static std::string getURIHome (const Options&);
 };
 
 } // namespace choc::ui
@@ -219,7 +233,7 @@ struct choc::ui::WebView::Pimpl
 
         if (options.fetchResource)
         {
-            const auto onResourceRequested = [](auto* request, auto* context)
+            const auto onResourceRequested = [] (auto* request, auto* context)
             {
                 try
                 {
@@ -267,9 +281,8 @@ struct choc::ui::WebView::Pimpl
                 }
             };
 
-            webkit_web_context_register_uri_scheme (webviewContext, "choc", onResourceRequested, this, nullptr);
-
-            navigate ("choc://choc.choc/");
+            webkit_web_context_register_uri_scheme (webviewContext, getURIScheme (options).c_str(), onResourceRequested, this, nullptr);
+            navigate (getURIHome (options));
         }
 
         gtk_widget_show_all (webview);
@@ -451,7 +464,7 @@ struct choc::ui::WebView::Pimpl
         call<void> (manager, "addScriptMessageHandler:name:", delegate, getNSString ("external"));
 
         if (options->fetchResource)
-            call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString ("choc"));
+            call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString (getURIScheme (*options)));
 
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", CGRect(), config);
         objc_setAssociatedObject (webview, "choc_webview", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
@@ -465,7 +478,7 @@ struct choc::ui::WebView::Pimpl
         call<void> (config, "release");
 
         if (options->fetchResource)
-            navigate ("choc://choc.choc/");
+            navigate (getURIHome (*options));
 
         CHOC_AUTORELEASE_END
     }
@@ -1245,6 +1258,9 @@ struct WebView::Pimpl
         if (hwnd.hwnd == nullptr)
             return;
 
+        resourceRequestURIPrefix = getURIHome (options);
+        setHTMLURI = resourceRequestURIPrefix + "getHTMLInternal";
+
         SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
 
         if (createEmbeddedWebView())
@@ -1311,15 +1327,14 @@ struct WebView::Pimpl
         std::copy (html.begin(), html.end(), std::back_inserter (pageHTML.data));
         pageHTML.mimeType = "text/html";
 
-        navigate (setHTMLUri);
+        navigate (setHTMLURI);
         return true;
     }
 
 private:
     WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
     HWNDHolder hwnd;
-    const std::string resourceRequestFilterUriPrefix = "https://choc.localhost/";
-    const std::string setHTMLUri                     = "https://choc.localhost/setHTML";
+    std::string resourceRequestURIPrefix, setHTMLURI;
     WebView::Options::Resource pageHTML;
 
     //==============================================================================
@@ -1411,14 +1426,14 @@ private:
                     if (coreWebView == nullptr)
                         return false;
 
-                    const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestFilterUriPrefix.c_str()) + L"*";
+                    const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestURIPrefix + "*");
                     coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
 
                     EventRegistrationToken token;
                     coreWebView->add_WebResourceRequested (handler, std::addressof (token));
 
                     if (options.fetchResource)
-                        navigate (resourceRequestFilterUriPrefix);
+                        navigate (resourceRequestURIPrefix);
 
                     ICoreWebView2Settings* settings = nullptr;
 
@@ -1476,10 +1491,10 @@ private:
 
     std::optional<WebView::Options::Resource> fetchResourceOrPageHTML (const std::string& uri)
     {
-        if (uri == setHTMLUri)
+        if (uri == setHTMLURI)
             return pageHTML;
 
-        return options.fetchResource (uri.substr (resourceRequestFilterUriPrefix.size() - 1));
+        return options.fetchResource (uri.substr (resourceRequestURIPrefix.size() - 1));
     }
 
     HRESULT onResourceRequested (ICoreWebView2WebResourceRequestedEventArgs* args)
@@ -1855,6 +1870,31 @@ inline void WebView::invokeBinding (const std::string& msg)
     }
     catch (const std::exception&)
     {}
+}
+
+inline std::string WebView::getURIHome (const Options& options)
+{
+    if (! options.customSchemeURI.empty())
+    {
+        if (choc::text::endsWith (options.customSchemeURI, "/"))
+            return options.customSchemeURI;
+
+        return options.customSchemeURI + "/";
+    }
+
+   #if CHOC_WINDOWS
+    return "https://choc.localhost/";
+   #else
+    return "choc://choc.choc/";
+   #endif
+}
+
+inline std::string WebView::getURIScheme (const Options& options)
+{
+    auto uri = getURIHome (options);
+    auto colon = uri.find (":");
+    CHOC_ASSERT (colon != std::string::npos && colon != 0); // need to provide a valid URI with a scheme at the start.
+    return uri.substr (0, colon);
 }
 
 } // namespace choc::ui
