@@ -48,7 +48,6 @@ struct ObjectPointer  final
 
     /// Creates a null ObjectPointer.
     ObjectPointer() = default;
-    ~ObjectPointer() = default;
 
     /// Creates a null ObjectPointer.
     ObjectPointer (decltype (nullptr)) noexcept {}

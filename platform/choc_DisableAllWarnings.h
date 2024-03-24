@@ -65,7 +65,7 @@
  #pragma GCC diagnostic ignored "-Wnarrowing"
  #pragma GCC diagnostic ignored "-Wparentheses"
  #pragma GCC diagnostic ignored "-Wwrite-strings"
-
+ #pragma GCC diagnostic ignored "-Wformat-overflow"
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif

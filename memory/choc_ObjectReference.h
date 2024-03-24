@@ -41,7 +41,6 @@ struct ObjectReference  final
 
     /// An ObjectReference can only be created for a valid, non-null object reference.
     ObjectReference() = delete;
-    ~ObjectReference() = default;
 
     /// An ObjectReference can never point to a nullptr!
     ObjectReference (decltype (nullptr)) = delete;

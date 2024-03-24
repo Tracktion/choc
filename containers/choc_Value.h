@@ -433,6 +433,12 @@ public:
 */
 struct SimpleStringDictionary  : public StringDictionary
 {
+    SimpleStringDictionary() = default;
+    SimpleStringDictionary (const SimpleStringDictionary& other) : strings (other.strings) {}
+    SimpleStringDictionary (SimpleStringDictionary&& other)      : strings (std::move (other.strings)) {}
+    SimpleStringDictionary& operator= (const SimpleStringDictionary& other) { strings = other.strings; return *this; }
+    SimpleStringDictionary& operator= (SimpleStringDictionary&& other)      { strings = std::move (other.strings); return *this; }
+
     Handle getHandleForString (std::string_view) override;
     std::string_view getStringForHandle (Handle handle) const override;
 

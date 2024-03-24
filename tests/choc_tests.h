@@ -2277,8 +2277,32 @@ inline void testWebview (TestProgress& progress)
         return false;
     });
 
+    std::string error1, error2, error3;
+    choc::value::Value value1, value2, value3;
+
+    webview.evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
+    {
+        error1 = error; value1 = value;
+    });
+
+    webview.evaluateJavascript ("return 1234;", [&] (const std::string& error, const choc::value::ValueView& value)
+    {
+        error2 = error; value2 = value;
+    });
+
+    webview.evaluateJavascript ("", [&] (const std::string& error, const choc::value::ValueView& value)
+    {
+        error3 = error; value3 = value;
+    });
+
     choc::messageloop::run();
     CHOC_EXPECT_EQ (result, "[1234, 5678]");
+    CHOC_EXPECT_TRUE (error1.empty());
+    CHOC_EXPECT_EQ (choc::json::toString (value1), R"({"x": [1, 2, 3], "y": 987, "z": true})");
+    CHOC_EXPECT_TRUE (! error2.empty());
+    CHOC_EXPECT_TRUE (value2.isVoid());
+    CHOC_EXPECT_TRUE (error3.empty());
+    CHOC_EXPECT_TRUE (value3.isVoid());
 }
 
 //==============================================================================
@@ -2583,8 +2607,16 @@ inline void testTimers (TestProgress& progress)
             return false;
         });
 
+        bool messageThread1 = false, messageThread2 = false;
+        choc::messageloop::postMessage ([&] { messageThread1 = choc::messageloop::callerIsOnMessageThread(); });
+        auto t = std::thread ([&] { messageThread2 = ! choc::messageloop::callerIsOnMessageThread(); });
+
         choc::messageloop::run();
+
+        t.join();
         CHOC_EXPECT_EQ (messageCount, 13);
+        CHOC_EXPECT_TRUE (messageThread1);
+        CHOC_EXPECT_TRUE (messageThread2);
     }
 }
 
