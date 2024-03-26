@@ -102,7 +102,7 @@ inline void registerConsoleFunctions (choc::javascript::Context& context,
         return {};
     });
 
-    context.evaluate (R"(
+    context.run (R"(
 console = {
     log:   function()     { for (let a of arguments) _choc_console_log (a, 0); },
     info:  function()     { for (let a of arguments) _choc_console_log (a, 1); },

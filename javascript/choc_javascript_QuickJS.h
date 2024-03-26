@@ -64081,27 +64081,47 @@ struct QuickJSContext  : public Context::Pimpl
     void pushArg (double v) override                                  { functionArgs.push_back (JS_NewFloat64 (context, v)); }
     void pushArg (bool v) override                                    { functionArgs.push_back (JS_NewBool    (context, v)); }
 
-    choc::value::Value evaluate (const std::string& code, Context::ReadModuleContentFn* resolveModule) override
+    choc::value::Value evaluateExpression (const std::string& code) override
     {
-        if (resolveModule != nullptr)
-        {
-            JS_SetModuleLoaderFunc (runtime, nullptr, moduleLoaderFunc, resolveModule);
-            auto result = takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_MODULE)).toChocValue();
-            JS_SetModuleLoaderFunc (runtime, nullptr, nullptr, nullptr);
-            return result;
-        }
-
         return takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_GLOBAL)).toChocValue();
     }
 
-    static JSModuleDef* moduleLoaderFunc (JSContext* ctx, const char* module_name, void* resolveModule)
+    void run (const std::string& code, Context::ReadModuleContentFn* resolveModule, Context::CompletionHandler handleResult) override
     {
-        auto content = (*static_cast<Context::ReadModuleContentFn*> (resolveModule)) (std::string_view (module_name));
+        try
+        {
+            if (resolveModule != nullptr)
+            {
+                JS_SetModuleLoaderFunc (runtime, nullptr, moduleLoaderFunc, resolveModule);
+                auto result = takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_MODULE));
+                JS_SetModuleLoaderFunc (runtime, nullptr, nullptr, nullptr);
+
+                if (handleResult)
+                    handleResult ({}, result.toChocValue());
+            }
+            else
+            {
+                auto result = takeValue (JS_Eval (context, code.c_str(), code.size(), "", JS_EVAL_TYPE_GLOBAL));
+
+                if (handleResult)
+                    handleResult ({}, result.toChocValue());
+            }
+        }
+        catch (const std::exception& e)
+        {
+            if (handleResult)
+                handleResult (e.what(), {});
+        }
+    }
+
+    static JSModuleDef* moduleLoaderFunc (JSContext* ctx, const char* moduleName, void* resolveModule)
+    {
+        auto content = (*static_cast<Context::ReadModuleContentFn*> (resolveModule)) (std::string_view (moduleName));
 
         if (! content)
-            throw Error ("Cannot find module '" + std::string (module_name) + "'");
+            throw Error ("Cannot find module '" + std::string (moduleName) + "'");
 
-        auto result = ValuePtr (JS_Eval (ctx, content->data(), content->length(), module_name,
+        auto result = ValuePtr (JS_Eval (ctx, content->data(), content->length(), moduleName,
                                          JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY), ctx);
         result.throwIfError();
         return static_cast<JSModuleDef*> (JS_VALUE_GET_PTR (result.get()));

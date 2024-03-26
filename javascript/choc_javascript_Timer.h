@@ -152,7 +152,7 @@ inline void registerTimerFunctions (Context& context)
         return {};
     });
 
-    context.evaluate (R"(
+    context.run (R"(
 var _choc_activeTimers = {};
 
 function _choc_invokeTimeout (timerID)
