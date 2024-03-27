@@ -170,6 +170,7 @@ private:
     void invokeBinding (const std::string&);
     static std::string getURIScheme (const Options&);
     static std::string getURIHome (const Options&);
+    struct DeletionChecker { bool deleted = false; };
 };
 
 } // namespace choc::ui
@@ -201,6 +202,7 @@ struct choc::ui::WebView::Pimpl
         if (! gtk_init_check (nullptr, nullptr))
             return;
 
+        defaultURI = getURIHome (options);
         webviewContext = webkit_web_context_new();
         g_object_ref_sink (G_OBJECT (webviewContext));
         webview = webkit_web_view_new_with_context (webviewContext);
@@ -282,7 +284,7 @@ struct choc::ui::WebView::Pimpl
             };
 
             webkit_web_context_register_uri_scheme (webviewContext, getURIScheme (options).c_str(), onResourceRequested, this, nullptr);
-            navigate (getURIHome (options));
+            navigate ({});
         }
 
         gtk_widget_show_all (webview);
@@ -290,6 +292,8 @@ struct choc::ui::WebView::Pimpl
 
     ~Pimpl()
     {
+        deletionChecker->deleted = true;
+
         if (signalHandlerID != 0 && webview != nullptr)
             g_signal_handler_disconnect (manager, signalHandlerID);
 
@@ -301,6 +305,8 @@ struct choc::ui::WebView::Pimpl
 
     bool loadedOK() const           { return getViewHandle() != nullptr; }
     void* getViewHandle() const     { return (void*) webview; }
+
+    std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
 
     bool evaluateJavascript (const std::string& js, CompletionHandler&& completionHandler)
     {
@@ -394,6 +400,9 @@ struct choc::ui::WebView::Pimpl
 
     bool navigate (const std::string& url)
     {
+        if (url.empty())
+            return navigate (defaultURI);
+
         webkit_web_view_load_uri (WEBKIT_WEB_VIEW (webview), url.c_str());
         return true;
     }
@@ -430,6 +439,7 @@ struct choc::ui::WebView::Pimpl
     WebKitWebContext* webviewContext = {};
     GtkWidget* webview = {};
     WebKitUserContentManager* manager = {};
+    std::string defaultURI;
     unsigned long signalHandlerID = 0;
 };
 
@@ -445,6 +455,8 @@ struct choc::ui::WebView::Pimpl
     {
         using namespace choc::objc;
         CHOC_AUTORELEASE_BEGIN
+
+        defaultURI = getURIHome (*options);
 
         id config = call<id> (getClass ("WKWebViewConfiguration"), "new");
 
@@ -478,7 +490,7 @@ struct choc::ui::WebView::Pimpl
         call<void> (config, "release");
 
         if (options->fetchResource)
-            navigate (getURIHome (*options));
+            navigate ({});
 
         CHOC_AUTORELEASE_END
     }
@@ -486,12 +498,16 @@ struct choc::ui::WebView::Pimpl
     ~Pimpl()
     {
         CHOC_AUTORELEASE_BEGIN
+        deletionChecker->deleted = true;
         objc_setAssociatedObject (delegate, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc_setAssociatedObject (webview, "choc_webview", nil, OBJC_ASSOCIATION_ASSIGN);
         objc::call<void> (webview, "release");
+        webview = {};
         objc::call<void> (manager, "removeScriptMessageHandlerForName:", objc::getNSString ("external"));
         objc::call<void> (manager, "release");
+        manager = {};
         objc::call<void> (delegate, "release");
+        delegate = {};
         CHOC_AUTORELEASE_END
     }
 
@@ -499,6 +515,8 @@ struct choc::ui::WebView::Pimpl
 
     bool loadedOK() const           { return getViewHandle() != nullptr; }
     void* getViewHandle() const     { return (CHOC_OBJC_CAST_BRIDGED void*) webview; }
+
+    std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
 
     bool addInitScript (const std::string& script)
     {
@@ -519,6 +537,9 @@ struct choc::ui::WebView::Pimpl
 
     bool navigate (const std::string& url)
     {
+        if (url.empty())
+            return navigate (defaultURI);
+
         using namespace choc::objc;
         CHOC_AUTORELEASE_BEGIN
 
@@ -606,7 +627,14 @@ private:
     static std::string getMessageFromNSError (id nsError)
     {
         if (nsError)
+        {
+            if (id userInfo = objc::call<id> (nsError, "userInfo"))
+                if (id message = objc::call<id> (userInfo, "objectForKey:", objc::getNSString ("WKJavaScriptExceptionMessage")))
+                    if (auto s = objc::getString (message); ! s.empty())
+                        return s;
+
             return objc::getString (objc::call<id> (nsError, "localizedDescription"));
+        }
 
         return {};
     }
@@ -731,6 +759,7 @@ private:
     // to 16, which then conflicts with obj-C pointer alignment...
     std::unique_ptr<Options> options;
     id webview = {}, manager = {}, delegate = {};
+    std::string defaultURI;
 
     struct WebviewClass
     {
@@ -1258,8 +1287,8 @@ struct WebView::Pimpl
         if (hwnd.hwnd == nullptr)
             return;
 
-        resourceRequestURIPrefix = getURIHome (options);
-        setHTMLURI = resourceRequestURIPrefix + "getHTMLInternal";
+        defaultURI = getURIHome (options);
+        setHTMLURI = defaultURI + "getHTMLInternal";
 
         SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
 
@@ -1272,6 +1301,8 @@ struct WebView::Pimpl
 
     ~Pimpl()
     {
+        deletionChecker->deleted = true;
+
         if (coreWebView != nullptr)
         {
             coreWebView->Release();
@@ -1296,8 +1327,13 @@ struct WebView::Pimpl
     bool loadedOK() const           { return coreWebView != nullptr; }
     void* getViewHandle() const     { return (void*) hwnd.hwnd; }
 
+    std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
+
     bool navigate (const std::string& url)
     {
+        if (url.empty())
+            return navigate (defaultURI);
+
         CHOC_ASSERT (coreWebView != nullptr);
         return coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str()) == S_OK;
     }
@@ -1334,7 +1370,7 @@ struct WebView::Pimpl
 private:
     WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
     HWNDHolder hwnd;
-    std::string resourceRequestURIPrefix, setHTMLURI;
+    std::string defaultURI, setHTMLURI;
     WebView::Options::Resource pageHTML;
 
     //==============================================================================
@@ -1426,14 +1462,14 @@ private:
                     if (coreWebView == nullptr)
                         return false;
 
-                    const auto wildcardFilter = createUTF16StringFromUTF8 (resourceRequestURIPrefix + "*");
+                    const auto wildcardFilter = createUTF16StringFromUTF8 (defaultURI + "*");
                     coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
 
                     EventRegistrationToken token;
                     coreWebView->add_WebResourceRequested (handler, std::addressof (token));
 
                     if (options.fetchResource)
-                        navigate (resourceRequestURIPrefix);
+                        navigate ({});
 
                     ICoreWebView2Settings* settings = nullptr;
 
@@ -1494,7 +1530,7 @@ private:
         if (uri == setHTMLURI)
             return pageHTML;
 
-        return options.fetchResource (uri.substr (resourceRequestURIPrefix.size() - 1));
+        return options.fetchResource (uri.substr (defaultURI.size() - 1));
     }
 
     HRESULT onResourceRequested (ICoreWebView2WebResourceRequestedEventArgs* args)
@@ -1782,7 +1818,7 @@ inline WebView::~WebView()
 }
 
 inline bool WebView::loadedOK() const                                { return pimpl != nullptr; }
-inline bool WebView::navigate (const std::string& url)               { return pimpl != nullptr && pimpl->navigate (url.empty() ? "about:blank" : url); }
+inline bool WebView::navigate (const std::string& url)               { return pimpl != nullptr && pimpl->navigate (url); }
 inline bool WebView::setHTML (const std::string& html)               { return pimpl != nullptr && pimpl->setHTML (html); }
 inline bool WebView::addInitScript (const std::string& script)       { return pimpl != nullptr && pimpl->addInitScript (script); }
 
@@ -1856,7 +1892,11 @@ inline void WebView::invokeBinding (const std::string& msg)
 
         try
         {
+            auto deletionChecker = pimpl->deletionChecker;
             auto result = b->second (json["params"]);
+
+            if (deletionChecker->deleted) // in case the WebView was deleted during the callback
+                return;
 
             auto call = callbackItem + ".resolve(" + choc::json::toString (result) + "); delete " + callbackItem + ";";
             evaluateJavascript (call);
