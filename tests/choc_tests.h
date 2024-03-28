@@ -45,6 +45,7 @@
 #include "../text/choc_TextTable.h"
 #include "../text/choc_Files.h"
 #include "../text/choc_Wildcard.h"
+#include "../text/choc_MIMETypes.h"
 #include "../memory/choc_Base64.h"
 #include "../memory/choc_xxHash.h"
 #include "../math/choc_MathHelpers.h"
@@ -622,6 +623,15 @@ inline void testStringUtilities (TestProgress& progress)
             h64.addInput (t.input.data(), t.input.length());
             CHOC_EXPECT_EQ (t.hash64, h64.getHash());
         }
+    }
+
+    {
+        CHOC_TEST (MIMETypes)
+        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename ("dfsdfsg/sdfgds.txt"), "text/plain");
+        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".ogg"), "audio/ogg");
+        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".."), "application/text");
+        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename ({}, "blah"), "blah");
+        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".ogg?foo...x"), "audio/ogg");
     }
 }
 
@@ -2385,36 +2395,21 @@ inline void testWebview (TestProgress& progress)
         choc::ui::WebView::Options opts;
         opts.enableDebugMode = true;
 
-        opts.fetchResource = [&] (const std::string& path)
+        opts.fetchResource = [&] (const std::string& path) -> choc::ui::WebView::Options::Resource
         {
-            choc::ui::WebView::Options::Resource result;
-            std::string text;
-
             if (path == "/")
             {
-                text = R"(
-<!DOCTYPE html> <html>
-
+                return { R"(<!DOCTYPE html> <html>
 <script>
 fetch (new Request("./hello.txt"))
    .then (response => response.text())
    .then (text => succeeded (text));
 </script>
-
-</html>
-)";
-                result.mimeType = "text/html";
-            }
-            else
-            {
-                text = path;
-                result.mimeType = "text/plain";
+</html>)",
+                         "text/html" };
             }
 
-            for (auto c : text)
-                result.data.push_back ((uint8_t) c);
-
-            return result;
+            return { path, "text/plain" };
         };
 
         choc::ui::WebView webview (opts);
