@@ -86,6 +86,9 @@ public:
         /// object, which is simply the raw content of the resource, and its MIME type.
         struct Resource
         {
+            Resource() = default;
+            Resource (std::string_view content, std::string mimeType);
+
             std::vector<uint8_t> data;
             std::string mimeType;
         };
@@ -1358,11 +1361,7 @@ struct WebView::Pimpl
     bool setHTML (const std::string& html)
     {
         CHOC_ASSERT (coreWebView != nullptr);
-
-        pageHTML.data.clear();
-        std::copy (html.begin(), html.end(), std::back_inserter (pageHTML.data));
-        pageHTML.mimeType = "text/html";
-
+        pageHTML = { html, "text/html" };
         navigate (setHTMLURI);
         return true;
     }
@@ -1935,6 +1934,17 @@ inline std::string WebView::getURIScheme (const Options& options)
     auto colon = uri.find (":");
     CHOC_ASSERT (colon != std::string::npos && colon != 0); // need to provide a valid URI with a scheme at the start.
     return uri.substr (0, colon);
+}
+
+inline WebView::Options::Resource::Resource (std::string_view content, std::string mime)
+{
+    if (! content.empty())
+    {
+        auto src = content.data();
+        data.insert (data.end(), src, src + content.length());
+    }
+
+    mimeType = std::move (mime);
 }
 
 } // namespace choc::ui
