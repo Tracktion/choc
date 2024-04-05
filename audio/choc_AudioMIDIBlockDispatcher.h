@@ -205,9 +205,9 @@ inline void AudioMIDIBlockDispatcher::setMidiOutputCallback (AudioMIDIBlockDispa
         return;
     }
 
-    midiOutputMessageCallback = [this, callback = std::move (callback)] (uint32_t frame, choc::midi::ShortMessage m)
+    midiOutputMessageCallback = [this, cb = std::move (callback)] (uint32_t frame, choc::midi::ShortMessage m)
                                 {
-                                    callback (frame + chunkFrameOffset, m);
+                                    cb (frame + chunkFrameOffset, m);
                                 };
 }
 

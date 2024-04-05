@@ -148,7 +148,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                 {
                     namespace sd = choc::audio::sampledata;
                     auto framesToDo = std::min (rawDataFrames, numFrames);
-                    stream->read (rawData, framesToDo * frameStride);
+                    stream->read (rawData, static_cast<std::streamsize> (framesToDo * frameStride));
                     auto dest = buffer.getStart (framesToDo);
 
                     switch (properties.bitDepth)
@@ -536,7 +536,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
         {
             std::string s;
             s.resize (size);
-            stream->read (s.data(), size);
+            stream->read (s.data(), static_cast<std::streamsize> (size));
             auto nullChar = s.find ('\0');
             return nullChar != std::string::npos ? s.substr (0, nullChar) : s;
         }
@@ -643,7 +643,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                         default:                return false;
                     }
 
-                    stream->write (rawTempBuffer, sampleStride * numChannels * framesThisTime);
+                    stream->write (rawTempBuffer, static_cast<std::streamsize> (sampleStride * numChannels * framesThisTime));
                     framesToDo -= framesThisTime;
                     source = source.fromFrame (framesThisTime);
                 }
