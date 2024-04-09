@@ -94,9 +94,9 @@ struct ObjectPointer  final
     bool operator!= (ObjectPointer other) const noexcept                                            { return pointer != other.pointer; }
     bool operator<  (ObjectPointer other) const noexcept                                            { return pointer <  other.pointer; }
 
-    template <typename OtherObjectType> bool operator== (OtherObjectType& other) const noexcept     { return pointer == std::addressof (other); }
-    template <typename OtherObjectType> bool operator!= (OtherObjectType& other) const noexcept     { return pointer != std::addressof (other); }
-    template <typename OtherObjectType> bool operator<  (OtherObjectType& other) const noexcept     { return pointer <  std::addressof (other); }
+    template <typename OtherObjectType> bool operator== (OtherObjectType& other) const noexcept     { return pointer == std::addressof (static_cast<const ObjectType&> (other)); }
+    template <typename OtherObjectType> bool operator!= (OtherObjectType& other) const noexcept     { return pointer != std::addressof (static_cast<const ObjectType&> (other)); }
+    template <typename OtherObjectType> bool operator<  (OtherObjectType& other) const noexcept     { return pointer <  std::addressof (static_cast<const ObjectType&> (other)); }
 
 private:
     ObjectType* pointer = {};
