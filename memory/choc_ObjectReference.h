@@ -62,12 +62,16 @@ struct ObjectReference  final
     ObjectType* getPointer() const noexcept                       { return target; }
     ObjectType& getReference() const noexcept                     { return *target; }
 
-    template <typename OtherObjectType> bool operator== (OtherObjectType& other) const noexcept     { return target == std::addressof (static_cast<ObjectType&> (other)); }
-    template <typename OtherObjectType> bool operator!= (OtherObjectType& other) const noexcept     { return target != std::addressof (static_cast<ObjectType&> (other)); }
-    template <typename OtherObjectType> bool operator<  (OtherObjectType& other) const noexcept     { return target <  std::addressof (static_cast<ObjectType&> (other)); }
+    template <typename OtherObjectType> bool operator== (const OtherObjectType& other) const noexcept  { return target == getPointer (other); }
+    template <typename OtherObjectType> bool operator!= (const OtherObjectType& other) const noexcept  { return target != getPointer (other); }
+    template <typename OtherObjectType> bool operator<  (const OtherObjectType& other) const noexcept  { return target <  getPointer (other); }
 
 private:
     ObjectType* target;
+
+    template <typename OtherType> static auto getPointer (ObjectReference<OtherType> o) noexcept  { return o.target; }
+    template <typename OtherType> static auto getPointer (const OtherType* o) noexcept            { return o; }
+    template <typename OtherType> static auto getPointer (const OtherType& o) noexcept            { return std::addressof (o); }
 };
 
 } // namespace choc

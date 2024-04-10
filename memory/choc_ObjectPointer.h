@@ -88,15 +88,12 @@ struct ObjectPointer  final
     /// Sets the pointer to a new value.
     void reset (ObjectType* newPointer) noexcept                { pointer = newPointer; }
 
-    bool operator== (decltype (nullptr)) const noexcept                                             { return pointer == nullptr; }
-    bool operator!= (decltype (nullptr)) const noexcept                                             { return pointer != nullptr; }
-    bool operator== (ObjectPointer other) const noexcept                                            { return pointer == other.pointer; }
-    bool operator!= (ObjectPointer other) const noexcept                                            { return pointer != other.pointer; }
-    bool operator<  (ObjectPointer other) const noexcept                                            { return pointer <  other.pointer; }
+    bool operator== (decltype (nullptr)) const noexcept         { return pointer == nullptr; }
+    bool operator!= (decltype (nullptr)) const noexcept         { return pointer != nullptr; }
 
-    template <typename OtherObjectType> bool operator== (OtherObjectType& other) const noexcept     { return pointer == std::addressof (static_cast<const ObjectType&> (other)); }
-    template <typename OtherObjectType> bool operator!= (OtherObjectType& other) const noexcept     { return pointer != std::addressof (static_cast<const ObjectType&> (other)); }
-    template <typename OtherObjectType> bool operator<  (OtherObjectType& other) const noexcept     { return pointer <  std::addressof (static_cast<const ObjectType&> (other)); }
+    template <typename OtherObjectType> bool operator== (const OtherObjectType& other) const noexcept  { return pointer == getPointer (other); }
+    template <typename OtherObjectType> bool operator!= (const OtherObjectType& other) const noexcept  { return pointer != getPointer (other); }
+    template <typename OtherObjectType> bool operator<  (const OtherObjectType& other) const noexcept  { return pointer <  getPointer (other); }
 
 private:
     ObjectType* pointer = {};
@@ -108,6 +105,10 @@ private:
     operator int()    const = delete;
     operator long()   const = delete;
     operator size_t() const = delete;
+
+    template <typename OtherType> static auto getPointer (ObjectPointer<OtherType> o) noexcept  { return o.pointer; }
+    template <typename OtherType> static auto getPointer (const OtherType* o) noexcept          { return o; }
+    template <typename OtherType> static auto getPointer (const OtherType& o) noexcept          { return std::addressof (o); }
 };
 
 } // namespace choc
