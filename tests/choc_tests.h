@@ -2573,7 +2573,7 @@ inline void testAudioFileRoundTrip (TestProgress& progress, choc::audio::BitDept
 
     try
     {
-        auto out = std::make_shared<std::ostringstream>();
+        auto out = std::make_shared<std::ostringstream> (std::ios::binary);
         CHOC_EXPECT_FALSE (out->fail());
 
         choc::audio::AudioFileProperties props;
