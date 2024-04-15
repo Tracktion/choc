@@ -248,7 +248,7 @@ inline void choc::ui::setWindowsDPIAwareness() {}
 namespace choc::ui
 {
 
-namespace
+namespace macos_ui_helpers
 {
     // Including CodeGraphics.h can create all kinds of messy C/C++ symbol clashes
     // with other headers, but all we actually need are these coordinate structs:
@@ -261,10 +261,19 @@ namespace
     struct CGPoint { CGFloat x = 0, y = 0; };
     struct CGSize  { CGFloat width = 0, height = 0; };
     struct CGRect  { CGPoint origin; CGSize size; };
+
+    inline CGSize createCGSize (double w, double h)  { return { (CGFloat) w, (CGFloat) h }; }
+    inline CGRect createCGRect (choc::ui::Bounds b)  { return { { (CGFloat) b.x, (CGFloat) b.y }, { (CGFloat) b.width, (CGFloat) b.height } }; }
+
+    static constexpr long NSWindowStyleMaskTitled = 1;
+    static constexpr long NSWindowStyleMaskMiniaturizable = 4;
+    static constexpr long NSWindowStyleMaskResizable = 8;
+    static constexpr long NSWindowStyleMaskClosable = 2;
+    static constexpr long NSBackingStoreBuffered = 2;
+    static constexpr long NSApplicationActivationPolicyRegular = 0;
 }
 
-static inline CGSize createCGSize (double w, double h)  { return { (CGFloat) w, (CGFloat) h }; }
-static inline CGRect createCGRect (choc::ui::Bounds b)  { return { { (CGFloat) b.x, (CGFloat) b.y }, { (CGFloat) b.width, (CGFloat) b.height } }; }
+using namespace macos_ui_helpers;
 
 inline void setWindowsDPIAwareness() {}
 
@@ -429,13 +438,6 @@ struct DesktopWindow::Pimpl
 
         Class delegateClass = {};
     };
-
-    static constexpr long NSWindowStyleMaskTitled = 1;
-    static constexpr long NSWindowStyleMaskMiniaturizable = 4;
-    static constexpr long NSWindowStyleMaskResizable = 8;
-    static constexpr long NSWindowStyleMaskClosable = 2;
-    static constexpr long NSBackingStoreBuffered = 2;
-    static constexpr long NSApplicationActivationPolicyRegular = 0;
 };
 
 } // namespace choc::ui
