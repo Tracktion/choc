@@ -55,6 +55,12 @@ std::string loadFileAsString (const std::string& filename);
 void replaceFileWithContent (const std::filesystem::path& file,
                              std::string_view newContent);
 
+/// Sanitises a string to remove illegal chatacters and leave it suitable for use
+/// as a filename. This is intended only for checking a filename, not a whole path,
+/// so it will remove any slashes in the string.
+std::string makeSafeFilename (std::string_view source, size_t maxLength = 80);
+
+
 //==============================================================================
 /// A self-deleting temp file or folder.
 struct TempFile
@@ -122,7 +128,12 @@ size_t readFileContent (const std::string& filename, GetDestBufferFn&& getBuffer
         stream.open (filename, std::ios::binary | std::ios::ate);
 
         if (! stream.is_open())
+        {
+            if (! exists (std::filesystem::path (filename)))
+                throw Error ("File does not exist: " + filename);
+
             throw Error ("Failed to open file: " + filename);
+        }
 
         auto fileSize = stream.tellg();
 
@@ -179,7 +190,6 @@ inline void replaceFileWithContent (const std::filesystem::path& path, std::stri
         stream.exceptions (std::ofstream::failbit | std::ofstream::badbit);
         stream.open (path.string(), std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
         stream.write (newContent.data(), static_cast<std::streamsize> (newContent.size()));
-        return;
     }
     catch (const std::ios_base::failure& e)
     {
@@ -189,6 +199,28 @@ inline void replaceFileWithContent (const std::filesystem::path& path, std::stri
     {
         throw Error ("Failed to write to file: " + path.string());
     }
+}
+
+inline std::string makeSafeFilename (std::string_view source, size_t maxLength)
+{
+    std::string name;
+    name.reserve (source.length());
+
+    for (auto c : source)
+        if (std::string_view (",;#@*^|?:<>\"\\/").find (c) == std::string_view::npos)
+            name += c;
+
+    if (name.length() >= maxLength)
+    {
+        auto stem = std::filesystem::path (name).stem().string();
+        auto extension = std::filesystem::path (name).extension().string();
+        return stem.substr (0, maxLength - std::min (maxLength - 2, extension.length())) + extension;
+    }
+
+    if (name.empty())
+        return "_";
+
+    return name;
 }
 
 //==============================================================================

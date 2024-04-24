@@ -633,6 +633,15 @@ inline void testStringUtilities (TestProgress& progress)
         CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename ({}, "blah"), "blah");
         CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".ogg?foo...x"), "audio/ogg");
     }
+
+    {
+        CHOC_TEST (SafeFilename)
+        CHOC_EXPECT_EQ (choc::file::makeSafeFilename (""), "_");
+        CHOC_EXPECT_EQ (choc::file::makeSafeFilename ("//"), "_");
+        CHOC_EXPECT_EQ (choc::file::makeSafeFilename ("::sadf/sdfds123 sdf.sdfs."), "sadfsdfds123 sdf.sdfs.");
+        CHOC_EXPECT_EQ (choc::file::makeSafeFilename ("::,;sadf/sdfds123 sdfsd.xyz", 10), "sadfsd.xyz");
+        CHOC_EXPECT_EQ (choc::file::makeSafeFilename ("\\sa'df/sdfds123 sdfsd.xyzdfgdfgdfg", 10), "sa.xyzdfgdfgdfg");
+    }
 }
 
 inline void testFileUtilities (TestProgress& progress)
