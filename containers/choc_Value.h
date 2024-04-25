@@ -1658,15 +1658,17 @@ inline int Type::getObjectMemberIndex (std::string_view name) const
 template <typename PrimitiveType>
 inline constexpr Type::MainType Type::selectMainType()
 {
-    if constexpr (std::is_same<const PrimitiveType, const int32_t>::value)       return MainType::int32;
-    if constexpr (std::is_same<const PrimitiveType, const int64_t>::value)       return MainType::int64;
-    if constexpr (std::is_same<const PrimitiveType, const float>::value)         return MainType::float32;
-    if constexpr (std::is_same<const PrimitiveType, const double>::value)        return MainType::float64;
-    if constexpr (std::is_same<const PrimitiveType, const bool>::value)          return MainType::boolean;
-    if constexpr (std::is_same<const PrimitiveType, const char* const>::value)   return MainType::string;
-    if constexpr (std::is_same<const PrimitiveType, const std::string>::value)   return MainType::string;
+    Type::MainType result = MainType::void_;
 
-    return MainType::void_;
+    if constexpr (std::is_same<const PrimitiveType, const int32_t>::value)          result = MainType::int32;
+    else if constexpr (std::is_same<const PrimitiveType, const int64_t>::value)     result = MainType::int64;
+    else if constexpr (std::is_same<const PrimitiveType, const float>::value)       result = MainType::float32;
+    else if constexpr (std::is_same<const PrimitiveType, const double>::value)      result = MainType::float64;
+    else if constexpr (std::is_same<const PrimitiveType, const bool>::value)        result = MainType::boolean;
+    else if constexpr (std::is_same<const PrimitiveType, const char* const>::value) result = MainType::string;
+    else if constexpr (std::is_same<const PrimitiveType, const std::string>::value) result = MainType::string;
+
+    return result;
 }
 
 template <typename PrimitiveType>
