@@ -28,7 +28,7 @@
 #include <stdlib.h>
 
 #include "../platform/choc_Assert.h"
-
+#include "../text/choc_OpenSourceLicenseList.h"
 
 namespace choc::zlib
 {
@@ -119,32 +119,35 @@ struct zlib
 // I even started trying to improve some of the appalling variable names,
 // but honestly, life's too short..
 
-/*
-  Copyright (C) 1995-2005 Jean-loup Gailly and Mark Adler
+CHOC_REGISTER_OPEN_SOURCE_LICENCE (QuickJS, R"(
+==============================================================================
+ZLIB License:
 
-  This software is provided 'as-is', without any express or implied
-  warranty.  In no event will the authors be held liable for any damages
-  arising from the use of this software.
+Copyright (C) 1995-2005 Jean-loup Gailly and Mark Adler
 
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-  1. The origin of this software must not be misrepresented; you must not
-     claim that you wrote the original software. If you use this software
-     in a product, an acknowledgment in the product documentation would be
-     appreciated but is not required.
-  2. Altered source versions must be plainly marked as such, and must not be
-     misrepresented as being the original software.
-  3. This notice may not be removed or altered from any source distribution.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
 
-  Jean-loup Gailly        Mark Adler
-  jloup@gzip.org          madler@alumni.caltech.edu
+1. The origin of this software must not be misrepresented; you must not
+    claim that you wrote the original software. If you use this software
+    in a product, an acknowledgment in the product documentation would be
+    appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 
-  The data format used by the zlib library is described by RFCs (Request for
-  Comments) 1950 to 1952 in the files http://www.ietf.org/rfc/rfc1950.txt
-  (zlib format), rfc1951.txt (deflate format) and rfc1952.txt (gzip format).
-*/
+Jean-loup Gailly        Mark Adler
+jloup@gzip.org          madler@alumni.caltech.edu
+
+The data format used by the zlib library is described by RFCs (Request for
+Comments) 1950 to 1952 in the files http://www.ietf.org/rfc/rfc1950.txt
+(zlib format), rfc1951.txt (deflate format) and rfc1952.txt (gzip format).
+)")
 
 static constexpr auto ZLIB_VERSION = "1.2.3";
 
