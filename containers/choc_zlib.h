@@ -300,11 +300,11 @@ struct DeflateStream
 
         gzhead = nullptr;
         w_bits = (uint32_t) windowBits;
-        w_size = 1 << w_bits;
+        w_size = 1U << w_bits;
         w_mask = w_size - 1;
 
         hash_bits = (uint32_t) memLevel + 7;
-        hash_size = 1 << hash_bits;
+        hash_size = 1U << hash_bits;
         hash_mask = hash_size - 1;
         hash_shift = ((hash_bits + MIN_MATCH - 1) / MIN_MATCH);
 
@@ -312,7 +312,7 @@ struct DeflateStream
         prev.resize (w_size);
         head.resize (hash_size);
 
-        lit_bufsize = 1 << (memLevel + 6); /* 16K elements by default */
+        lit_bufsize = 1U << (memLevel + 6); /* 16K elements by default */
 
         pending_buf.resize (lit_bufsize * (sizeof (uint16_t) + 2));
 
@@ -1423,7 +1423,7 @@ private:
         for (h = heap_max + 1; h < HEAP_SIZE; h++)
         {
             n = heap[h];
-            bits = tree[tree[n].dl.dad].dl.len + 1;
+            bits = tree[tree[n].dl.dad].dl.len + 1U;
             if (bits > max_length)
                 bits = max_length, overflow++;
             tree[n].dl.len = (uint16_t) bits;
