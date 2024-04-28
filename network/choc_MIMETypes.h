@@ -19,10 +19,10 @@
 #ifndef CHOC_MIME_TYPES_HEADER_INCLUDED
 #define CHOC_MIME_TYPES_HEADER_INCLUDED
 
-#include "choc_StringUtilities.h"
+#include "../text/choc_StringUtilities.h"
 
 
-namespace choc::web
+namespace choc::network
 {
     /// Makes a guess at picking a sensible MIME type from a list of common ones,
     /// based on the extension of the filename/path/URL provided. If nothing matches,

@@ -46,7 +46,7 @@
 #include "../text/choc_TextTable.h"
 #include "../text/choc_Files.h"
 #include "../text/choc_Wildcard.h"
-#include "../text/choc_MIMETypes.h"
+#include "../network/choc_MIMETypes.h"
 #include "../memory/choc_Base64.h"
 #include "../memory/choc_xxHash.h"
 #include "../math/choc_MathHelpers.h"
@@ -74,6 +74,10 @@
 #include "../javascript/choc_javascript.h"
 #include "../javascript/choc_javascript_Timer.h"
 #include "../javascript/choc_javascript_Console.h"
+
+#if CHOC_ENABLE_HTTP_SERVER_TEST
+ #include "../network/choc_HTTPServer.h"
+#endif
 
 #include "choc_UnitTest.h"
 
@@ -171,7 +175,7 @@ inline void testPlatform (choc::test::TestProgress& progress)
         for (int64_t i : { (int64_t) 0, (int64_t) 1, (int64_t) -1, (int64_t) 3, (int64_t) -3, (int64_t) 65535, (int64_t) -65535, (int64_t) (1ll << 31), (int64_t) 0x8000000000000000ull })
             CHOC_EXPECT_EQ (i, zigzagDecode (zigzagEncode (i));)
 
-        for (int32_t i : { (int32_t) 0, (int32_t) 1, (int32_t) -1, (int32_t) 3, (int32_t) -3, (int32_t) 65535, (int32_t) -65535, (int32_t) (1 << 31), (int32_t) 0x80000000u })
+        for (int32_t i : { (int32_t) 0, (int32_t) 1, (int32_t) -1, (int32_t) 3, (int32_t) -3, (int32_t) 65535, (int32_t) -65535, (int32_t) (1u << 31), (int32_t) 0x80000000u })
             CHOC_EXPECT_EQ (i, zigzagDecode (zigzagEncode (i));)
 
         {
@@ -628,11 +632,11 @@ inline void testStringUtilities (choc::test::TestProgress& progress)
 
     {
         CHOC_TEST (MIMETypes)
-        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename ("dfsdfsg/sdfgds.txt"), "text/plain");
-        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".ogg"), "audio/ogg");
-        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".."), "application/text");
-        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename ({}, "blah"), "blah");
-        CHOC_EXPECT_EQ (choc::web::getMIMETypeFromFilename (".ogg?foo...x"), "audio/ogg");
+        CHOC_EXPECT_EQ (choc::network::getMIMETypeFromFilename ("dfsdfsg/sdfgds.txt"), "text/plain");
+        CHOC_EXPECT_EQ (choc::network::getMIMETypeFromFilename (".ogg"), "audio/ogg");
+        CHOC_EXPECT_EQ (choc::network::getMIMETypeFromFilename (".."), "application/text");
+        CHOC_EXPECT_EQ (choc::network::getMIMETypeFromFilename ({}, "blah"), "blah");
+        CHOC_EXPECT_EQ (choc::network::getMIMETypeFromFilename (".ogg?foo...x"), "audio/ogg");
     }
 
     {
@@ -3071,6 +3075,184 @@ static void testZipFile (choc::test::TestProgress& progress)
     }
 }
 
+//==============================================================================
+static void testHTTPServer (choc::test::TestProgress& progress)
+{
+    (void) progress;
+
+   #if CHOC_ENABLE_HTTP_SERVER_TEST
+    struct TestClient
+    {
+        TestClient (std::string host, uint16_t port, std::function<void (std::string_view)> onMessage)
+            : onMessageRead (std::move (onMessage))
+        {
+            // Look up the domain name
+            auto results = resolver.resolve (host, std::to_string (port));
+
+            // Make the connection on the IP address we get from a lookup
+            boost::asio::connect (ws.next_layer(), results.begin(), results.end());
+
+            // Set a decorator to change the User-Agent of the handshake
+            ws.set_option (boost::beast::websocket::stream_base::decorator(
+                [] (boost::beast::websocket::request_type& req)
+                {
+                    req.set (boost::beast::http::field::user_agent,
+                        std::string (BOOST_BEAST_VERSION_STRING) + " websocket-client-coro");
+                }));
+
+            // Perform the websocket handshake
+            ws.handshake (host, "/test123");
+            ws.async_read (destBuffer, [this] (auto code, auto bytes) { readMessage (code, bytes); });
+
+            std::atomic<bool> threadStarted { false };
+
+            connection = std::thread ([this, &threadStarted]
+            {
+                try
+                {
+                    threadStarted = true;
+
+                    while (! threadShouldExit)
+                        ioc.run();
+                }
+                catch (std::exception const&) {}
+            });
+
+            // Wait for thread to be waiting for events
+            while (! threadStarted)
+                std::this_thread::sleep_for (std::chrono::milliseconds (1));
+        }
+
+        ~TestClient()
+        {
+            try
+            {
+                threadShouldExit = true;
+                ioc.stop();
+                ws.close (boost::beast::websocket::close_code::normal);
+            }
+            catch (std::exception const& e)
+            {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
+
+            connection.join();
+        }
+
+        void send (std::string text)
+        {
+            ws.write (boost::asio::buffer (text));
+        }
+
+        boost::asio::io_context ioc;
+        boost::asio::ip::tcp::resolver resolver { ioc };
+        boost::beast::websocket::stream<boost::asio::ip::tcp::socket> ws { ioc };
+        boost::beast::flat_buffer destBuffer;
+
+        std::function<void (std::string_view)> onMessageRead;
+        std::thread connection;
+        std::atomic<bool> threadShouldExit { false };
+
+        void readMessage (boost::beast::error_code ec, std::size_t numBytes)
+        {
+            if (numBytes > 0 && ! ec)
+            {
+                onMessageRead (boost::beast::buffers_to_string (destBuffer.data()));
+                destBuffer.clear();
+
+                // Prepare another read callback to be processed by the thread
+                ws.async_read (destBuffer,
+                            [this] (auto code, auto bytes) { readMessage (code, bytes); });
+            }
+        }
+    };
+
+    using namespace std::chrono_literals;
+
+    struct Test
+    {
+        std::string serverString, clientString, handshake;
+        std::atomic<bool> clientConnected { false };
+        std::atomic<int> messagecount { 0 };
+    };
+
+    Test testStatus;
+
+    {
+        struct TestClientInstance  : public choc::network::HTTPServer::ClientInstance
+        {
+            TestClientInstance (Test& t) : test (t)
+            {
+                test.clientConnected = true;
+            }
+
+            void handleWebSocketMessage (std::string_view m) override
+            {
+                test.serverString += m;
+                sendWebSocketMessage (std::string (m));
+            }
+
+            void upgradedToWebSocket (std::string_view path) override
+            {
+                test.handshake = path;
+            }
+
+            choc::network::HTTPContent getHTTPContent (std::string_view) override  { return {}; }
+            Test& test;
+        };
+
+        choc::network::HTTPServer server;
+
+        if (server.open ("127.0.0.1", 8080, 0,
+                         [&] { return std::make_unique<TestClientInstance> (testStatus); }, {}))
+        {
+            TestClient client (server.getHost(),
+                               server.getPort(),
+                               [&] (std::string_view m)
+                               {
+                                   testStatus.clientString += m;
+                                   ++testStatus.messagecount;
+                               });
+
+            {
+                auto start = std::chrono::system_clock::now();
+
+                while (! testStatus.clientConnected)
+                {
+                    if ((std::chrono::system_clock::now() - start) >= 30s)
+                        break;
+
+                    std::this_thread::sleep_for (1ms);
+                }
+
+                client.send ("Hello ");
+                client.send ("world!");
+            }
+
+            {
+                auto start = std::chrono::system_clock::now();
+
+                while (testStatus.messagecount < 2)
+                {
+                    if ((std::chrono::system_clock::now() - start) >= 30s)
+                        break;
+
+                    std::this_thread::sleep_for (1ms);
+                }
+            }
+        }
+    }
+
+    {
+        CHOC_CATEGORY (HTTPServer)
+        CHOC_TEST (Websocket)
+        CHOC_EXPECT_TRUE (testStatus.clientConnected)
+        CHOC_EXPECT_EQ (testStatus.clientString, "Hello world!")
+        CHOC_EXPECT_EQ (testStatus.serverString, "Hello world!")
+        CHOC_EXPECT_EQ (testStatus.handshake, "/test123")
+    }
+   #endif
+}
 
 //==============================================================================
 inline bool runAllTests (choc::test::TestProgress& progress)
@@ -3093,6 +3275,7 @@ inline bool runAllTests (choc::test::TestProgress& progress)
     {
         choc::messageloop::initialise();
 
+        testHTTPServer (progress);
         testZLIB (progress);
         testZipFile (progress);
         testFileWatcher (progress);
