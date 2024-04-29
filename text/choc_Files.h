@@ -214,14 +214,27 @@ inline size_t attemptToRead (std::istream& source, std::istream::char_type* buff
 {
     size_t numRead = 0;
 
-    while (numRead < size)
+    while (size != 0)
     {
-        std::istream::char_type c;
+        try
+        {
+            source.read (buffer, static_cast<std::streamsize> (size));
+        }
+        catch (...) {}
 
-        if (! source.get (c))
-            break;
+        if (auto numDone = static_cast<size_t> (source.gcount()))
+        {
+            numRead += numDone;
 
-        buffer[numRead++] = c;
+            if (numDone != size)
+            {
+                buffer += numDone;
+                size -= numDone;
+                continue;
+            }
+        }
+
+        break;
     }
 
     return numRead;
