@@ -247,7 +247,7 @@ inline std::filesystem::file_time_type ZipFile::Item::getFileTime() const
     tm.tm_mday  = date & 31u;
     tm.tm_hour  = (int) (time >> 11);
     tm.tm_min   = (time >> 5) & 63u;
-    tm.tm_sec   = (time & 31u) * 2;
+    tm.tm_sec   = (int) ((time & 31u) * 2u);
     tm.tm_isdst = 0;
 
     auto systemTime = std::chrono::system_clock::from_time_t (std::mktime (&tm));

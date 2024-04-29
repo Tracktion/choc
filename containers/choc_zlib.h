@@ -3430,7 +3430,7 @@ struct InflateStream
                 if (thisx.op && (thisx.op & 0xf0) == 0) {
                     last2 = thisx;
                     for (;;) {
-                        thisx = lencode[last2.val + (BITS(last2.bits + last2.op) >> last2.bits)];
+                        thisx = lencode[last2.val + (BITS((uint32_t)last2.bits + last2.op) >> last2.bits)];
                         if ((uint32_t) (last2.bits + thisx.bits) <= bits2)
                             break;
                         CHOC_ZLIB_PULLBYTE();
@@ -3471,7 +3471,7 @@ struct InflateStream
                 if ((thisx.op & 0xf0) == 0) {
                     last2 = thisx;
                     for (;;) {
-                        thisx = distcode[last2.val + (BITS(last2.bits + last2.op) >> last2.bits)];
+                        thisx = distcode[last2.val + (BITS((uint32_t)last2.bits + last2.op) >> last2.bits)];
                         if ((uint32_t) (last2.bits + thisx.bits) <= bits2)
                             break;
                         CHOC_ZLIB_PULLBYTE();
