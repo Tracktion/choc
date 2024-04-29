@@ -2960,6 +2960,7 @@ static void testZLIB (choc::test::TestProgress& progress)
                 in.seekg (static_cast<std::istream::off_type> (start), std::ios_base::beg);
                 CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (start));
                 in.read (buffer.data(), static_cast<std::streamsize> (len));
+                CHOC_EXPECT_EQ (in.gcount(), static_cast<std::istream::off_type> (len));
                 CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (start + len));
                 CHOC_EXPECT_TRUE (std::string (buffer.data(), len) == original.substr (start, len));
             };
@@ -3066,8 +3067,16 @@ static void testZipFile (choc::test::TestProgress& progress)
                 auto reader = item.createReader();
 
                 f.data.resize (item.uncompressedSize);
-                reader->read (static_cast<std::ifstream::char_type*> (f.data.data()),
-                              static_cast<std::streamsize> (item.uncompressedSize));
+
+                size_t numRead = 0;
+
+                while (numRead < item.uncompressedSize)
+                {
+                    std::istream::char_type c;
+                    CHOC_EXPECT_TRUE (static_cast<bool> (reader->get (c)));
+                    f.data[numRead++] = c;
+                }
+
                 check (f);
             }
         }

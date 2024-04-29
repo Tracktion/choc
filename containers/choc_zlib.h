@@ -61,7 +61,8 @@ private:
 
     pos_type seekoff (off_type, std::ios_base::seekdir, std::ios_base::openmode) override;
     pos_type seekpos (pos_type, std::ios_base::openmode) override;
-    std::streamsize xsgetn (char_type*, std::streamsize) override;
+    std::streambuf::int_type underflow() override;
+    pos_type getPosition() const;
 };
 
 //==============================================================================
@@ -2238,13 +2239,13 @@ struct InflateStream
     };
 
     //==============================================================================
-    uint8_t* next_in; /* next input byte */
-    uint32_t avail_in; /* number of bytes available at next_in */
-    size_t total_in; /* total nb of input bytes read so far */
+    uint8_t* next_in = nullptr; /* next input byte */
+    uint32_t avail_in = 0; /* number of bytes available at next_in */
+    size_t total_in = 0; /* total nb of input bytes read so far */
 
-    uint8_t* next_out; /* next output byte should be put there */
-    uint32_t avail_out; /* remaining free space at next_out */
-    size_t total_out; /* total nb of bytes output so far */
+    uint8_t* next_out = nullptr; /* next output byte should be put there */
+    uint32_t avail_out = 0; /* remaining free space at next_out */
+    size_t total_out = 0; /* total nb of bytes output so far */
 
     const char* msg = nullptr;
 
@@ -3707,6 +3708,7 @@ struct InflaterStream::Pimpl
        : source (std::move (s)), formatType (type)
     {
         buffer.resize (32768);
+        decompressed.resize (32768);
         originalSourcePos = source->tellg();
         CHOC_ASSERT (originalSourcePos >= 0); // must provide a stream that supports seeking
         createStream();
@@ -3727,77 +3729,44 @@ struct InflaterStream::Pimpl
 
     void deleteStream()
     {
-        bufferSize = 0;
-        position = 0;
+        decompressedPosition = {};
+        decompressedSize = 0;
         finished = true;
         needsDictionary = false;
         error = false;
         streamIsValid = false;
     }
 
-    std::streamsize xsgetn (char_type* dest, std::streamsize size)
+    size_t fillBuffer()
     {
-        if (dest == nullptr || size == 0 || finished || ! streamIsValid)
+        if (finished || ! streamIsValid)
             return 0;
 
-        std::streamsize totalRead = 0;
+        decompressedPosition += static_cast<off_type> (decompressedSize);
+        decompressedSize = 0;
 
-        while (! error)
+        if (inflateStream.avail_in == 0)
         {
-            if (auto numDone = decompressNextBlock (dest, size))
+            try
             {
-                position += numDone;
-                totalRead += numDone;
-
-                if (numDone >= size)
-                    break;
-
-                size -= numDone;
-                dest += numDone;
+                source->read (buffer.data(), static_cast<std::streamsize> (buffer.size()));
             }
-            else
-            {
-                if (finished || needsDictionary)
-                    break;
+            catch (...) {}
 
-                if (bufferSize == 0)
-                {
-                    bufferStart = buffer.data();
-                    bufferSize = buffer.size();
+            auto numRead = static_cast<size_t> (source->gcount());
 
-                    try
-                    {
-                        source->read (bufferStart, static_cast<std::streamsize> (bufferSize));
-                    }
-                    catch (...) {}
+            if (numRead == 0)
+                return 0;
 
-                    if (source->eof())
-                    {
-                        source->clear();
-                        bufferSize = static_cast<size_t> (source->gcount());
-                    }
+            inflateStream.next_in   = reinterpret_cast<uint8_t*> (buffer.data());
+            inflateStream.avail_in  = static_cast<decltype(inflateStream.avail_in)> (numRead);
 
-                    if (bufferSize <= 0)
-                    {
-                        finished = true;
-                        break;
-                    }
-                }
-            }
+            if (source->eof())
+                source->clear();
         }
 
-        return totalRead;
-    }
-
-    std::streamsize decompressNextBlock (char_type* dest, std::streamsize destSize)
-    {
-        if (bufferStart == nullptr || bufferSize == 0 || finished)
-            return 0;
-
-        inflateStream.next_out  = reinterpret_cast<uint8_t*> (dest);
-        inflateStream.avail_out = static_cast<decltype(inflateStream.avail_out)> (destSize);
-        inflateStream.next_in   = reinterpret_cast<uint8_t*> (bufferStart);
-        inflateStream.avail_in  = static_cast<decltype(inflateStream.avail_in)> (bufferSize);
+        inflateStream.next_out  = reinterpret_cast<uint8_t*> (decompressed.data());
+        inflateStream.avail_out = static_cast<decltype(inflateStream.avail_out)> (decompressed.size());
 
         switch (inflateStream.inflate())
         {
@@ -3814,11 +3783,8 @@ struct InflaterStream::Pimpl
             default:                             error = true; return 0;
         }
 
-        bufferStart += bufferSize - inflateStream.avail_in;
-        bufferSize = static_cast<size_t> (inflateStream.avail_in);
-        auto availOut = static_cast<std::streamsize> (inflateStream.avail_out);
-        CHOC_ASSERT (destSize >= availOut);
-        return destSize - availOut;
+        decompressedSize = decompressed.size() - inflateStream.avail_out;
+        return decompressedSize;
     }
 
     int getNumBits() const
@@ -3834,12 +3800,11 @@ struct InflaterStream::Pimpl
     zlib::InflateStream inflateStream;
     std::streamoff originalSourcePos = {};
 
-    pos_type position = 0;
     bool finished = true, needsDictionary = false, error = false, streamIsValid = false;
 
-    std::vector<char_type> buffer;
-    char_type* bufferStart = nullptr;
-    size_t bufferSize = 0;
+    std::vector<char_type> buffer, decompressed;
+    off_type decompressedPosition = {};
+    size_t decompressedSize = 0;
 };
 
 inline InflaterStream::InflaterStream (std::shared_ptr<std::istream> source, FormatType format)
@@ -3852,45 +3817,70 @@ inline InflaterStream::~InflaterStream() = default;
 
 inline InflaterStream::pos_type InflaterStream::seekoff (off_type off, std::ios_base::seekdir dir, std::ios_base::openmode mode)
 {
-    CHOC_ASSERT (dir != std::ios_base::end);
+    if (off == 0 && dir == std::ios_base::cur)
+        return getPosition();
 
     if (dir == std::ios_base::end)
         return pos_type (off_type (-1));
 
-    return seekpos (dir == std::ios_base::cur ? pimpl->position + static_cast<pos_type> (off)
+    return seekpos (dir == std::ios_base::cur ? static_cast<pos_type> (getPosition() + off)
                                               : static_cast<pos_type> (off), mode);
 }
 
 inline InflaterStream::pos_type InflaterStream::seekpos (pos_type newPosition, std::ios_base::openmode)
 {
-    if (newPosition < pimpl->position)
+    auto currentPos = getPosition();
+
+    if (newPosition < currentPos)
     {
         pimpl->deleteStream();
         pimpl->createStream();
+        setg ({}, {}, {});
+        clear();
+        currentPos = 0;
     }
 
-    while (pimpl->position < newPosition && ! eof())
+    while (currentPos < newPosition)
     {
-        char dummy[2048];
-        auto num = std::min (static_cast<std::streamsize> (newPosition - pimpl->position),
-                             static_cast<std::streamsize> (sizeof (dummy)));
+        if (auto avail = in_avail())
+        {
+            auto needed = newPosition - currentPos;
 
-        try
-        {
-            read (dummy, num);
+            if (avail >= needed)
+            {
+                gbump (static_cast<int> (needed));
+                return newPosition;
+            }
         }
-        catch (...)
-        {
+
+        setg ({}, {}, {});
+
+        if (underflow() == std::streambuf::traits_type::eof())
             break;
-        }
+
+        currentPos = getPosition();
     }
 
-    return pimpl->position;
+    return currentPos;
 }
 
-inline std::streamsize InflaterStream::xsgetn (char_type* dest, std::streamsize size)
+inline std::streambuf::int_type InflaterStream::underflow()
 {
-    return pimpl->xsgetn (dest, size);
+    if (in_avail() != 0)
+        return std::streambuf::traits_type::to_int_type (*gptr());
+
+    auto numAvail = pimpl->fillBuffer();
+    setg (pimpl->decompressed.data(), pimpl->decompressed.data(), pimpl->decompressed.data() + numAvail);
+
+    if (numAvail != 0)
+        return std::streambuf::traits_type::to_int_type (*gptr());
+
+    return std::streambuf::traits_type::eof();
+}
+
+inline InflaterStream::pos_type InflaterStream::getPosition() const
+{
+    return gptr() != nullptr ? pimpl->decompressedPosition + (gptr() - eback()) : 0;
 }
 
 //==============================================================================
