@@ -440,7 +440,7 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                               beast::bind_front_handler (&ClientSession::handleRead, shared_from_this()));
         }
 
-        void runWebsocketSession (asio::ip::tcp::socket&& socket, MessageType&& req)
+        void upgradeToWebsocket (asio::ip::tcp::socket&& socket, MessageType&& req)
         {
             auto target = std::string (req.target());
 
@@ -452,8 +452,7 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
 
         void handleRead (beast::error_code errorCode, std::size_t)
         {
-            // This means they closed the connection
-            if (errorCode == http::error::end_of_stream)
+            if (errorCode == http::error::end_of_stream) // connection closed
             {
                 tcpStream.socket().shutdown (asio::ip::tcp::socket::shutdown_send, errorCode);
                 return;
@@ -462,37 +461,37 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
             if (errorCode)
                 return owner.reportErrorIfFatal (errorCode, "HTTP read");
 
-            // Upgrade to a websocket session, transferring ownership
-            // of both the socket and the HTTP request.
             if (beast::websocket::is_upgrade (parser->get()))
-                return runWebsocketSession (tcpStream.release_socket(), parser->release());
+                return upgradeToWebsocket (tcpStream.release_socket(), parser->release());
 
             handleRequest (parser->release());
         }
 
         template <typename ResponseType>
-        void sendRequestResponse (ResponseType&& response)
+        void sendRequestResponse (ResponseType&& response, bool keepAlive)
         {
-            auto sp = std::make_shared<ResponseType> (std::forward<ResponseType> (response));
+            response.set (http::field::server, BOOST_BEAST_VERSION_STRING);
+            response.keep_alive (keepAlive);
+
+            auto sp = std::make_shared<ResponseType> (std::move (response));
 
             http::async_write (tcpStream, *sp,
-                            [self = shared_from_this(), sp] (beast::error_code e, std::size_t bytes)
-                            {
-                                self->handleWrite (e, bytes, sp->need_eof());
-                            });
+                               [self = shared_from_this(), sp] (beast::error_code e, std::size_t bytes)
+                               {
+                                   self->handleWrite (e, bytes, sp->need_eof());
+                               },
+                               nullptr);
         }
 
         template <typename RequestType>
         void sendFailureResponse (const RequestType& req, http::status status, std::string text)
         {
             http::response<http::string_body> res { status, req.version() };
-            res.set (http::field::server, BOOST_BEAST_VERSION_STRING);
             res.set (http::field::content_type, "text/html");
-            res.keep_alive (req.keep_alive());
             res.body() = std::move (text);
             res.prepare_payload();
 
-            sendRequestResponse (std::move (res));
+            sendRequestResponse (std::move (res), req.keep_alive());
         }
 
         void handleWrite (beast::error_code errorCode, std::size_t, bool close)
@@ -538,19 +537,14 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                 {
                     auto size = http::string_body::size (*result.content);
 
-                    http::response<http::string_body> res
-                    {
-                        std::piecewise_construct,
-                        std::make_tuple (std::move (*result.content)),
-                        std::make_tuple (http::status::ok, req.version())
-                    };
+                    http::response<http::string_body> res (std::piecewise_construct,
+                                                           std::make_tuple (std::move (*result.content)),
+                                                           std::make_tuple (http::status::ok, req.version()));
 
-                    res.set (http::field::server, BOOST_BEAST_VERSION_STRING);
                     res.set (http::field::content_type, getMIMEType (requestPath));
                     res.content_length (size);
-                    res.keep_alive (req.keep_alive());
 
-                    return sendRequestResponse (std::move (res));
+                    return sendRequestResponse (std::move (res), req.keep_alive());
                 }
 
                 return sendFailureResponse (req, http::status::bad_request, "POST not supported");
@@ -574,25 +568,18 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                     if (req.method() == http::verb::head)
                     {
                         http::response<http::empty_body> res { http::status::ok, req.version() };
-                        res.set (http::field::server, BOOST_BEAST_VERSION_STRING);
                         res.set (http::field::content_type, getMIMEType (path));
                         res.content_length (size);
-                        res.keep_alive (req.keep_alive());
-                        return sendRequestResponse (std::move (res));
+                        return sendRequestResponse (std::move (res), req.keep_alive());
                     }
 
-                    http::response<http::file_body> res
-                    {
-                        std::piecewise_construct,
-                        std::make_tuple (std::move (body)),
-                        std::make_tuple (http::status::ok, req.version())
-                    };
+                    http::response<http::file_body> res (std::piecewise_construct,
+                                                         std::make_tuple (std::move (body)),
+                                                         std::make_tuple (http::status::ok, req.version()));
 
-                    res.set (http::field::server, BOOST_BEAST_VERSION_STRING);
                     res.set (http::field::content_type, getMIMEType (path));
                     res.content_length (size);
-                    res.keep_alive (req.keep_alive());
-                    return sendRequestResponse (std::move (res));
+                    return sendRequestResponse (std::move (res), req.keep_alive());
                 }
             }
 
