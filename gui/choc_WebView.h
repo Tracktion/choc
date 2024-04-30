@@ -1277,6 +1277,8 @@ struct WebView::Pimpl
     Pimpl (WebView& v, const Options& opts)
         : owner (v), options (opts)
     {
+        CoInitialize (nullptr);
+
         // You cam define this macro to provide a custom way of getting a
         // choc::file::DynamicLibrary that contains the redistributable
         // Microsoft WebView2Loader.dll
