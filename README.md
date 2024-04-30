@@ -33,6 +33,7 @@ The library is getting quite big now! Some of its many delights include:
 - A system for easily adding and collecting all the [open-source licenses](./text/choc_OpenSourceLicenseList.h) that your project uses into a single string for displaying to a user (for license compliance).
 - A one-file header-only [encapsulation of zlib](./containers/choc_zlib.h), exposing `std::iostream` compatible classes for compressing and decompressing data.
 - A [Zip file reader](./containers/choc_ZipFile.h) and decompressor class.
+- A [HTTP and WebSocket server](./network/choc_HTTPServer.h) class. Life is too short to learn how `boost::beast` works and write all the boilerplate required just to serve some content and talk down a web-socket, so this class hides all the horribleness behind a very simple API.
 
 #### Text and Files
 
