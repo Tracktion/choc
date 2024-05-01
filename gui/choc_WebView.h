@@ -176,6 +176,14 @@ private:
     struct DeletionChecker { bool deleted = false; };
 };
 
+
+#ifdef JUCE_GUI_EXTRA_H_INCLUDED
+// This function will create a JUCE Component that contains and manages the given WebView.
+// (Obviously it's only available if you've already included the juce_gui_extra module
+// headers before this file).
+inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebView&);
+#endif
+
 } // namespace choc::ui
 
 
@@ -1950,6 +1958,64 @@ inline WebView::Options::Resource::Resource (std::string_view content, std::stri
 
     mimeType = std::move (mime);
 }
+
+//==============================================================================
+#ifdef JUCE_GUI_EXTRA_H_INCLUDED
+inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebView& view)
+{
+   #if JUCE_MAC
+    using NativeUIBase = juce::NSViewComponent;
+   #elif JUCE_IOS
+    using NativeUIBase = juce::UIViewComponent;
+   #elif JUCE_WINDOWS
+    using NativeUIBase = juce::HWNDComponent;
+   #else
+    using NativeUIBase = juce::XEmbedComponent;
+   #endif
+
+    struct Holder  : public NativeUIBase
+    {
+        Holder (choc::ui::WebView& view)
+           #if JUCE_LINUX
+            : juce::XEmbedComponent (getWindowID (view), true, false),
+           #endif
+        {
+           #if JUCE_MAC || JUCE_IOS
+            setView (view.getViewHandle());
+           #elif JUCE_WINDOWS
+            setHWND (view.getViewHandle());
+           #endif
+        }
+
+        ~Holder() override
+        {
+           #if JUCE_MAC || JUCE_IOS
+            setView ({});
+           #elif JUCE_WINDOWS
+            setHWND ({});
+           #elif JUCE_LINUX
+            removeClient();
+           #endif
+        }
+
+       #if JUCE_LINUX
+        static unsigned long getWindowID (choc::ui::WebView& v)
+        {
+            auto childWidget = GTK_WIDGET (v.getViewHandle());
+            auto plug = gtk_plug_new (0);
+            gtk_container_add (GTK_CONTAINER (plug), childWidget);
+            gtk_widget_show_all (plug);
+            return gtk_plug_get_id (GTK_PLUG (plug));
+        }
+       #endif
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Holder)
+    };
+
+    return std::make_unique<Holder> (view);
+}
+#endif
+
 
 } // namespace choc::ui
 
