@@ -98,7 +98,7 @@ endif()
 if (DEFINED BOOST_LOCATION)
     add_compile_definitions (choc_tests
         CHOC_ENABLE_HTTP_SERVER_TEST=1
-        BOOST_STATIC_STRING_STANDALONE=0)
+    )
 
     target_include_directories(choc_tests
         SYSTEM PRIVATE

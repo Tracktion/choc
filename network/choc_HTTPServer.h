@@ -135,6 +135,12 @@ public:
     /// Returns the full address (host + port) that this server is curently using.
     std::string getAddress() const;
 
+    /// Returns the full address, with HTTP scheme prefix, that the server is using.
+    std::string getHTTPAddress() const;
+
+    /// Returns the full address, with WebSocket scheme prefix, that the server is using.
+    std::string getWebSocketAddress() const;
+
 private:
     struct Pimpl;
     std::shared_ptr<Pimpl> pimpl;
@@ -164,6 +170,7 @@ private:
 #include <thread>
 #include "choc_MIMETypes.h"
 
+#define BOOST_STATIC_STRING_STANDALONE 1
 #include "../platform/choc_DisableAllWarnings.h"
 
 // Sorry, but you'll need boost::beast, boost::asio and a whole bag of
@@ -615,10 +622,12 @@ inline void HTTPServer::close()
    pimpl.reset();
 }
 
-inline bool HTTPServer::isOpen() const              { return pimpl != nullptr; }
-inline std::string HTTPServer::getHost() const      { return pimpl != nullptr ? pimpl->host : std::string(); }
-inline uint16_t HTTPServer::getPort() const         { return pimpl != nullptr ? pimpl->port : 0; }
-inline std::string HTTPServer::getAddress() const   { return pimpl != nullptr ? pimpl->address : std::string(); }
+inline bool HTTPServer::isOpen() const                      { return pimpl != nullptr; }
+inline std::string HTTPServer::getHost() const              { return pimpl != nullptr ? pimpl->host : std::string(); }
+inline uint16_t HTTPServer::getPort() const                 { return pimpl != nullptr ? pimpl->port : 0; }
+inline std::string HTTPServer::getAddress() const           { return pimpl != nullptr ? pimpl->address : std::string(); }
+inline std::string HTTPServer::getHTTPAddress() const       { return "http://" + getAddress(); }
+inline std::string HTTPServer::getWebSocketAddress() const  { return "ws://" + getAddress(); }
 
 inline bool HTTPServer::ClientInstance::sendWebSocketMessage (std::string m)
 {
