@@ -45,6 +45,7 @@ The library is getting quite big now! Some of its many delights include:
 - A [HTML generator](./text/choc_HTML.h) for creating a tree of DOM objects and generating HTML text for it
 - A [text table generator](./text/choc_TextTable.h), which can take an array of strings and tabulate it to align the columns nicely.
 - A [file wildcard](./text/choc_Wildcard.h) matcher. I claim this is the cleanest possible implementation of this algorithm - I challenge you to prove me wrong!
+- A simple [command-line argumment helper](./containers/choc_ArgumentList.h) which simplifies a lot of basic command-line arg parsing tasks.
 
 #### Containers
 

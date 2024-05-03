@@ -19,7 +19,7 @@
 #include "choc_tests.h"
 #include "../gui/choc_WebView.h"
 #include "../gui/choc_DesktopWindow.h"
-
+#include "../containers/choc_ArgumentList.h"
 
 inline int openDemoWebViewWindow()
 {
@@ -92,9 +92,10 @@ inline int openDemoWebViewWindow()
 //==============================================================================
 int main (int argc, const char** argv)
 {
-    for (int i = 0; i < argc; ++i)
-        if (std::string_view (argv[i]) == "webview")
-            return openDemoWebViewWindow();
+    choc::ArgumentList args (argc, argv);
+
+    if (args.contains ("webview"))
+        return openDemoWebViewWindow();
 
     choc::test::TestProgress progress;
     return choc_unit_tests::runAllTests (progress) ? 0 : 1;
