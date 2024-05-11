@@ -80,6 +80,7 @@
 #endif
 
 #include "choc_UnitTest.h"
+#include <future>
 
 /**
     To keep things simpole for users, I've just shoved all the tests for everything into this
@@ -2322,8 +2323,9 @@ inline void testJavascriptPlatform (choc::test::TestProgress& progress, std::fun
 
                         function t2()
                         {
-                            clearInterval (intID);
-                            setTimeout (stop, 0);
+                            testDone (result);
+                            // clearInterval (intID);
+                            // setTimeout (stop, 0);
                         }
 
                         setTimeout (t2, 600.1);
@@ -2335,7 +2337,8 @@ inline void testJavascriptPlatform (choc::test::TestProgress& progress, std::fun
                 });
             }
             CHOC_CATCH_UNEXPECTED_EXCEPTION
-        });
+        },
+        [&] { timer = {}; context = {}; });
 
         CHOC_EXPECT_TRUE (result == 4 || result == 5);
     }
@@ -2392,11 +2395,11 @@ inline void testWebview (choc::test::TestProgress& progress)
     {
         CHOC_TEST (Javascript)
 
-        std::string result;
-        std::string error1, error2, error3;
+        std::string result, error1 = "x", error2, error3 = "x";
         choc::value::Value value1, value2, value3;
         std::unique_ptr<choc::ui::WebView> webview;
         choc::messageloop::Timer timer;
+        bool unavailable = false;
 
         runTestOnMessageThread ([&] (const std::function<void()>& finished)
         {
@@ -2407,6 +2410,7 @@ inline void testWebview (choc::test::TestProgress& progress)
             if (! webview->loadedOK())
             {
                 std::cout << "WebView was unavailable" << std::endl;
+                unavailable = true;
                 finished();
                 return;
             }
@@ -2416,12 +2420,6 @@ inline void testWebview (choc::test::TestProgress& progress)
                 result = choc::json::toString (args);
                 finished();
                 return choc::value::Value();
-            });
-
-            timer = choc::messageloop::Timer (100, [&]
-            {
-                webview->evaluateJavascript ("succeeded (1234, 5678);");
-                return false;
             });
 
             webview->evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
@@ -2438,8 +2436,17 @@ inline void testWebview (choc::test::TestProgress& progress)
             {
                 error3 = error; value3 = value;
             });
+
+            timer = choc::messageloop::Timer (200, [&]
+            {
+                webview->evaluateJavascript ("succeeded (1234, 5678);");
+                return false;
+            });
         },
-        [&] { webview.reset(); });
+        [&] { webview.reset(); timer = {}; });
+
+        if (unavailable)
+            return;
 
         CHOC_EXPECT_EQ (result, "[1234, 5678]");
         CHOC_EXPECT_TRUE (error1.empty());
@@ -2483,6 +2490,7 @@ fetch (new Request("./hello.txt"))
             if (! webview->loadedOK())
             {
                 std::cout << "WebView was unavailable" << std::endl;
+                finished();
                 return;
             }
 
@@ -2781,35 +2789,39 @@ inline void testTimers (choc::test::TestProgress& progress)
         CHOC_TEST (Timers)
 
         int count = 0, messageCount = 0;
-        std::atomic_bool finished { false };
+        bool messageThread1 = false, messageThread2 = false;
+        choc::messageloop::Timer t1, t2;
 
-        auto t1 = choc::messageloop::Timer (100, [&]
+        runTestOnMessageThread ([&] (const std::function<void()>& finished)
         {
-            return ++count != 13;
-        });
-
-        auto t2 = choc::messageloop::Timer (1500, [&]
-        {
-            if (count < 13)
-                return true;
-
-            choc::messageloop::postMessage ([&finished, &messageCount, count]
+            t1 = choc::messageloop::Timer (100, [&]
             {
-                messageCount = count;
-                finished = true;
+                return ++count != 13;
             });
 
-            return false;
+            t2 = choc::messageloop::Timer (1500, [&]
+            {
+                if (count < 13)
+                    return true;
+
+                choc::messageloop::postMessage ([&finished, &messageCount, count]
+                {
+                    messageCount = count;
+                    finished();
+                });
+
+                return false;
+            });
+
+            choc::messageloop::postMessage ([&] { messageThread1 = choc::messageloop::callerIsOnMessageThread(); });
+            auto t = std::thread ([&] { messageThread2 = ! choc::messageloop::callerIsOnMessageThread(); });
+            t.join();
+        },
+        [&]
+        {
+            t1 = {}; t2 = {};
         });
 
-        bool messageThread1 = false, messageThread2 = false;
-        choc::messageloop::postMessage ([&] { messageThread1 = choc::messageloop::callerIsOnMessageThread(); });
-        auto t = std::thread ([&] { messageThread2 = ! choc::messageloop::callerIsOnMessageThread(); });
-
-        while (! finished)
-            std::this_thread::yield();
-
-        t.join();
         CHOC_EXPECT_EQ (messageCount, 13);
         CHOC_EXPECT_TRUE (messageThread1);
         CHOC_EXPECT_TRUE (messageThread2);
@@ -3317,7 +3329,7 @@ static void testHTTPServer (choc::test::TestProgress& progress)
 }
 
 //==============================================================================
-inline bool runAllTests (choc::test::TestProgress& progress)
+inline bool runAllTests (choc::test::TestProgress& progress, bool multithread)
 {
     choc::threading::TaskThread emergencyKillThread;
     int secondsElapsed = 0;
@@ -3335,34 +3347,68 @@ inline bool runAllTests (choc::test::TestProgress& progress)
 
     choc::messageloop::initialise();
 
+    std::function<void(choc::test::TestProgress&)> testFunctions[] =
+    {
+        testHTTPServer,
+        testZLIB,
+        testZipFile,
+        testFileWatcher,
+        testPlatform,
+        testContainerUtils,
+        testStringUtilities,
+        testFileUtilities,
+        testValues,
+        testJSON,
+        testMIDI,
+        testAudioBuffers,
+        testIntToFloat,
+        testFIFOs,
+        testMIDIFiles,
+        testJavascript,
+        testWebview,
+        testCOM,
+        testStableSort,
+        testAudioFileFormat,
+        testThreading,
+        testTimers
+    };
+
     auto t = std::thread ([&]
     {
-        try
+        if (multithread)
         {
-            testHTTPServer (progress);
-            testZLIB (progress);
-            testZipFile (progress);
-            testFileWatcher (progress);
-            testPlatform (progress);
-            testContainerUtils (progress);
-            testStringUtilities (progress);
-            testFileUtilities (progress);
-            testValues (progress);
-            testJSON (progress);
-            testMIDI (progress);
-            testAudioBuffers (progress);
-            testIntToFloat (progress);
-            testFIFOs (progress);
-            testMIDIFiles (progress);
-            testJavascript (progress);
-            testWebview (progress);
-            testCOM (progress);
-            testStableSort (progress);
-            testAudioFileFormat (progress);
-            testThreading (progress);
-            testTimers (progress);
+            std::vector<std::future<void>> futures;
+            std::mutex progressLock;
+
+            for (auto& fn : testFunctions)
+            {
+                futures.emplace_back (std::async (std::launch::async, [fn, &progress, &progressLock]
+                {
+                    std::ostringstream testOutput;
+                    choc::test::TestProgress p;
+                    p.printMessage = [&] (std::string_view m) { testOutput << m << "\n"; };
+                    fn (p);
+
+                    std::scoped_lock lock (progressLock);
+
+                    progress.print (choc::text::trimEnd (testOutput.str()));
+                    progress.numPasses += p.numPasses;
+                    progress.numFails += p.numFails;
+
+                    for (auto& failed : p.failedTests)
+                        progress.failedTests.push_back (failed);
+                }));
+            }
+
+            for (auto& f : futures)
+                f.wait();
         }
-        CHOC_CATCH_UNEXPECTED_EXCEPTION
+        else
+        {
+            for (auto& fn : testFunctions)
+                fn (progress);
+
+        }
 
         choc::messageloop::stop();
     });

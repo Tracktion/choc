@@ -185,8 +185,8 @@ struct Timer::Pimpl
     ~Pimpl()
     {
         if (sharedState->isInCallback)
-            sharedState->isRemoved = true;
-        else
+            sharedState->isRunning = false;
+        else if (sharedState->isRunning)
             g_source_remove (handle);
     }
 
@@ -199,14 +199,18 @@ struct Timer::Pimpl
     struct SharedState  : public std::enable_shared_from_this<SharedState>
     {
         Callback callback;
-        bool isInCallback = false, isRemoved = false;
+        bool isInCallback = false, isRunning = true;
 
         bool handleCallback()
         {
             isInCallback = true;
             bool result = callback();
             isInCallback = false;
-            return result && ! isRemoved;
+
+            if (! result)
+                isRunning = false;
+
+            return isRunning;
         }
     };
 
