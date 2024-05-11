@@ -2853,7 +2853,7 @@ inline void testFileWatcher (choc::test::TestProgress& progress)
 
         choc::file::Watcher watcher (folder, [&] (const choc::file::Watcher::Event& e)
         {
-            std::lock_guard<decltype(lock)> lg (lock);
+            std::scoped_lock lg (lock);
 
             switch (e.eventType)
             {
@@ -2877,13 +2877,13 @@ inline void testFileWatcher (choc::test::TestProgress& progress)
             for (int i = 0; i < 400; ++i)
             {
                 std::this_thread::sleep_for (std::chrono::milliseconds (10));
-                std::lock_guard<decltype(lock)> lg (lock);
+                std::scoped_lock lg (lock);
 
                 if (choc::text::contains (lastEvent, contentNeeded))
                     return;
             }
 
-            std::lock_guard<decltype(lock)> lg (lock);
+            std::scoped_lock lg (lock);
             CHOC_FAIL ("Expected '" + std::string (contentNeeded) + "' in '" + lastEvent + "'");
         };
 

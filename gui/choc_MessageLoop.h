@@ -388,7 +388,7 @@ struct Timer::Pimpl
 
         bool invokeIfStillAlive (Pimpl* p)
         {
-            std::lock_guard<decltype(lock)> l (lock);
+            std::scoped_lock l (lock);
 
             // must check before AND after the call because the Pimpl
             // may be deleted during the callback
@@ -399,13 +399,13 @@ struct Timer::Pimpl
 
         void add (Pimpl* p)
         {
-            std::lock_guard<decltype(lock)> l (lock);
+            std::scoped_lock l (lock);
             timers.insert (p);
         }
 
         void remove (Pimpl* p)
         {
-            std::lock_guard<decltype(lock)> l (lock);
+            std::scoped_lock l (lock);
             timers.erase (p);
         }
     };
