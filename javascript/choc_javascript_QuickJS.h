@@ -8408,10 +8408,10 @@ inline int unicode_prop(CharRange *cr, const char *prop_name)
 
 using JS_BOOL = int;
 
-typedef struct JSRuntime JSRuntime;
-typedef struct JSContext JSContext;
-typedef struct JSObject JSObject;
-typedef struct JSClass JSClass;
+struct JSRuntime;
+struct JSContext;
+struct JSObject;
+struct JSClass;
 typedef uint32_t JSClassID;
 typedef uint32_t JSAtom;
 
