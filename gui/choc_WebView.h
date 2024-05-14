@@ -1977,7 +1977,7 @@ inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebVi
     {
         Holder (choc::ui::WebView& view)
            #if JUCE_LINUX
-            : juce::XEmbedComponent (getWindowID (view), true, false),
+            : juce::XEmbedComponent (getWindowID (view), true, false)
            #endif
         {
            #if JUCE_MAC || JUCE_IOS
