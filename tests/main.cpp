@@ -17,7 +17,6 @@
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "choc_tests.h"
-#include "../gui/choc_WebView.h"
 #include "../gui/choc_DesktopWindow.h"
 #include "../containers/choc_ArgumentList.h"
 

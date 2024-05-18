@@ -248,33 +248,6 @@ inline void choc::ui::setWindowsDPIAwareness() {}
 namespace choc::ui
 {
 
-namespace macos_ui_helpers
-{
-    // Including CodeGraphics.h can create all kinds of messy C/C++ symbol clashes
-    // with other headers, but all we actually need are these coordinate structs:
-   #if defined (__LP64__) && __LP64__
-    using CGFloat = double;
-   #else
-    using CGFloat = float;
-   #endif
-
-    struct CGPoint { CGFloat x = 0, y = 0; };
-    struct CGSize  { CGFloat width = 0, height = 0; };
-    struct CGRect  { CGPoint origin; CGSize size; };
-
-    inline CGSize createCGSize (double w, double h)  { return { (CGFloat) w, (CGFloat) h }; }
-    inline CGRect createCGRect (choc::ui::Bounds b)  { return { { (CGFloat) b.x, (CGFloat) b.y }, { (CGFloat) b.width, (CGFloat) b.height } }; }
-
-    static constexpr long NSWindowStyleMaskTitled = 1;
-    static constexpr long NSWindowStyleMaskMiniaturizable = 4;
-    static constexpr long NSWindowStyleMaskResizable = 8;
-    static constexpr long NSWindowStyleMaskClosable = 2;
-    static constexpr long NSBackingStoreBuffered = 2;
-    static constexpr long NSApplicationActivationPolicyRegular = 0;
-}
-
-using namespace macos_ui_helpers;
-
 inline void setWindowsDPIAwareness() {}
 
 struct DesktopWindow::Pimpl
@@ -285,7 +258,7 @@ struct DesktopWindow::Pimpl
         CHOC_AUTORELEASE_BEGIN
         call<void> (getSharedNSApplication(), "setActivationPolicy:", NSApplicationActivationPolicyRegular);
 
-        window = call<id> (call<id> (getClass ("NSWindow"), "alloc"),
+        window = call<id> (callClass<id> ("NSWindow", "alloc"),
                            "initWithContentRect:styleMask:backing:defer:",
                            createCGRect (bounds),
                            NSWindowStyleMaskTitled, NSBackingStoreBuffered, (int) 0);
@@ -344,9 +317,9 @@ struct DesktopWindow::Pimpl
     void setMinimumSize (int w, int h) { CHOC_AUTORELEASE_BEGIN objc::call<void> (window, "setContentMinSize:", createCGSize (w, h)); CHOC_AUTORELEASE_END }
     void setMaximumSize (int w, int h) { CHOC_AUTORELEASE_BEGIN objc::call<void> (window, "setContentMaxSize:", createCGSize (w, h)); CHOC_AUTORELEASE_END }
 
-    CGRect getFrameRectForContent (Bounds b)
+    objc::CGRect getFrameRectForContent (Bounds b)
     {
-        return objc::call<CGRect> (window, "frameRectForContentRect:", createCGRect (b));
+        return objc::call<objc::CGRect> (window, "frameRectForContentRect:", createCGRect (b));
     }
 
     void centreWithSize (int w, int h)
@@ -398,35 +371,35 @@ struct DesktopWindow::Pimpl
                 class_addProtocol (delegateClass, p);
 
             class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
-                            (IMP) (+[](id self, SEL, id) -> BOOL
-                            {
-                                CHOC_AUTORELEASE_BEGIN
-                                auto& p = getPimplFromContext (self);
-                                p.window = {};
+                             (IMP) (+[](id self, SEL, id) -> BOOL
+                             {
+                                 CHOC_AUTORELEASE_BEGIN
+                                 auto& p = getPimplFromContext (self);
+                                 p.window = {};
 
-                                if (auto callback = p.owner.windowClosed)
-                                    choc::messageloop::postMessage ([callback] { callback(); });
+                                 if (auto callback = p.owner.windowClosed)
+                                     choc::messageloop::postMessage ([callback] { callback(); });
 
-                                CHOC_AUTORELEASE_END
-                                return TRUE;
-                            }),
-                            "c@:@");
+                                 CHOC_AUTORELEASE_END
+                                 return TRUE;
+                             }),
+                             "c@:@");
 
             class_addMethod (delegateClass, sel_registerName ("windowDidResize:"),
-                            (IMP) (+[](id self, SEL, id)
-                            {
-                                CHOC_AUTORELEASE_BEGIN
+                             (IMP) (+[](id self, SEL, id)
+                             {
+                                 CHOC_AUTORELEASE_BEGIN
 
-                                if (auto callback = getPimplFromContext (self).owner.windowResized)
-                                    callback();
+                                 if (auto callback = getPimplFromContext (self).owner.windowResized)
+                                     callback();
 
-                                CHOC_AUTORELEASE_END
-                            }),
-                            "v@:@");
+                                 CHOC_AUTORELEASE_END
+                             }),
+                             "v@:@");
 
             class_addMethod (delegateClass, sel_registerName ("applicationShouldTerminateAfterLastWindowClosed:"),
-                            (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
-                            "c@:@");
+                             (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
+                             "c@:@");
 
             objc_registerClassPair (delegateClass);
         }
@@ -438,6 +411,16 @@ struct DesktopWindow::Pimpl
 
         Class delegateClass = {};
     };
+
+    static constexpr long NSWindowStyleMaskTitled = 1;
+    static constexpr long NSWindowStyleMaskMiniaturizable = 4;
+    static constexpr long NSWindowStyleMaskResizable = 8;
+    static constexpr long NSWindowStyleMaskClosable = 2;
+    static constexpr long NSBackingStoreBuffered = 2;
+    static constexpr long NSApplicationActivationPolicyRegular = 0;
+
+    static objc::CGSize createCGSize (double w, double h)  { return { (objc::CGFloat) w, (objc::CGFloat) h }; }
+    static objc::CGRect createCGRect (choc::ui::Bounds b)  { return { { (objc::CGFloat) b.x, (objc::CGFloat) b.y }, { (objc::CGFloat) b.width, (objc::CGFloat) b.height } }; }
 };
 
 } // namespace choc::ui
