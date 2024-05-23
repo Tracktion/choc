@@ -296,7 +296,8 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
 
     void stop()
     {
-        ioContext.stop();
+        if (! ioContext.stopped())
+            ioContext.stop();
 
         for (auto& t : threadPool)
             t.join();
@@ -619,7 +620,11 @@ inline bool HTTPServer::open (std::string_view address, uint16_t port, uint32_t 
 
 inline void HTTPServer::close()
 {
-   pimpl.reset();
+    if (pimpl)
+    {
+        pimpl->stop();
+        pimpl.reset();
+    }
 }
 
 inline bool HTTPServer::isOpen() const                      { return pimpl != nullptr; }
