@@ -359,7 +359,7 @@ inline bool ZipFile::Item::uncompressToFile (const std::filesystem::path& target
 
     if (isFolder())
     {
-        if (! create_directories (targetFile))
+        if (! (create_directories (targetFile) || is_directory (targetFile)))
             throw std::runtime_error ("Failed to create folder: " + targetFile.string());
 
         return true;
