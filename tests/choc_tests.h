@@ -2044,7 +2044,7 @@ inline void testMIDIFiles (choc::test::TestProgress& progress)
 
             std::string output1, output2;
 
-            mf.iterateEvents ([&] (const choc::midi::Message& m, double time)
+            mf.iterateEvents ([&] (const choc::midi::LongMessage& m, double time)
                               {
                                   output1 += choc::text::floatToString (time, 3) + " " + m.toHexString() + "\n";
                               });
