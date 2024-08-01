@@ -70,7 +70,8 @@
  #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
  #pragma GCC diagnostic ignored "-Wdeprecated"
  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
+ #pragma GCC diagnostic ignored "-Wuse-after-free"
+ #pragma GCC diagnostic ignored "-Warray-bounds"
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif
