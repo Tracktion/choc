@@ -116,6 +116,11 @@ public:
         /// and the view will navigate to that address when launched.
         /// Leave blank for a default.
         std::string customSchemeURI;
+
+        /// On OSX there's some custom code to intercept copy/paste keys, which
+        /// otherwise wouldn't work by default. This lets you turn that off if you
+        /// need to.
+        bool enableDefaultClipboardKeyShortcutsInSafari = true;
     };
 
     /// Creates a WebView with default options
@@ -714,6 +719,9 @@ private:
 
     BOOL performKeyEquivalent (id self, id e)
     {
+        if (! options->enableDefaultClipboardKeyShortcutsInSafari)
+            return false;
+
         enum
         {
             NSEventTypeKeyDown = 10,
@@ -790,9 +798,10 @@ private:
                             (IMP) (+[](id self, SEL, id e) -> BOOL
                             {
                                 if (auto p = getPimpl (self))
-                                    return p->performKeyEquivalent (self, e);
+                                    if (p->performKeyEquivalent (self, e))
+                                        return true;
 
-                                return false;
+                                return choc::objc::callSuper<BOOL> (self, "performKeyEquivalent:", e);
                             }), "B@:@");
 
             objc_registerClassPair (webviewClass);
