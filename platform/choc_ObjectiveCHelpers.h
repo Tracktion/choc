@@ -74,6 +74,35 @@ namespace choc::objc
         return call<ReturnType> ((id) objc_getClass (targetClassName), selector, std::forward<Args> (args)...);
     }
 
+    /// Invokes an obj-C selector for the superclass of a given target.
+    template <typename ReturnType, typename... Args>
+    ReturnType callSuper (id target, const char* selector, Args... args)
+    {
+        constexpr const auto msgSendSuper = ([]
+        {
+          #if defined (__x86_64__)
+            if constexpr (std::is_void_v<ReturnType>)
+                return objc_msgSendSuper;
+            else if constexpr (sizeof (ReturnType) > 16)
+                return objc_msgSendSuper_stret;
+            else
+                return objc_msgSendSuper;
+          #elif defined (__arm64__)
+            return objc_msgSendSuper;
+          #else
+            #error "Unknown or unsupported architecture!"
+          #endif
+        })();
+
+        objc_super superInfo =
+        {
+            target,
+            (Class) call<id> (target, "superclass")
+        };
+
+        return reinterpret_cast<ReturnType(*)(objc_super*, SEL, Args...)> (msgSendSuper) (&superInfo, sel_registerName (selector), args...);
+    }
+
     //==============================================================================
     // This stuff lets you write autorelease scopes that work either with or without
     // ARC support being enabled in the compiler.
