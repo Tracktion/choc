@@ -19,7 +19,11 @@
 #ifndef CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 #define CHOC_DESKTOPWINDOW_HEADER_INCLUDED
 
+#include <memory>
+#include <string>
+#include <functional>
 #include "../platform/choc_Platform.h"
+#include "../platform/choc_Assert.h"
 
 
 //==============================================================================
@@ -435,6 +439,8 @@ struct DesktopWindow::Pimpl
 #define Rectangle Rectangle_renamed_to_avoid_name_collisions
 #include <windows.h>
 #undef Rectangle
+
+#include "../platform/choc_DynamicLibrary.h"
 
 namespace choc::ui
 {
