@@ -25,6 +25,7 @@
 #include <functional>
 #include "../platform/choc_Platform.h"
 #include "../text/choc_JSON.h"
+#include <iostream>
 
 //==============================================================================
 namespace choc::ui
@@ -116,6 +117,8 @@ public:
         /// and the view will navigate to that address when launched.
         /// Leave blank for a default.
         std::string customSchemeURI;
+
+        std::optional<std::string> initScript{};
     };
 
     /// Creates a WebView with default options
@@ -1352,8 +1355,9 @@ struct WebView::Pimpl
 
         COMPtr<ExecuteScriptCompletedCallback> callback (ch ? new ExecuteScriptCompletedCallback (std::move (ch))
                                                             : nullptr);
-
-        return coreWebView->ExecuteScript (createUTF16StringFromUTF8 (script).c_str(), callback) == S_OK;
+        const auto execRes = coreWebView->ExecuteScript(createUTF16StringFromUTF8(script).c_str(), callback);
+        std::cout << "CALLBACK RES: " << execRes << "\n";
+        return execRes == S_OK;
     }
 
     bool setHTML (const std::string& html)
@@ -1464,7 +1468,9 @@ private:
 
                     EventRegistrationToken token;
                     coreWebView->add_WebResourceRequested (handler, std::addressof (token));
-
+                    if(options.initScript) {
+                        addInitScript(*(options.initScript));
+                    }
                     if (options.fetchResource)
                         navigate ({});
 
