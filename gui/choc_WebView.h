@@ -503,6 +503,9 @@ struct choc::ui::WebView::Pimpl
 
         call<void> (config, "release");
 
+        if(options->initScript) {
+            addInitScript(*(options->initScript));
+        }
         if (options->fetchResource)
             navigate ({});
 
