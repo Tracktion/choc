@@ -27,6 +27,7 @@
 #include "../text/choc_JSON.h"
 #include <iostream>
 
+// clang-format off
 //==============================================================================
 namespace choc::ui
 {
@@ -119,6 +120,7 @@ public:
         std::string customSchemeURI;
 
         std::optional<std::string> initScript{};
+        std::uint32_t backgroundColour{ 0x000000 };
     };
 
     /// Creates a WebView with default options
@@ -1275,7 +1277,14 @@ namespace choc::ui
 struct WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& opts)
-        : owner (v), options (opts)
+        : owner (v),
+         options (opts), 
+         m_brush(::CreateSolidBrush(RGB(
+            (opts.backgroundColour >> 12) & 0xFF,
+            (opts.backgroundColour >> 8) & 0xFF,
+            opts.backgroundColour & 0xFF
+         ))),
+         windowClass(L"CHOCWebView", (WNDPROC)wndProc, m_brush)
     {
         CoInitialize (nullptr);
 
@@ -1327,6 +1336,7 @@ struct WebView::Pimpl
         }
 
         hwnd.reset();
+        ::DeleteObject(m_brush);
     }
 
     static constexpr const char* postMessageFn = "window.chrome.webview.postMessage";
@@ -1372,7 +1382,9 @@ struct WebView::Pimpl
     }
 
 private:
-    WindowClass windowClass { L"CHOCWebView", (WNDPROC) wndProc };
+    Options options;
+    ::HBRUSH m_brush{ nullptr };
+    WindowClass windowClass;
     HWNDHolder hwnd;
     std::string defaultURI, setHTMLURI;
     WebView::Options::Resource pageHTML;
@@ -1765,7 +1777,6 @@ private:
     //==============================================================================
     WebView& owner;
     WebViewDLL webviewDLL;
-    Options options;
     ICoreWebView2Environment* coreWebViewEnvironment = nullptr;
     ICoreWebView2* coreWebView = nullptr;
     ICoreWebView2Controller* coreWebViewController = nullptr;
@@ -5865,5 +5876,5 @@ inline choc::ui::WebViewDLL choc::ui::getWebview2LoaderDLL()
 }
 
 #endif
-
+// clang-format on
 #endif // CHOC_WEBVIEW_HEADER_INCLUDED

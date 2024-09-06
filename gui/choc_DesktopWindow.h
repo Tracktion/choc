@@ -406,6 +406,7 @@ namespace choc::ui {
 #define NOMINMAX
 #define Rectangle Rectangle_renamed_to_avoid_name_collisions
 #include <windows.h>
+#include <wingdi.h>
 #undef Rectangle
 
 namespace choc::ui {
@@ -453,7 +454,7 @@ namespace choc::ui {
     };
 
     struct WindowClass {
-        WindowClass(std::wstring name, WNDPROC wndProc) {
+        WindowClass(std::wstring name, WNDPROC wndProc, ::HBRUSH brush = nullptr) {
             name += std::to_wstring(static_cast<uint32_t>(GetTickCount()));
 
             moduleHandle = GetModuleHandle(nullptr);
@@ -468,6 +469,9 @@ namespace choc::ui {
             wc.hIcon = icon;
             wc.hIconSm = icon;
             wc.lpfnWndProc = wndProc;
+            if (brush) {
+                wc.hbrBackground = brush;
+            }
 
             classAtom = (LPCWSTR)(uintptr_t)RegisterClassExW(&wc);
             CHOC_ASSERT(classAtom != 0);
