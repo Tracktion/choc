@@ -468,6 +468,8 @@ namespace choc::ui {
             wc.hIcon = icon;
             wc.hIconSm = icon;
             wc.lpfnWndProc = wndProc;
+            //            auto brush = ::CreateSolidBrush(RGB(255, 0, 0));
+            //            wc.hbrBackground = brush;
 
             classAtom = (LPCWSTR)(uintptr_t)RegisterClassExW(&wc);
             CHOC_ASSERT(classAtom != 0);
@@ -480,6 +482,8 @@ namespace choc::ui {
         HWNDHolder createWindow(DWORD style, int w, int h, void* userData) {
             if (auto hwnd = CreateWindowW(classAtom, L"", style, CW_USEDEFAULT, CW_USEDEFAULT, w, h, nullptr, nullptr, moduleHandle, nullptr)) {
                 SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)userData);
+                SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+                SetLayeredWindowAttributes(hwnd, RGB(255, 255, 255), 0, LWA_COLORKEY);
                 return hwnd;
             }
 
