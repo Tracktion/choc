@@ -123,7 +123,7 @@ public:
         /// Where supported, this property gives the webview a transparent background
         /// by default, so you can avoid a flash of white while it's loading the
         /// content.
-        bool transparentBackground = false;
+        bool transparentBackground = true;
 
         std::optional<std::string> initScript{};
     };
@@ -1351,7 +1351,6 @@ struct WebView::Pimpl
         }
 
         hwnd.reset();
-        ::DeleteObject(m_brush);
     }
 
     static constexpr const char* postMessageFn = "window.chrome.webview.postMessage";
@@ -1408,7 +1407,6 @@ struct WebView::Pimpl
 
 private:
     Options options;
-    ::HBRUSH m_brush{ nullptr };
     WindowClass windowClass;
     HWNDHolder hwnd;
     std::string defaultURI, setHTMLURI;
