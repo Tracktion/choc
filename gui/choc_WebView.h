@@ -15,10 +15,11 @@
 //   CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
 //   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
+// clang-format off
 #ifndef CHOC_WEBVIEW_HEADER_INCLUDED
 #define CHOC_WEBVIEW_HEADER_INCLUDED
 
+// clang-format off
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -119,8 +120,12 @@ public:
         /// Leave blank for a default.
         std::string customSchemeURI;
 
+        /// Where supported, this property gives the webview a transparent background
+        /// by default, so you can avoid a flash of white while it's loading the
+        /// content.
+        bool transparentBackground = false;
+
         std::optional<std::string> initScript{};
-        std::uint32_t backgroundColour{ 0x000000 };
     };
 
     /// Creates a WebView with default options
@@ -504,6 +509,8 @@ struct choc::ui::WebView::Pimpl
         call<void> (webview, "setUIDelegate:", delegate);
         call<void> (webview, "setNavigationDelegate:", delegate);
 
+        if (options->transparentBackground)
+            call<void> (webview, "setValue:forKey:", getNSNumberBool (false), getNSString ("drawsBackground"));
 
         call<void> (config, "release");
 
@@ -950,6 +957,7 @@ struct EventRegistrationToken { __int64 value; };
 
 typedef interface ICoreWebView2 ICoreWebView2;
 typedef interface ICoreWebView2Controller ICoreWebView2Controller;
+typedef interface ICoreWebView2Controller2 ICoreWebView2Controller2;
 typedef interface ICoreWebView2Environment ICoreWebView2Environment;
 typedef interface ICoreWebView2HttpHeadersCollectionIterator ICoreWebView2HttpHeadersCollectionIterator;
 typedef interface ICoreWebView2HttpRequestHeaders ICoreWebView2HttpRequestHeaders;
@@ -1196,6 +1204,15 @@ public:
     virtual HRESULT STDMETHODCALLTYPE get_CoreWebView2(ICoreWebView2**) = 0;
 };
 
+struct COREWEBVIEW2_COLOR { BYTE A; BYTE R; BYTE G; BYTE B; };
+
+MIDL_INTERFACE("c979903e-d4ca-4228-92eb-47ee3fa96eab")
+ICoreWebView2Controller2 : public ICoreWebView2Controller
+{
+    virtual HRESULT STDMETHODCALLTYPE get_DefaultBackgroundColor (COREWEBVIEW2_COLOR*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE put_DefaultBackgroundColor (COREWEBVIEW2_COLOR) = 0;
+};
+
 STDAPI CreateCoreWebView2EnvironmentWithOptions(PCWSTR, PCWSTR, void*, ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler*);
 
 MIDL_INTERFACE("0702fc30-f43b-47bb-ab52-a42cb552ad9f")
@@ -1280,13 +1297,8 @@ struct WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& opts)
         : owner (v),
-         options (opts), 
-         m_brush(::CreateSolidBrush(RGB(
-            (opts.backgroundColour >> 12) & 0xFF,
-            (opts.backgroundColour >> 8) & 0xFF,
-            opts.backgroundColour & 0xFF
-         ))),
-         windowClass(L"CHOCWebView", (WNDPROC)wndProc, m_brush)
+         options (opts),      ))),
+         windowClass(L"CHOCWebView", (WNDPROC)wndProc)
     {
         CoInitialize (nullptr);
 
@@ -1540,6 +1552,19 @@ private:
             view->AddRef();
             coreWebViewController = controller;
             coreWebView = view;
+
+            if (options.transparentBackground)
+            {
+                auto guid = IID { 0xc979903e, 0xd4ca, 0x4228, { 0x92, 0xeb, 0x47, 0xee, 0x3f, 0xa9, 0x6e, 0xab } };
+                ICoreWebView2Controller2* controller2 = {};
+
+                if (controller->QueryInterface (guid, (void**) std::addressof (controller2)) == S_OK
+                                   && controller2 != nullptr)
+                {
+                    controller2->put_DefaultBackgroundColor ({ 0, 0, 0, 0 });
+                    controller2->Release();
+                }
+            }
         }
 
         webviewInitialising.clear();
