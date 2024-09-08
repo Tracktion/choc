@@ -3171,7 +3171,7 @@ static void testHTTPServer (choc::test::TestProgress& progress)
                 [] (boost::beast::websocket::request_type& req)
                 {
                     req.set (boost::beast::http::field::user_agent,
-                        std::string (BOOST_BEAST_VERSION_STRING) + " websocket-client-coro");
+                             std::string (BOOST_BEAST_VERSION_STRING) + " websocket-client-coro");
                 }));
 
             // Perform the websocket handshake
@@ -3236,7 +3236,7 @@ static void testHTTPServer (choc::test::TestProgress& progress)
 
                 // Prepare another read callback to be processed by the thread
                 ws.async_read (destBuffer,
-                            [this] (auto code, auto bytes) { readMessage (code, bytes); });
+                               [this] (auto code, auto bytes) { readMessage (code, bytes); });
             }
         }
     };
