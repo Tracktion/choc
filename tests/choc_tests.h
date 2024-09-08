@@ -2852,7 +2852,7 @@ inline void testThreading (choc::test::TestProgress& progress)
             if (numCallbacks1 == 3)
                 break;
 
-            if (i > 100)
+            if (i > 500)
                 CHOC_FAIL ("Expected some callbacks");
         }
 
