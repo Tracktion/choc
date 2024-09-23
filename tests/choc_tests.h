@@ -19,6 +19,7 @@
 #ifndef CHOC_TESTS_HEADER_INCLUDED
 #define CHOC_TESTS_HEADER_INCLUDED
 
+#include "../platform/choc_BuildDate.h"
 #include "../containers/choc_ZipFile.h"
 #include "../platform/choc_FileWatcher.h"
 #include "../threading/choc_ThreadSafeFunctor.h"
@@ -138,6 +139,13 @@ inline void testPlatform (choc::test::TestProgress& progress)
     {
         CHOC_TEST (DetectDebugger)
         CHOC_EXPECT_FALSE (choc::isDebuggerActive());
+    }
+
+    {
+        CHOC_TEST (BuildDate)
+        // For the purpose of testing, we'll assume you always do a fresh build
+        // before running this.
+        CHOC_EXPECT_TRUE (choc::getDaysSinceBuildDate() < 5);
     }
 
     {
