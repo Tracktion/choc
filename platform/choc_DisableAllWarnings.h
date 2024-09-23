@@ -72,6 +72,7 @@
  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
  #pragma GCC diagnostic ignored "-Wuse-after-free"
  #pragma GCC diagnostic ignored "-Warray-bounds"
+ #pragma GCC diagnostic ignored "-Wvolatile"
  #ifndef __MINGW32__
   #pragma GCC diagnostic ignored "-Wredundant-move"
  #endif

@@ -1978,8 +1978,9 @@ inline WebView::Options::Resource::Resource (std::string_view content, std::stri
 {
     if (! content.empty())
     {
-        auto src = content.data();
-        data.insert (data.end(), src, src + content.length());
+        // NB: not using vector::insert() because it triggers some stupid glib bug in MINGW
+        data.resize (content.length());
+        std::memcpy (data.data(), content.data(), content.length());
     }
 
     mimeType = std::move (mime);

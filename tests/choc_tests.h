@@ -2849,7 +2849,7 @@ inline void testThreading (choc::test::TestProgress& progress)
         {
             std::this_thread::sleep_for (std::chrono::milliseconds (5));
 
-            if (numCallbacks1 == 3)
+            if (numCallbacks1 == 3 && numCallbacks2 == 1)
                 break;
 
             if (i > 500)

@@ -12,6 +12,7 @@ add_executable(choc_tests main.cpp main2.cpp)
 # folder at this location:
 # set(BOOST_LOCATION "/Users/jules/code/cmajor-dev/cmajor/3rdParty/boost")
 
+target_compile_features(choc_tests PRIVATE cxx_std_20)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -71,9 +72,6 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /W4 /WX -DWIN32 /bigobj ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-
-    # MSVC seems to throw up more problems with C++20 mode than C++17
-    target_compile_features(choc_tests PRIVATE cxx_std_20)
 endif()
 
 # On OSX, need to add the WebKit framework for WebView functionality
