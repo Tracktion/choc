@@ -29,20 +29,20 @@ namespace choc
     {
         using namespace std::chrono;
 
-        constexpr month m (__DATE__[0] == 'J' ? (__DATE__[1] == 'a' ? 1
-                                              : (__DATE__[2] == 'n' ? 6 : 7))
+        constexpr month m (__DATE__[0] == 'J' ? (__DATE__[1] == 'a' ? 1u
+                                              : (__DATE__[2] == 'n' ? 6u : 7u))
                          : __DATE__[0] == 'F' ? 2
-                         : __DATE__[0] == 'M' ? (__DATE__[2] == 'r' ? 3 : 5)
-                         : __DATE__[0] == 'A' ? (__DATE__[1] == 'p' ? 4 : 8)
-                         : __DATE__[0] == 'S' ? 9
-                         : __DATE__[0] == 'O' ? 10
-                         : __DATE__[0] == 'N' ? 11
-                         : __DATE__[0] == 'D' ? 12
-                         : 0);
+                         : __DATE__[0] == 'M' ? (__DATE__[2] == 'r' ? 3u : 5u)
+                         : __DATE__[0] == 'A' ? (__DATE__[1] == 'p' ? 4u : 8u)
+                         : __DATE__[0] == 'S' ? 9u
+                         : __DATE__[0] == 'O' ? 10u
+                         : __DATE__[0] == 'N' ? 11u
+                         : __DATE__[0] == 'D' ? 12u
+                         : 0u);
 
-        constexpr day d ((__DATE__[4] == ' ') ? (__DATE__[5] - '0')
-                                              : (__DATE__[4] - '0') * 10
-                                                  + (__DATE__[5] - '0'));
+        constexpr day d ((__DATE__[4] == ' ') ? static_cast<unsigned> (__DATE__[5] - '0')
+                                              : static_cast<unsigned> ((__DATE__[4] - '0') * 10
+                                                                         + (__DATE__[5] - '0')));
 
         constexpr year y ((__DATE__[7] - '0') * 1000
                             + (__DATE__[8] - '0') * 100
