@@ -108,6 +108,16 @@ namespace choc::messageloop
         struct Pimpl;
         std::unique_ptr<Pimpl> pimpl;
     };
+
+    //==============================================================================
+    /// Triggers a one-shot timer callback of a given lambda function after a given
+    /// interval.
+    /// This uses the Timer class, but saves you needing to keep a Timer object alive,
+    /// if you just need a fire-and-forget event.
+    /// The callback function should just be a void lambda.
+    template <typename Callback>
+    void setTimeout (uint32_t intervalMillisecs, Callback&& callbackFunction);
+
 }
 
 
@@ -527,6 +537,19 @@ inline Timer::Timer (uint32_t interval, Callback&& cb)
 {
     CHOC_ASSERT (cb != nullptr); // The callback must be a valid function!
     pimpl = std::make_unique<Pimpl> (std::move (cb), interval);
+}
+
+template <typename Callback>
+void setTimeout (uint32_t intervalMillisecs, Callback&& callback)
+{
+    auto t = new Timer();
+
+    *t = Timer (intervalMillisecs, [t, c = std::move (callback)]
+    {
+        c();
+        postMessage ([t] { delete t; });
+        return false;
+    });
 }
 
 } // namespace choc::messageloop
