@@ -73,6 +73,9 @@ public:
         /// If supported, this enables developer features in the browser
         bool enableDebugMode = false;
 
+        /// If supported, this pops up a separate debug inspector window
+        bool enableDebugInspector = false;
+
         /// On OSX, setting this to true will allow the first click on a non-focused
         /// webview to be used as input, rather than the default behaviour, which is
         /// for the first click to give the webview focus but not trigger any action.
@@ -246,6 +249,12 @@ struct choc::ui::WebView::Pimpl
         {
             webkit_settings_set_enable_write_console_messages_to_stdout (settings, true);
             webkit_settings_set_enable_developer_extras (settings, true);
+        }
+
+        if (options.enableDebugInspector)
+        {
+            if (auto inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector (WEBKIT_WEB_VIEW (webview))))
+                webkit_web_inspector_show (inspector);
         }
 
         if (! options.customUserAgent.empty())
