@@ -2964,9 +2964,6 @@ inline Value Value::deserialise (InputData& input)
         auto stringDataSize = Type::SerialisationHelpers::readVariableLengthInt (input);
         Type::SerialisationHelpers::expect (stringDataSize <= static_cast<uint32_t> (input.end - input.start));
         v.dictionary.setRawData (input.start, stringDataSize);
-//        v.dictionary.strings.resize (stringDataSize);
-//        std::memcpy (v.dictionary.strings.data(), input.start, stringDataSize);
-//        Type::SerialisationHelpers::expect (v.dictionary.strings.back() == 0);
     }
 
     return v;
@@ -3273,7 +3270,7 @@ inline std::pair<std::vector<uint32_t>::const_iterator, bool> SimpleStringDictio
 {
     bool exactMatch = false;
 
-    auto it = std::lower_bound(stringMap.begin(), stringMap.end(), v, [&] (uint32_t i, std::string_view sv) -> bool
+    auto it = std::lower_bound (stringMap.begin(), stringMap.end(), v, [&] (uint32_t i, std::string_view sv) -> bool
     {
         auto c = sv.compare (getStringForHandle ( { i }));
 
