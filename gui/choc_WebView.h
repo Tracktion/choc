@@ -246,9 +246,6 @@ struct choc::ui::WebView::Pimpl
         {
             webkit_settings_set_enable_write_console_messages_to_stdout (settings, true);
             webkit_settings_set_enable_developer_extras (settings, true);
-
-            if (auto inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector (WEBKIT_WEB_VIEW (webview))))
-                webkit_web_inspector_show (inspector);
         }
 
         if (! options.customUserAgent.empty())
@@ -390,11 +387,6 @@ struct choc::ui::WebView::Pimpl
                     }
 
                     g_free (json);
-                }
-                else
-                {
-                    if (errorMessage.empty())
-                        errorMessage = "Failed to convert result to JSON";
                 }
 
                #if WEBKIT_CHECK_VERSION (2, 40, 0)
