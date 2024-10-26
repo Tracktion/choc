@@ -9457,6 +9457,14 @@ int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
 #define CONFIG_STACK_CHECK
 #endif
 
+// Avoid enabling the stack check if the sanitiser is active, as it causes all
+// kinds of (hopefully) spurious exceptions
+#if defined (__has_feature)
+ #if __has_feature (address_sanitizer) && __has_feature (undefined_behavior_sanitizer)
+  #undef CONFIG_STACK_CHECK
+ #endif
+#endif
+
 
 /* dump object free */
 //#define DUMP_FREE
