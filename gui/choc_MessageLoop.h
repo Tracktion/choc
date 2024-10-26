@@ -98,7 +98,7 @@ namespace choc::messageloop
 
         /// Stops and clears the timer. (You can also clear a Timer
         /// by assigning an empty Timer to it).
-        void clear()                    { pimpl.reset(); }
+        void clear();
 
         /// Returns true if the Timer has been initialised with
         /// a callback, or false if it's just an empty object.
@@ -551,6 +551,8 @@ void setTimeout (uint32_t intervalMillisecs, Callback&& callback)
         return false;
     });
 }
+
+inline void Timer::clear()   { pimpl.reset(); }
 
 } // namespace choc::messageloop
 
