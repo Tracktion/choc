@@ -19,7 +19,7 @@
 #ifndef CHOC_OBJC_HELPERS_HEADER_INCLUDED
 #define CHOC_OBJC_HELPERS_HEADER_INCLUDED
 
-#include "../platform/choc_Platform.h"
+#include "choc_Platform.h"
 
 #if CHOC_APPLE
 
@@ -28,7 +28,7 @@
 #include <objc/message.h>
 #include <type_traits>
 
-#include "../platform/choc_Assert.h"
+#include "choc_Assert.h"
 
 
 //==============================================================================
