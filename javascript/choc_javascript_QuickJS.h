@@ -220,18 +220,6 @@ static inline int clz32(unsigned int a)
 }
 
 /* WARNING: undefined if a = 0 */
-static inline int clz64(uint64_t a)
-{
-   #if _MSC_VER
-    unsigned long i;
-    _BitScanReverse64 (&i, a);
-    return 63 ^ i;
-   #else
-    return __builtin_clzll(a);
-   #endif
-}
-
-/* WARNING: undefined if a = 0 */
 static inline int ctz32(unsigned int a)
 {
    #if _MSC_VER
@@ -240,18 +228,6 @@ static inline int ctz32(unsigned int a)
     return 31 ^ i;
    #else
     return __builtin_ctz(a);
-   #endif
-}
-
-/* WARNING: undefined if a = 0 */
-static inline int ctz64(uint64_t a)
-{
-   #if _MSC_VER
-    unsigned long i;
-    _BitScanForward64 (&i, a);
-    return 63 ^ i;
-   #else
-    return __builtin_ctzll(a);
    #endif
 }
 
