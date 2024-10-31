@@ -2442,6 +2442,12 @@ void ValueView::serialise (OutputStream& output) const
      uint8_t* localCopy = nullptr;
 
     #if _MSC_VER
+
+     #ifdef __clang__
+      #pragma clang diagnostic push
+      #pragma clang diagnostic ignored "-Wlanguage-extension-token"
+     #endif
+
      __try
      {
          localCopy = (uint8_t*) _alloca (dataSize);
@@ -2450,6 +2456,11 @@ void ValueView::serialise (OutputStream& output) const
      {
          throwError ("Stack overflow");
      }
+
+     #ifdef __clang__
+      #pragma clang diagnostic pop
+     #endif
+
     #else
      localCopy = (uint8_t*) alloca (dataSize);
     #endif
