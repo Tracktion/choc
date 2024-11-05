@@ -368,13 +368,7 @@ struct Timer::Pimpl
 //==============================================================================
 #elif CHOC_WINDOWS
 
-#undef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#undef  NOMINMAX
-#define NOMINMAX
-#define Rectangle Rectangle_renamed_to_avoid_name_collisions
-#include <windows.h>
-#undef Rectangle
+#include "../platform/choc_Windows.h"
 
 namespace choc::messageloop
 {
