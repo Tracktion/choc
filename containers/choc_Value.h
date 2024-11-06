@@ -2439,28 +2439,15 @@ void ValueView::serialise (OutputStream& output) const
         return;
     }
 
-    uint8_t* localCopy = nullptr;
-
-   #if _MSC_VER
-    #ifdef __clang__
-     #pragma clang diagnostic push
-     #pragma clang diagnostic ignored "-Wlanguage-extension-token"
-    #endif
-
-    __try
-    {
-        localCopy = (uint8_t*) _alloca (dataSize);
-    }
-    __except (1)
-    {
-        throwError ("Stack overflow");
-    }
-
-    #ifdef __clang__
-     #pragma clang diagnostic pop
-    #endif
+   #if defined (_MSC_VER)
+    #pragma warning (push)
+    #pragma warning (disable: 6255)
+    auto* localCopy = (uint8_t*) _alloca (dataSize);
+    #pragma warning (pop)
+   #elif defined (__MINGW32__)
+    auto* localCopy = (uint8_t*) _alloca (dataSize);
    #else
-    localCopy = (uint8_t*) alloca (dataSize);
+    auto* localCopy = (uint8_t*) alloca (dataSize);
    #endif
 
     check (localCopy != nullptr, "Stack allocation failed");
