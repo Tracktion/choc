@@ -1297,7 +1297,7 @@ struct WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& opts)
         : owner (v),
-         options (opts),      ))),
+         options (opts),
          windowClass(L"CHOCWebView", (WNDPROC)wndProc)
     {
         CoInitialize (nullptr);
