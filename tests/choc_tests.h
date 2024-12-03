@@ -2874,7 +2874,9 @@ inline void testThreading (choc::test::TestProgress& progress)
             choc::threading::ThreadSafeFunctor<std::function<void(int)>> tsf;
 
             int result = 0;
+            CHOC_EXPECT_FALSE (tsf);
             tsf = [&] (int x) { result = x; };
+            CHOC_EXPECT_TRUE (tsf);
             CHOC_EXPECT_TRUE (tsf (2));
             tsf.reset();
             CHOC_EXPECT_FALSE (tsf (3));
