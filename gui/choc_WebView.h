@@ -2094,7 +2094,7 @@ inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebVi
 
 */
 
-#if CHOC_WINDOWS
+#if CHOC_USE_INTERNAL_WEBVIEW_DLL
 
 #ifdef CHOC_REGISTER_OPEN_SOURCE_LICENCE
  CHOC_REGISTER_OPEN_SOURCE_LICENCE (WebView2Loader, R"(
@@ -5897,6 +5897,6 @@ inline choc::ui::WebViewDLL choc::ui::getWebview2LoaderDLL()
     return choc::memory::MemoryDLL (dllData, sizeof (dllData));
 }
 
-#endif
+#endif // CHOC_USE_INTERNAL_WEBVIEW_DLL
 
 #endif // CHOC_WEBVIEW_HEADER_INCLUDED
