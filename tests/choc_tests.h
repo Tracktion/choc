@@ -766,6 +766,16 @@ inline void testValues (choc::test::TestProgress& progress)
         {
             CHOC_EXPECT_EQ (e.description, std::string ("Index out of range"));
         }
+
+        try
+        {
+            auto o = choc::value::createObject (std::string_view ("xx\0x", 4u));
+            CHOC_FAIL ("Failed to fail");
+        }
+        catch (choc::value::Error& e)
+        {
+            CHOC_EXPECT_EQ (e.description, std::string ("Object names may not contain a null character"));
+        }
     }
 
     {

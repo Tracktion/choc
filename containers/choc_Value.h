@@ -251,10 +251,12 @@ public:
 
     //==============================================================================
     /// Returns a type representing an empty object, with the given class name.
+    /// Note that the name must be a valid UTF8 string, and may not contain a null character.
     static Type createObject (std::string_view className, Allocator* allocator = nullptr);
 
     /// Appends a member to an object type, with the given name and type. This will throw an Error if
     /// this isn't possible for some reason.
+    /// Note that the name must be a valid UTF8 string, and may not contain a null character.
     void addObjectMember (std::string_view memberName, Type memberType);
 
     //==============================================================================
@@ -1107,6 +1109,8 @@ namespace
     {
         if (auto size = s.length())
         {
+            check (s.find ('\0') == std::string_view::npos, "Object names may not contain a null character");
+
             auto data = static_cast<char*> (allocateBytes (a, size + 1));
             std::memcpy (data, s.data(), size);
             data[size] = 0;
@@ -3238,6 +3242,8 @@ inline SimpleStringDictionary::Handle SimpleStringDictionary::getHandleForString
         return { *i.first };
 
     auto newHandle = static_cast<decltype(Handle::handle)> (strings.size() + 1);
+
+    check (text.find ('\0') == std::string_view::npos, "SimpleStringDictionary can't hold strings which contain a null character");
 
     if (strings.size() > 100 && (strings.capacity() < (strings.size() + text.length() + 1)))
         strings.reserve (strings.size() + 1000);
