@@ -1464,6 +1464,7 @@ private:
         {
             COMPtr<EventHandler> handler (new EventHandler (*this));
             webviewInitialising.test_and_set();
+            auto localDeletionChecker = deletionChecker;
 
             if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
                                                                    webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
@@ -1477,6 +1478,9 @@ private:
                     {
                         TranslateMessage (std::addressof (msg));
                         DispatchMessage (std::addressof (msg));
+
+                        if (localDeletionChecker->deleted)
+                            return false;
 
                         if (msg.message == WM_TIMER && msg.hwnd == nullptr && msg.wParam == timeoutTimer)
                             break;
