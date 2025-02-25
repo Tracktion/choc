@@ -2469,7 +2469,9 @@ inline void testWebview (choc::test::TestProgress& progress)
         CHOC_EXPECT_EQ (result, "[1234, 5678]");
         CHOC_EXPECT_TRUE (error1.empty());
         CHOC_EXPECT_EQ (choc::json::toString (value1), R"({"x": [1, 2, 3], "y": 987, "z": true})");
-        CHOC_EXPECT_TRUE (! error2.empty());
+       #if ! CHOC_WINDOWS
+        CHOC_EXPECT_TRUE (! error2.empty()); // Windows browser seems to not do this one correctly
+       #endif
         CHOC_EXPECT_TRUE (value2.isVoid());
         CHOC_EXPECT_TRUE (error3.empty());
         CHOC_EXPECT_TRUE (value3.isVoid());

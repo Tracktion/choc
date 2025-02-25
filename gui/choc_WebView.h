@@ -330,7 +330,8 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
-    bool loadedOK() const           { return getViewHandle() != nullptr; }
+    bool hasFailed() const          { return getViewHandle() == nullptr; }
+    bool stillInitialising() const  { return false; }
     void* getViewHandle() const     { return (void*) webview; }
 
     std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
@@ -538,7 +539,8 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
-    bool loadedOK() const           { return getViewHandle() != nullptr; }
+    bool hasFailed() const          { return getViewHandle() == nullptr; }
+    bool stillInitialising() const  { return false; }
     void* getViewHandle() const     { return (CHOC_OBJC_CAST_BRIDGED void*) webview; }
 
     std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
@@ -1103,6 +1105,8 @@ ICoreWebView2Settings2 : public ICoreWebView2Settings
 public:
     virtual HRESULT STDMETHODCALLTYPE get_UserAgent(LPWSTR * userAgent) = 0;
     virtual HRESULT STDMETHODCALLTYPE put_UserAgent(LPCWSTR userAgent) = 0;
+
+    static IID getIID() { return { 0xee9a0f68, 0xf46c, 0x4e32, { 0xac, 0x23, 0xef, 0x8c, 0xac, 0x22, 0x4d, 0x2a } }; }
 };
 
 MIDL_INTERFACE("15e1c6a3-c72a-4df3-91d7-d097fbec6bfd")
@@ -1212,6 +1216,9 @@ ICoreWebView2Controller2 : public ICoreWebView2Controller
 {
     virtual HRESULT STDMETHODCALLTYPE get_DefaultBackgroundColor (COREWEBVIEW2_COLOR*) = 0;
     virtual HRESULT STDMETHODCALLTYPE put_DefaultBackgroundColor (COREWEBVIEW2_COLOR) = 0;
+
+    static IID getIID()     { return { 0xc979903e, 0xd4ca, 0x4228, { 0x92, 0xeb, 0x47, 0xee, 0x3f, 0xa9, 0x6e, 0xab } }; }
+
 };
 
 STDAPI CreateCoreWebView2EnvironmentWithOptions(PCWSTR, PCWSTR, void*, ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler*);
@@ -1319,10 +1326,16 @@ struct WebView::Pimpl
 
         SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
 
-        if (createEmbeddedWebView())
+        if (auto userDataFolder = getUserDataFolder(); ! userDataFolder.empty())
         {
-            resizeContentToFit();
-            // coreWebViewController->MoveFocus (COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+            if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
+                                                                   webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
+            {
+                eventHandler = new EventHandler (*this);
+                createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, eventHandler);
+
+                runMessageLoopUntilInitComplete();
+            }
         }
     }
 
@@ -1330,52 +1343,58 @@ struct WebView::Pimpl
     {
         deletionChecker->deleted = true;
 
-        if (coreWebView != nullptr)
-        {
-            coreWebView->Release();
-            coreWebView = nullptr;
-        }
-
-        if (coreWebViewController != nullptr)
-        {
-            coreWebViewController->Release();
-            coreWebViewController = nullptr;
-        }
-
-        if (coreWebViewEnvironment != nullptr)
-        {
-            coreWebViewEnvironment->Release();
-            coreWebViewEnvironment = nullptr;
-        }
-
+        eventHandler.reset();
+        coreWebView.reset();
+        coreWebViewController.reset();
+        coreWebViewEnvironment.reset();
         hwnd.reset();
+    }
+
+    // This is a temporary hack while refactoring towards an async init model
+    void runMessageLoopUntilInitComplete()
+    {
+        MSG msg;
+
+        while (stillInitialising() && GetMessage (std::addressof(msg), nullptr, 0, 0))
+        {
+            TranslateMessage (std::addressof(msg));
+            DispatchMessage (std::addressof(msg));
+
+            if (deletionChecker->deleted)
+                return;
+        }
     }
 
     static constexpr const char* postMessageFn = "window.chrome.webview.postMessage";
 
-    bool loadedOK() const           { return coreWebView != nullptr; }
+    bool hasFailed() const          { return ! eventHandler; }
+    bool stillInitialising() const  { return ! coreWebView; }
     void* getViewHandle() const     { return (void*) hwnd.hwnd; }
 
     std::shared_ptr<DeletionChecker> deletionChecker { std::make_shared<DeletionChecker>() };
 
     bool navigate (const std::string& url)
     {
+        if (! coreWebView)
+            return false;
+
         if (url.empty())
             return navigate (defaultURI);
 
-        CHOC_ASSERT (coreWebView != nullptr);
         return coreWebView->Navigate (createUTF16StringFromUTF8 (url).c_str()) == S_OK;
     }
 
     bool addInitScript (const std::string& script)
     {
-        CHOC_ASSERT (coreWebView != nullptr);
+        if (! coreWebView)
+            return false;
+
         return coreWebView->AddScriptToExecuteOnDocumentCreated (createUTF16StringFromUTF8 (script).c_str(), nullptr) == S_OK;
     }
 
     bool evaluateJavascript (const std::string& script, CompletionHandler&& ch)
     {
-        if (coreWebView == nullptr)
+        if (! coreWebView)
             return false;
 
         COMPtr<ExecuteScriptCompletedCallback> callback (ch ? new ExecuteScriptCompletedCallback (std::move (ch))
@@ -1386,7 +1405,9 @@ struct WebView::Pimpl
 
     bool setHTML (const std::string& html)
     {
-        CHOC_ASSERT (coreWebView != nullptr);
+        if (! coreWebView)
+            return false;
+
         pageHTML = { html, "text/html" };
         navigate (setHTMLURI);
         return true;
@@ -1398,17 +1419,83 @@ private:
     std::string defaultURI, setHTMLURI;
     WebView::Options::Resource pageHTML;
 
+    void webviewControllerCreationComplete (ICoreWebView2Controller* controller, ICoreWebView2* view)
+    {
+        if (controller == nullptr || view == nullptr)
+            return;
+
+        coreWebViewController = controller;
+        coreWebView = view;
+
+        if (options.transparentBackground)
+        {
+            COMPtr<ICoreWebView2Controller2> controller2;
+
+            if (controller->QueryInterface (ICoreWebView2Controller2::getIID(), (void**) controller2.getAddress()) == S_OK
+                  && controller2 != nullptr)
+            {
+                controller2->put_DefaultBackgroundColor ({ 0, 0, 0, 0 });
+            }
+        }
+
+        auto wildcardFilter = createUTF16StringFromUTF8 (defaultURI + "*");
+        coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+        EventRegistrationToken token;
+        coreWebView->add_WebResourceRequested (eventHandler, std::addressof (token));
+
+        if (options.fetchResource)
+            navigate ({});
+
+        COMPtr<ICoreWebView2Settings> settings;
+
+        if (coreWebView->get_Settings (settings.getAddress()) == S_OK
+             && settings != nullptr)
+        {
+            settings->put_AreDevToolsEnabled (options.enableDebugMode);
+
+            if (! options.customUserAgent.empty())
+            {
+                COMPtr<ICoreWebView2Settings2> settings2;
+
+                if (settings->QueryInterface (ICoreWebView2Settings2::getIID(), (void**) settings2.getAddress()) == S_OK
+                        && settings2 != nullptr)
+                {
+                    auto agent = createUTF16StringFromUTF8 (options.customUserAgent);
+                    settings2->put_UserAgent (agent.c_str());
+                }
+            }
+        }
+
+        resizeContentToFit();
+    }
+
+    bool environmentCreationComplete (ICoreWebView2Environment* env)
+    {
+        if (coreWebViewEnvironment || env == nullptr)
+            return false;
+
+        coreWebViewEnvironment = env;
+        return true;
+    }
+
     //==============================================================================
     template <typename Type>
     struct COMPtr
     {
+        COMPtr() = default;
         COMPtr (const COMPtr&) = delete;
         COMPtr (COMPtr&&) = delete;
         COMPtr (Type* o) : object (o) { if (object) object->AddRef(); }
-        ~COMPtr() { if (object) object->Release(); }
+        COMPtr& operator= (Type* o) { reset(); object = o; if (o) o->AddRef(); return *this; }
+        ~COMPtr()                   { reset(); }
+
+        void reset()                { if (object) { object->Release(); object = {}; } }
+        operator Type*() const      { return object; }
+        Type* operator->() const    { return object; }
+        Type** getAddress()         { return std::addressof (object); }
 
         Type* object = nullptr;
-        operator Type*() const  { return object; }
     };
 
     static std::string getMessageFromHRESULT (HRESULT hr)
@@ -1440,15 +1527,21 @@ private:
                 w->resizeContentToFit();
 
         if (msg == WM_SHOWWINDOW)
-            if (auto w = getPimpl (h); w->coreWebViewController != nullptr)
-                w->coreWebViewController->put_IsVisible (wp != 0);
+            if (auto w = getPimpl (h))
+                w->setVisible (wp != 0);
 
         return DefWindowProcW (h, msg, wp, lp);
     }
 
+    void setVisible (bool b)
+    {
+        if (coreWebViewController)
+            coreWebViewController->put_IsVisible (b);
+    }
+
     void resizeContentToFit()
     {
-        if (coreWebViewController != nullptr)
+        if (coreWebViewController)
         {
             RECT r;
             GetWindowRect (hwnd, &r);
@@ -1456,115 +1549,6 @@ private:
             r.left = r.top = 0;
             coreWebViewController->put_Bounds (r);
         }
-    }
-
-    bool createEmbeddedWebView()
-    {
-        if (auto userDataFolder = getUserDataFolder(); ! userDataFolder.empty())
-        {
-            COMPtr<EventHandler> handler (new EventHandler (*this));
-            webviewInitialising.test_and_set();
-            auto localDeletionChecker = deletionChecker;
-
-            if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
-                                                                   webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
-            {
-                if (createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, handler) == S_OK)
-                {
-                    MSG msg;
-                    auto timeoutTimer = SetTimer ({}, {}, 6000, {});
-
-                    while (webviewInitialising.test_and_set() && GetMessage (std::addressof (msg), nullptr, 0, 0))
-                    {
-                        TranslateMessage (std::addressof (msg));
-                        DispatchMessage (std::addressof (msg));
-
-                        if (localDeletionChecker->deleted)
-                            return false;
-
-                        if (msg.message == WM_TIMER && msg.hwnd == nullptr && msg.wParam == timeoutTimer)
-                            break;
-                    }
-
-                    KillTimer ({}, timeoutTimer);
-
-                    if (coreWebView == nullptr)
-                        return false;
-
-                    const auto wildcardFilter = createUTF16StringFromUTF8 (defaultURI + "*");
-                    coreWebView->AddWebResourceRequestedFilter (wildcardFilter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-
-                    EventRegistrationToken token;
-                    coreWebView->add_WebResourceRequested (handler, std::addressof (token));
-
-                    if (options.fetchResource)
-                        navigate ({});
-
-                    ICoreWebView2Settings* settings = nullptr;
-
-                    if (coreWebView->get_Settings (std::addressof (settings)) == S_OK
-                         && settings != nullptr)
-                    {
-                        settings->put_AreDevToolsEnabled (options.enableDebugMode);
-
-                        if (! options.customUserAgent.empty())
-                        {
-                            ICoreWebView2Settings2* settings2 = nullptr;
-
-                            // This palaver is needed because __uuidof doesn't work in MINGW
-                            auto guid = IID { 0xee9a0f68, 0xf46c, 0x4e32, { 0xac, 0x23, 0xef, 0x8c, 0xac, 0x22, 0x4d, 0x2a } };
-
-                            if (settings->QueryInterface (guid, (void**) std::addressof (settings2)) == S_OK
-                                 && settings2 != nullptr)
-                            {
-                                auto agent = createUTF16StringFromUTF8 (options.customUserAgent);
-                                settings2->put_UserAgent (agent.c_str());
-                            }
-                        }
-                    }
-
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    bool environmentCreated (ICoreWebView2Environment* env)
-    {
-        if (coreWebViewEnvironment != nullptr)
-            return false;
-
-        env->AddRef();
-        coreWebViewEnvironment = env;
-        return true;
-    }
-
-    void webviewCreated (ICoreWebView2Controller* controller, ICoreWebView2* view)
-    {
-        if (controller != nullptr && view != nullptr)
-        {
-            controller->AddRef();
-            view->AddRef();
-            coreWebViewController = controller;
-            coreWebView = view;
-
-            if (options.transparentBackground)
-            {
-                auto guid = IID { 0xc979903e, 0xd4ca, 0x4228, { 0x92, 0xeb, 0x47, 0xee, 0x3f, 0xa9, 0x6e, 0xab } };
-                ICoreWebView2Controller2* controller2 = {};
-
-                if (controller->QueryInterface (guid, (void**) std::addressof (controller2)) == S_OK
-                                   && controller2 != nullptr)
-                {
-                    controller2->put_DefaultBackgroundColor ({ 0, 0, 0, 0 });
-                    controller2->Release();
-                }
-            }
-        }
-
-        webviewInitialising.clear();
     }
 
     std::optional<WebView::Options::Resource> fetchResourceOrPageHTML (const std::string& uri)
@@ -1577,66 +1561,49 @@ private:
 
     HRESULT onResourceRequested (ICoreWebView2WebResourceRequestedEventArgs* args)
     {
-        struct ScopedExit
-        {
-            using Fn = std::function<void()>;
-
-            explicit ScopedExit (Fn&& fn) : onExit (std::move (fn)) {}
-
-            ScopedExit (const ScopedExit&) = delete;
-            ScopedExit (ScopedExit&&) = delete;
-            ScopedExit& operator= (const ScopedExit&) = delete;
-            ScopedExit& operator= (ScopedExit&&) = delete;
-
-            ~ScopedExit()
-            {
-                if (onExit)
-                    onExit();
-            }
-
-            Fn onExit;
-        };
-
-        auto makeCleanup          = [](auto*& ptr, auto cleanup) { return [&ptr, cleanup] { if (ptr) cleanup (ptr); }; };
-        auto makeCleanupIUnknown  = [](auto*& ptr)               { return [&ptr]          { if (ptr) ptr->Release(); }; };
-
         try
         {
-            if (coreWebViewEnvironment == nullptr)
+            if (! coreWebViewEnvironment)
                 return E_FAIL;
 
-            ICoreWebView2WebResourceRequest* request = {};
-            ScopedExit cleanupRequest (makeCleanupIUnknown (request));
+            COMPtr<ICoreWebView2WebResourceRequest> request;
 
-            if (args->get_Request (std::addressof (request)) != S_OK)
+            if (args->get_Request (request.getAddress()) != S_OK)
                 return E_FAIL;
 
-            LPWSTR uri = {};
-            ScopedExit cleanupUri (makeCleanup (uri, CoTaskMemFree));
-
-            if (request->get_Uri (std::addressof (uri)) != S_OK)
-                return E_FAIL;
-
-            ICoreWebView2WebResourceResponse* response = {};
-            ScopedExit cleanupResponse (makeCleanupIUnknown (response));
-
-            if (const auto resource = fetchResourceOrPageHTML (createUTF8FromUTF16 (uri)))
+            struct URIStringPtr
             {
-                const auto makeMemoryStream = [](const auto* data, auto length) -> IStream*
+                ~URIStringPtr()
+                {
+                    if (uri)
+                        CoTaskMemFree (uri);
+                }
+
+                LPWSTR uri = {};
+            };
+
+            URIStringPtr uri;
+
+            if (request->get_Uri (std::addressof (uri.uri)) != S_OK)
+                return E_FAIL;
+
+            COMPtr<ICoreWebView2WebResourceResponse> response;
+
+            if (auto resource = fetchResourceOrPageHTML (createUTF8FromUTF16 (uri.uri)))
+            {
+                COMPtr<IStream> stream;
+
                 {
                     choc::file::DynamicLibrary lib ("shlwapi.dll");
                     using SHCreateMemStreamFn = IStream*(__stdcall *)(const BYTE*, UINT);
-                    auto fn = reinterpret_cast<SHCreateMemStreamFn> (lib.findFunction ("SHCreateMemStream"));
-                    return fn ? fn (data, length) : nullptr;
+
+                    if (auto fn = reinterpret_cast<SHCreateMemStreamFn> (lib.findFunction ("SHCreateMemStream")))
+                        stream.object = fn (reinterpret_cast<const BYTE*> (resource->data.data()),
+                                            static_cast<UINT> (resource->data.size()));
                 };
 
-                auto* stream = makeMemoryStream (reinterpret_cast<const BYTE*> (resource->data.data()),
-                                                 static_cast<UINT> (resource->data.size()));
-
-                if (stream == nullptr)
+                if (! stream)
                     return E_FAIL;
-
-                ScopedExit cleanupStream (makeCleanupIUnknown (stream));
 
                 std::vector<std::string> headers;
                 headers.emplace_back ("Content-Type: " + resource->mimeType);
@@ -1648,24 +1615,21 @@ private:
 
                 const auto headerString = createUTF16StringFromUTF8 (choc::text::joinStrings (headers, "\n"));
 
-                if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headerString.c_str(), std::addressof (response)) != S_OK)
+                if (coreWebViewEnvironment->CreateWebResourceResponse (stream, 200, L"OK", headerString.c_str(), response.getAddress()) != S_OK)
                     return E_FAIL;
             }
             else
             {
-                if (coreWebViewEnvironment->CreateWebResourceResponse (nullptr, 404, L"Not Found", nullptr, std::addressof (response)) != S_OK)
+                if (coreWebViewEnvironment->CreateWebResourceResponse (nullptr, 404, L"Not Found", nullptr, response.getAddress()) != S_OK)
                     return E_FAIL;
             }
 
-            if (args->put_Response (response) != S_OK)
-                return E_FAIL;
+            if (args->put_Response (response) == S_OK)
+                return S_OK;
         }
-        catch (...)
-        {
-            return E_FAIL;
-        }
+        catch (...) {}
 
-        return S_OK;
+        return E_FAIL;
     }
 
     //==============================================================================
@@ -1691,7 +1655,7 @@ private:
             if (env == nullptr)
                 return E_FAIL;
 
-            if (! ownerPimpl.environmentCreated (env))
+            if (! ownerPimpl.environmentCreationComplete (env))
                 return E_FAIL;
 
             env->CreateCoreWebView2Controller (ownerPimpl.hwnd, this);
@@ -1712,7 +1676,7 @@ private:
             EventRegistrationToken token;
             view->add_WebMessageReceived (this, std::addressof (token));
             view->add_PermissionRequested (this, std::addressof (token));
-            ownerPimpl.webviewCreated (controller, view);
+            ownerPimpl.webviewControllerCreationComplete (controller, view);
             return S_OK;
         }
 
@@ -1802,10 +1766,10 @@ private:
     WebView& owner;
     WebViewDLL webviewDLL;
     Options options;
-    ICoreWebView2Environment* coreWebViewEnvironment = nullptr;
-    ICoreWebView2* coreWebView = nullptr;
-    ICoreWebView2Controller* coreWebViewController = nullptr;
-    std::atomic_flag webviewInitialising = ATOMIC_FLAG_INIT;
+    COMPtr<EventHandler> eventHandler;
+    COMPtr<ICoreWebView2Environment> coreWebViewEnvironment;
+    COMPtr<ICoreWebView2> coreWebView;
+    COMPtr<ICoreWebView2Controller> coreWebViewController;
 
     //==============================================================================
     static std::wstring getUserDataFolder()
@@ -1850,7 +1814,7 @@ inline WebView::WebView (const Options& options)
 {
     pimpl = std::make_unique<Pimpl> (*this, options);
 
-    if (! pimpl->loadedOK())
+    if (pimpl->hasFailed())
         pimpl.reset();
 }
 
@@ -1859,7 +1823,7 @@ inline WebView::~WebView()
     pimpl.reset();
 }
 
-inline bool WebView::loadedOK() const                                { return pimpl != nullptr; }
+inline bool WebView::loadedOK() const                                { return pimpl != nullptr && ! pimpl->stillInitialising(); }
 inline bool WebView::navigate (const std::string& url)               { return pimpl != nullptr && pimpl->navigate (url); }
 inline bool WebView::setHTML (const std::string& html)               { return pimpl != nullptr && pimpl->setHTML (html); }
 inline bool WebView::addInitScript (const std::string& script)       { return pimpl != nullptr && pimpl->addInitScript (script); }
