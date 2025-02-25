@@ -102,6 +102,8 @@ namespace choc_unit_tests
 /// to log its progress.
 bool runAllTests (choc::test::TestProgress&);
 
+/// Performs the setup function, then waits for it to call the exit function provided,
+/// then calls handleResult
 static void runTestOnMessageThread (std::function<void(const std::function<void()>&)> setup,
                                     std::function<void()> handleResult = {})
 {
@@ -2423,6 +2425,38 @@ inline void testWebview (choc::test::TestProgress& progress)
         {
             choc::ui::WebView::Options opts;
             opts.enableDebugMode = true;
+
+            opts.webviewIsReady = [&] (choc::ui::WebView& w)
+            {
+                w.bind ("succeeded", [&] (const choc::value::ValueView& args)
+                {
+                    result = choc::json::toString (args);
+                    finished();
+                    return choc::value::Value();
+                });
+
+                w.evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
+                {
+                    error1 = error; value1 = value;
+                });
+
+                w.evaluateJavascript ("return 1234;", [&] (const std::string& error, const choc::value::ValueView& value)
+                {
+                    error2 = error; value2 = value;
+                });
+
+                w.evaluateJavascript ("", [&] (const std::string& error, const choc::value::ValueView& value)
+                {
+                    error3 = error; value3 = value;
+                });
+
+                timer = choc::messageloop::Timer (200, [&]
+                {
+                    w.evaluateJavascript ("succeeded (1234, 5678);");
+                    return false;
+                });
+            };
+
             webview = std::make_unique<choc::ui::WebView> (opts);
 
             if (! webview->loadedOK())
@@ -2432,34 +2466,6 @@ inline void testWebview (choc::test::TestProgress& progress)
                 finished();
                 return;
             }
-
-            webview->bind ("succeeded", [&] (const choc::value::ValueView& args)
-            {
-                result = choc::json::toString (args);
-                finished();
-                return choc::value::Value();
-            });
-
-            webview->evaluateJavascript ("let a = { x: [1, 2, 3], y: 987.0, z: true }; a", [&] (const std::string& error, const choc::value::ValueView& value)
-            {
-                error1 = error; value1 = value;
-            });
-
-            webview->evaluateJavascript ("return 1234;", [&] (const std::string& error, const choc::value::ValueView& value)
-            {
-                error2 = error; value2 = value;
-            });
-
-            webview->evaluateJavascript ("", [&] (const std::string& error, const choc::value::ValueView& value)
-            {
-                error3 = error; value3 = value;
-            });
-
-            timer = choc::messageloop::Timer (200, [&]
-            {
-                webview->evaluateJavascript ("succeeded (1234, 5678);");
-                return false;
-            });
         },
         [&] { webview.reset(); timer = {}; });
 
@@ -2505,21 +2511,24 @@ fetch (new Request("./hello.txt"))
 
         runTestOnMessageThread ([&] (const std::function<void()>& finished)
         {
+            opts.webviewIsReady = [&] (choc::ui::WebView& w)
+            {
+                if (! w.loadedOK())
+                {
+                    std::cout << "WebView was unavailable" << std::endl;
+                    finished();
+                    return;
+                }
+
+                w.bind ("succeeded", [&] (const choc::value::ValueView& args)
+                {
+                    result = choc::json::toString (args);
+                    finished();
+                    return choc::value::Value();
+                });
+            };
+
             webview = std::make_unique<choc::ui::WebView> (opts);
-
-            if (! webview->loadedOK())
-            {
-                std::cout << "WebView was unavailable" << std::endl;
-                finished();
-                return;
-            }
-
-            webview->bind ("succeeded", [&] (const choc::value::ValueView& args)
-            {
-                result = choc::json::toString (args);
-                finished();
-                return choc::value::Value();
-            });
         },
         [&] { webview.reset(); });
 

@@ -20,6 +20,7 @@
 
 inline int openDemoWebViewWindow()
 {
+    choc::messageloop::initialise(); // Tells the message loop that this is the message thread
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
 
     choc::ui::DesktopWindow window ({ 100, 100, 800, 600 });
@@ -30,58 +31,65 @@ inline int openDemoWebViewWindow()
     window.setMaximumSize (1500, 1200);
     window.windowClosed = [] { choc::messageloop::stop(); };
 
-    choc::ui::WebView webview;
+    choc::ui::WebView::Options options;
+    options.enableDebugMode = true;
 
-    CHOC_ASSERT (webview.loadedOK());
-
-    window.setContent (webview.getViewHandle());
-
-    CHOC_ASSERT (webview.bind ("eventCallbackFn", [] (const choc::value::ValueView& args) -> choc::value::Value
+    options.webviewIsReady = [&] (choc::ui::WebView& webview)
     {
-        auto message = "eventCallbackFn() called with args: " + choc::json::toString (args);
+        CHOC_ASSERT (webview.loadedOK());
 
-        // This just shows how to invoke an async callback
-        choc::messageloop::postMessage ([message]
+        window.setContent (webview.getViewHandle());
+
+        CHOC_ASSERT (webview.bind ("eventCallbackFn", [] (const choc::value::ValueView& args) -> choc::value::Value
         {
-            std::cout << "WebView callback message: " << message << std::endl;
-        });
+            auto message = "eventCallbackFn() called with args: " + choc::json::toString (args);
 
-        return choc::value::createString (message);
-    }));
+            // This just shows how to invoke an async callback
+            choc::messageloop::postMessage ([message]
+            {
+                std::cout << "WebView callback message: " << message << std::endl;
+            });
 
-    CHOC_ASSERT (webview.bind ("loadCHOCWebsite", [&webview] (const choc::value::ValueView&) -> choc::value::Value
-    {
-        webview.navigate ("https://github.com/Tracktion/choc");
-        return {};
-    }));
+            return choc::value::createString (message);
+        }));
 
-    CHOC_ASSERT (webview.setHTML (R"xxx(
-      <!DOCTYPE html> <html>
-        <head> <title>Page Title</title> </head>
-        <script>
-          var eventCounter = 0;
+        CHOC_ASSERT (webview.bind ("loadCHOCWebsite", [&webview] (const choc::value::ValueView&) -> choc::value::Value
+        {
+            webview.navigate ("https://github.com/Tracktion/choc");
+            return {};
+        }));
 
-          // invokes a call to eventCallbackFn() and displays the return value
-          function sendEvent()
-          {
-            // When you invoke a function, it returns a Promise object
-            eventCallbackFn({ counter: ++eventCounter }, "Hello World")
-              .then ((result) => { document.getElementById ("eventResultDisplay").innerText = result; });
-          }
-        </script>
+        CHOC_ASSERT (webview.setHTML (R"xxx(
+          <!DOCTYPE html> <html>
+            <head> <title>Page Title</title> </head>
+            <script>
+              var eventCounter = 0;
 
-        <body>
-          <h1>CHOC WebView Demo</h1>
-          <p>This is a demo of a choc::ui::WebView window</p>
-          <p><button onclick="sendEvent()">Click to invoke an event callback</button></p>
-          <p><button onclick="loadCHOCWebsite()">Click to visit the CHOC github repo</button></p>
-          <p><input type="file" /></p>
-          <p id="eventResultDisplay"></p>
-        </body>
-      </html>
-    )xxx"));
+              // invokes a call to eventCallbackFn() and displays the return value
+              function sendEvent()
+              {
+                // When you invoke a function, it returns a Promise object
+                eventCallbackFn({ counter: ++eventCounter }, "Hello World")
+                  .then ((result) => { document.getElementById ("eventResultDisplay").innerText = result; });
+              }
+            </script>
 
-    window.toFront();
+            <body>
+              <h1>CHOC WebView Demo</h1>
+              <p>This is a demo of a choc::ui::WebView window</p>
+              <p><button onclick="sendEvent()">Click to invoke an event callback</button></p>
+              <p><button onclick="loadCHOCWebsite()">Click to visit the CHOC github repo</button></p>
+              <p><input type="file" /></p>
+              <p id="eventResultDisplay"></p>
+            </body>
+          </html>
+        )xxx"));
+
+        window.toFront();
+    };
+
+    choc::ui::WebView webview (options);
+
     choc::messageloop::run();
     return 0;
 }

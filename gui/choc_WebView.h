@@ -85,6 +85,14 @@ public:
         // this empty for default behaviour.
         std::string customUserAgent;
 
+        /// On some platforms (e.g. Windows) a newly constructed WebView can't do
+        /// anything until the message loop has dispatched a few messages doing setup
+        /// work - so you should use this callback to be told when that has happened.
+        /// On some platforms, this may be called synchronously during WebView
+        /// construction, on others it may happen later on the message thread, so
+        /// be sure to take account of this when you first use your WebView.
+        std::function<void(choc::ui::WebView&)> webviewIsReady;
+
         /// If you provide a fetchResource function, it is expected to return this
         /// object, which is simply the raw content of the resource, and its MIME type.
         struct Resource
@@ -131,19 +139,29 @@ public:
         bool enableDefaultClipboardKeyShortcutsInSafari = true;
     };
 
-    /// Creates a WebView with default options
+    /// Creates a WebView with default options.
+    /// This must be called on the message thread.
     WebView();
+
     /// Creates a WebView with some options
+    /// This must be called on the message thread.
     WebView (const Options&);
 
     WebView (const WebView&) = delete;
     WebView (WebView&&) = default;
     WebView& operator= (WebView&&) = default;
+
+    /// The destructor must be called on the message thread.
     ~WebView();
 
-    /// Returns true if the webview has been successfully initialised. This could
+    /// Returns true if the webview has been successfully constructed. This could
     /// fail on some systems if the OS doesn't provide a suitable component.
     bool loadedOK() const;
+
+    /// Returns true if the webview is in a state where it is ready to be controlled.
+    /// On some platforms, it might not be ready immediately after construction, until
+    /// the message loop has been allowed to run for a while.
+    bool isReady() const;
 
     /// Directly sets the HTML content of the browser
     bool setHTML (const std::string& html);
@@ -220,16 +238,24 @@ inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebVi
 
 struct choc::ui::WebView::Pimpl
 {
-    Pimpl (WebView& v, const Options& options)
-        : owner (v), fetchResource (options.fetchResource)
+    Pimpl (WebView& v, const Options& opts)
+        : owner (v), options (opts), fetchResource (options.fetchResource)
+    {
+    }
+
+    bool initialise()
     {
         if (! gtk_init_check (nullptr, nullptr))
-            return;
+            return false;
 
         defaultURI = getURIHome (options);
         webviewContext = webkit_web_context_new();
         g_object_ref_sink (G_OBJECT (webviewContext));
         webview = webkit_web_view_new_with_context (webviewContext);
+
+        if (! webview)
+            return false;
+
         g_object_ref_sink (G_OBJECT (webview));
         manager = webkit_web_view_get_user_content_manager (WEBKIT_WEB_VIEW (webview));
 
@@ -252,10 +278,8 @@ struct choc::ui::WebView::Pimpl
         }
 
         if (options.enableDebugInspector)
-        {
             if (auto inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector (WEBKIT_WEB_VIEW (webview))))
                 webkit_web_inspector_show (inspector);
-        }
 
         if (! options.customUserAgent.empty())
             webkit_settings_set_user_agent (settings, options.customUserAgent.c_str());
@@ -315,6 +339,11 @@ struct choc::ui::WebView::Pimpl
         }
 
         gtk_widget_show_all (webview);
+
+        if (options.webviewIsReady)
+            options.webviewIsReady (owner);
+
+        return true;
     }
 
     ~Pimpl()
@@ -330,7 +359,6 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
-    bool hasFailed() const          { return getViewHandle() == nullptr; }
     bool stillInitialising() const  { return false; }
     void* getViewHandle() const     { return (void*) webview; }
 
@@ -458,6 +486,7 @@ struct choc::ui::WebView::Pimpl
     }
 
     WebView& owner;
+    const Options options;
     Options::FetchResource fetchResource;
     WebKitWebContext* webviewContext = {};
     GtkWidget* webview = {};
@@ -475,6 +504,10 @@ struct choc::ui::WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& optionsToUse)
         : owner (v), options (std::make_unique<Options> (optionsToUse))
+    {
+    }
+
+    bool initialise()
     {
         using namespace choc::objc;
         CHOC_AUTORELEASE_BEGIN
@@ -502,6 +535,10 @@ struct choc::ui::WebView::Pimpl
             call<void> (config, "setURLSchemeHandler:forURLScheme:", delegate, getNSString (getURIScheme (*options)));
 
         webview = call<id> (allocateWebview(), "initWithFrame:configuration:", objc::CGRect(), config);
+
+        if (! webview)
+            return false;
+
         objc_setAssociatedObject (webview, "choc_webview", (CHOC_OBJC_CAST_BRIDGED id) this, OBJC_ASSOCIATION_ASSIGN);
 
         if (! options->customUserAgent.empty())
@@ -519,6 +556,11 @@ struct choc::ui::WebView::Pimpl
             navigate ({});
 
         CHOC_AUTORELEASE_END
+
+        if (options->webviewIsReady)
+            options->webviewIsReady (owner);
+
+        return true;
     }
 
     ~Pimpl()
@@ -539,7 +581,6 @@ struct choc::ui::WebView::Pimpl
 
     static constexpr const char* postMessageFn = "window.webkit.messageHandlers.external.postMessage";
 
-    bool hasFailed() const          { return getViewHandle() == nullptr; }
     bool stillInitialising() const  { return false; }
     void* getViewHandle() const     { return (CHOC_OBJC_CAST_BRIDGED void*) webview; }
 
@@ -1305,6 +1346,9 @@ struct WebView::Pimpl
 {
     Pimpl (WebView& v, const Options& opts)
         : owner (v), options (opts)
+    {}
+
+    bool initialise()
     {
         CoInitialize (nullptr);
 
@@ -1313,30 +1357,31 @@ struct WebView::Pimpl
         // Microsoft WebView2Loader.dll
         webviewDLL = CHOC_FIND_WEBVIEW2LOADER_DLL;
 
-        if (! webviewDLL)
-            return;
-
-        hwnd = windowClass.createWindow (WS_POPUP, 400, 400, this);
-
-        if (hwnd.hwnd == nullptr)
-            return;
-
-        defaultURI = getURIHome (options);
-        setHTMLURI = defaultURI + "getHTMLInternal";
-
-        SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
-
-        if (auto userDataFolder = getUserDataFolder(); ! userDataFolder.empty())
+        if (webviewDLL)
         {
-            if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
-                                                                   webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
-            {
-                eventHandler = new EventHandler (*this);
-                createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, eventHandler);
+            hwnd = windowClass.createWindow (WS_POPUP, 400, 400, this);
 
-                runMessageLoopUntilInitComplete();
+            if (hwnd.hwnd != nullptr)
+            {
+                defaultURI = getURIHome (options);
+                setHTMLURI = defaultURI + "getHTMLInternal";
+
+                SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
+
+                if (auto userDataFolder = getUserDataFolder(); ! userDataFolder.empty())
+                {
+                    if (auto createCoreWebView2EnvironmentWithOptions = (decltype(&CreateCoreWebView2EnvironmentWithOptions))
+                                                                        webviewDLL.findFunction ("CreateCoreWebView2EnvironmentWithOptions"))
+                    {
+                        eventHandler = new EventHandler (*this);
+                        createCoreWebView2EnvironmentWithOptions (nullptr, userDataFolder.c_str(), nullptr, eventHandler);
+                        return true;
+                    }
+                }
             }
         }
+
+        return false;
     }
 
     ~Pimpl()
@@ -1350,24 +1395,8 @@ struct WebView::Pimpl
         hwnd.reset();
     }
 
-    // This is a temporary hack while refactoring towards an async init model
-    void runMessageLoopUntilInitComplete()
-    {
-        MSG msg;
-
-        while (stillInitialising() && GetMessage (std::addressof(msg), nullptr, 0, 0))
-        {
-            TranslateMessage (std::addressof(msg));
-            DispatchMessage (std::addressof(msg));
-
-            if (deletionChecker->deleted)
-                return;
-        }
-    }
-
     static constexpr const char* postMessageFn = "window.chrome.webview.postMessage";
 
-    bool hasFailed() const          { return ! eventHandler; }
     bool stillInitialising() const  { return ! coreWebView; }
     void* getViewHandle() const     { return (void*) hwnd.hwnd; }
 
@@ -1468,6 +1497,9 @@ private:
         }
 
         resizeContentToFit();
+
+        if (options.webviewIsReady)
+            options.webviewIsReady (owner);
     }
 
     bool environmentCreationComplete (ICoreWebView2Environment* env)
@@ -1812,18 +1844,26 @@ inline WebView::WebView() : WebView (Options()) {}
 
 inline WebView::WebView (const Options& options)
 {
+    // This must be called from the message thread.
+    // If you're calling it from a bare main() function and hitting this, maybe
+    // you need to call choc::messageloop::initialise() beforehand, to tell the
+    // messageloop code that it's on the main thread.
+    CHOC_ASSERT (choc::messageloop::callerIsOnMessageThread());
+
     pimpl = std::make_unique<Pimpl> (*this, options);
 
-    if (pimpl->hasFailed())
+    if (! pimpl->initialise())
         pimpl.reset();
 }
 
 inline WebView::~WebView()
 {
+    CHOC_ASSERT (choc::messageloop::callerIsOnMessageThread());
     pimpl.reset();
 }
 
-inline bool WebView::loadedOK() const                                { return pimpl != nullptr && ! pimpl->stillInitialising(); }
+inline bool WebView::loadedOK() const                                { return pimpl != nullptr; }
+inline bool WebView::isReady() const                                 { return pimpl != nullptr && ! pimpl->stillInitialising(); }
 inline bool WebView::navigate (const std::string& url)               { return pimpl != nullptr && pimpl->navigate (url); }
 inline bool WebView::setHTML (const std::string& html)               { return pimpl != nullptr && pimpl->setHTML (html); }
 inline bool WebView::addInitScript (const std::string& script)       { return pimpl != nullptr && pimpl->addInitScript (script); }
