@@ -1671,7 +1671,7 @@ private:
                            public ICoreWebView2PermissionRequestedEventHandler,
                            public ICoreWebView2WebResourceRequestedEventHandler
     {
-        EventHandler (Pimpl& p) : ownerPimpl (p) {}
+        EventHandler (Pimpl& p) : ownerPimpl (p), deletionCheckerRef (p.deletionChecker) {}
         EventHandler (const EventHandler&) = delete;
         EventHandler (EventHandler&&) = delete;
         EventHandler& operator= (const EventHandler&) = delete;
@@ -1684,7 +1684,7 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (HRESULT, ICoreWebView2Environment* env) override
         {
-            if (env == nullptr)
+            if (env == nullptr || deletionCheckerRef->deleted)
                 return E_FAIL;
 
             if (! ownerPimpl.environmentCreationComplete (env))
@@ -1696,7 +1696,7 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (HRESULT, ICoreWebView2Controller* controller) override
         {
-            if (controller == nullptr)
+            if (controller == nullptr || deletionCheckerRef->deleted)
                 return E_FAIL;
 
             ICoreWebView2* view = {};
@@ -1714,7 +1714,7 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args) override
         {
-            if (sender == nullptr)
+            if (sender == nullptr || deletionCheckerRef->deleted)
                 return E_FAIL;
 
             LPWSTR message = {};
@@ -1738,11 +1738,15 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* args) override
         {
+            if (deletionCheckerRef->deleted)
+                return E_FAIL;
+
             return ownerPimpl.onResourceRequested (args);
         }
 
         Pimpl& ownerPimpl;
         std::atomic<ULONG> refCount { 0 };
+        std::shared_ptr<DeletionChecker> deletionCheckerRef;
     };
 
     //==============================================================================
