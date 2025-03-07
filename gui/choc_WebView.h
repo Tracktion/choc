@@ -1848,11 +1848,13 @@ inline WebView::WebView() : WebView (Options()) {}
 
 inline WebView::WebView (const Options& options)
 {
+   #ifdef CHOC_MESSAGELOOP_HEADER_INCLUDED
     // This must be called from the message thread.
     // If you're calling it from a bare main() function and hitting this, maybe
     // you need to call choc::messageloop::initialise() beforehand, to tell the
     // messageloop code that it's on the main thread.
     CHOC_ASSERT (choc::messageloop::callerIsOnMessageThread());
+   #endif
 
     pimpl = std::make_unique<Pimpl> (*this, options);
 
@@ -1862,7 +1864,14 @@ inline WebView::WebView (const Options& options)
 
 inline WebView::~WebView()
 {
+   #ifdef CHOC_MESSAGELOOP_HEADER_INCLUDED
+    // This must be called from the message thread.
+    // If you're calling it from a bare main() function and hitting this, maybe
+    // you need to call choc::messageloop::initialise() beforehand, to tell the
+    // messageloop code that it's on the main thread.
     CHOC_ASSERT (choc::messageloop::callerIsOnMessageThread());
+   #endif
+
     pimpl.reset();
 }
 
