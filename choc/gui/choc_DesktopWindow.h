@@ -106,6 +106,22 @@ struct DesktopWindow
     /// An optional callback that will be called when the parent window is closed
     std::function<void()> windowClosed;
 
+    /// Information about a file drop event - see setFileDropCallback()
+    struct FileDropEvent
+    {
+        std::vector<std::string> filePaths;
+        float x, y;
+    };
+
+    /// This callback should return true if the operation was handled, or false
+    /// to allow it to be passed on to other handlers.
+    using FileDropCallback = std::function<bool(const FileDropEvent&)>;
+
+    /// Call this to enable file drag-and-drop support, and to set a callback
+    /// that will be called when files are dropped onto the window. Pass an
+    /// empty function to disable drag-and-drop.
+    void setFileDropCallback (FileDropCallback);
+
 private:
     struct Pimpl;
     std::unique_ptr<Pimpl> pimpl;
@@ -247,10 +263,63 @@ struct choc::ui::DesktopWindow::Pimpl
         return { x, y, w, h };
     }
 
+    void setFileDropCallback (FileDropCallback handler)
+    {
+        if (handler)
+        {
+            fileDropCallback = std::move (handler);
+
+            gtk_drag_dest_set (window, GTK_DEST_DEFAULT_ALL, nullptr, 0, GDK_ACTION_COPY);
+            gtk_drag_dest_add_uri_targets (window);
+
+            g_signal_connect (window, "drag-data-received",
+                              G_CALLBACK (+[](GtkWidget*, GdkDragContext* context,
+                                              gint x, gint y, GtkSelectionData* selectionData,
+                                              guint /*info*/, guint time, gpointer userData)
+                                          {
+                                              static_cast<Pimpl*> (userData)
+                                                ->onDragDataReceived (context, x, y, time, selectionData);
+                                          }), this);
+        }
+        else
+        {
+            fileDropCallback = {};
+            gtk_drag_dest_unset (window);
+        }
+    }
+
+    void onDragDataReceived (GdkDragContext* context, gint x, gint y,
+                             guint time, GtkSelectionData* selectionData)
+    {
+        FileDropEvent e;
+        e.x = static_cast<float> (x);
+        e.y = static_cast<float> (y);
+
+        if (const auto uris = gtk_selection_data_get_uris (selectionData))
+        {
+            for (auto uri = uris; *uri != nullptr; ++uri)
+            {
+                if (auto filename = g_filename_from_uri (*uri, nullptr, nullptr))
+                {
+                    e.filePaths.push_back (filename);
+                    g_free (filename);
+                }
+            }
+
+            g_strfreev (uris);
+        }
+
+        if (fileDropCallback)
+            fileDropCallback (e);
+
+        gtk_drag_finish (context, TRUE, FALSE, time);
+    }
+
     DesktopWindow& owner;
     GtkWidget* window = {};
     GtkWidget* content = {};
     unsigned long destroyHandlerID = 0;
+    FileDropCallback fileDropCallback;
 };
 
 inline void choc::ui::setWindowsDPIAwareness() {}
@@ -387,6 +456,62 @@ struct DesktopWindow::Pimpl
                         (int) contentRect.size.height };
     }
 
+    void setFileDropCallback (FileDropCallback handler)
+    {
+        CHOC_AUTORELEASE_BEGIN
+
+        if (handler)
+        {
+            fileDropCallback = std::move (handler);
+            auto types = objc::callClass<id> ("NSArray", "arrayWithObject:", objc::getNSString ("NSFilenamesPboardType"));
+            objc::call<void> (window, "registerForDraggedTypes:", types);
+        }
+        else
+        {
+            fileDropCallback = {};
+            objc::call<void> (window, "unregisterDraggedTypes");
+        }
+
+        CHOC_AUTORELEASE_END
+    }
+
+    long draggingEntered()
+    {
+        return fileDropCallback ? NSDragOperationCopy : NSDragOperationNone;
+    }
+
+    BOOL performDragOperation (id sender)
+    {
+        if (fileDropCallback == nullptr)
+            return NO;
+
+        FileDropEvent e;
+
+        {
+            CHOC_AUTORELEASE_BEGIN
+            auto pboard = objc::call<id> (sender, "draggingPasteboard");
+            auto files = objc::call<id> (pboard, "propertyListForType:", objc::getNSString ("NSFilenamesPboardType"));
+
+            auto count = objc::call<long> (files, "count");
+
+            for (long i = 0; i < count; ++i)
+            {
+                auto nsPath = objc::call<id>(files, "objectAtIndex:", i);
+                auto utf8Path = objc::call<const char*>(nsPath, "UTF8String");
+                e.filePaths.push_back (utf8Path);
+            }
+
+            struct NSPoint { double x = 0, y = 0; };
+            auto point = objc::call<NSPoint> (sender, "draggingLocation");
+            e.x = static_cast<float> (point.x);
+            e.y = static_cast<float> (point.y);
+
+            CHOC_AUTORELEASE_END
+        }
+
+        return fileDropCallback (e) ? YES : NO;
+    }
+
     static Pimpl& getPimplFromContext (id self)
     {
         auto view = (CHOC_OBJC_CAST_BRIDGED Pimpl*) objc_getAssociatedObject (self, "choc_window");
@@ -402,6 +527,7 @@ struct DesktopWindow::Pimpl
 
     DesktopWindow& owner;
     id window = {}, delegate = {}, intermediateView = {};
+    FileDropCallback fileDropCallback;
 
     struct DelegateClass
     {
@@ -410,6 +536,9 @@ struct DesktopWindow::Pimpl
             delegateClass = choc::objc::createDelegateClass ("NSResponder", "CHOCDesktopWindowDelegate_");
 
             if (auto* p = objc_getProtocol ("NSWindowDelegate"))
+                class_addProtocol (delegateClass, p);
+
+            if (auto* p = objc_getProtocol ("NSDraggingDestination"))
                 class_addProtocol (delegateClass, p);
 
             class_addMethod (delegateClass, sel_registerName ("windowShouldClose:"),
@@ -443,6 +572,20 @@ struct DesktopWindow::Pimpl
                              (IMP) (+[](id, SEL, id) -> BOOL { return 0; }),
                              "c@:@");
 
+            class_addMethod (delegateClass, sel_registerName ("draggingEntered:"),
+                             (IMP) (+[](id self, SEL, id) -> long
+                             {
+                                 return getPimplFromContext (self).draggingEntered();
+                             }),
+                             "l@:@");
+
+            class_addMethod (delegateClass, sel_registerName ("performDragOperation:"),
+                             (IMP) (+[](id self, SEL, id sender) -> BOOL
+                             {
+                                 return getPimplFromContext (self).performDragOperation (sender);
+                             }),
+                             "B@:@");
+
             objc_registerClassPair (delegateClass);
         }
 
@@ -460,6 +603,8 @@ struct DesktopWindow::Pimpl
     static constexpr long NSWindowStyleMaskClosable = 2;
     static constexpr long NSBackingStoreBuffered = 2;
     static constexpr long NSApplicationActivationPolicyRegular = 0;
+    static constexpr long NSDragOperationNone = 0;
+    static constexpr long NSDragOperationCopy = 1;
 
     static objc::CGSize createCGSize (double w, double h)  { return { (objc::CGFloat) w, (objc::CGFloat) h }; }
     static objc::CGRect createCGRect (choc::ui::Bounds b)  { return { { (objc::CGFloat) b.x, (objc::CGFloat) b.y }, { (objc::CGFloat) b.width, (objc::CGFloat) b.height } }; }
@@ -748,11 +893,23 @@ struct DesktopWindow::Pimpl
         return scaleBounds ({ r.left, r.top, r.right - r.left, r.bottom - r.top }, scale);
     }
 
+    void setFileDropCallback (FileDropCallback handler)
+    {
+        if (auto shell32 = choc::file::DynamicLibrary ("shell32.dll"))
+        {
+            typedef UINT (WINAPI *DragAcceptFilesFunc)(HWND, BOOL);
+            auto dragAcceptFiles = reinterpret_cast<DragAcceptFilesFunc> (shell32.findFunction ("DragAcceptFiles"));
+            dragAcceptFiles (hwnd, handler ? TRUE : FALSE);
+            fileDropCallback = std::move (handler);
+        }
+    }
+
 private:
     DesktopWindow& owner;
     HWNDHolder hwnd;
     POINT minimumSize = {}, maximumSize = {};
     WindowClass windowClass { L"CHOCWindow", (WNDPROC) wndProc };
+    FileDropCallback fileDropCallback;
 
     Bounds scaleBounds (Bounds b, double scale)
     {
@@ -805,6 +962,45 @@ private:
             owner.windowResized();
     }
 
+    bool handleFileDrop (HANDLE hdrop)
+    {
+        typedef UINT (WINAPI *DragQueryFileWFunc)(HANDLE, UINT, LPWSTR, UINT);
+        typedef BOOL (WINAPI *DragQueryPointFunc)(HANDLE, LPPOINT);
+        typedef BOOL (WINAPI *DragFinishFunc)(HANDLE);
+
+        if (fileDropCallback)
+        {
+            if (auto shell32 = choc::file::DynamicLibrary ("shell32.dll"))
+            {
+                auto dragQueryFileW = reinterpret_cast<DragQueryFileWFunc> (shell32.findFunction ("DragQueryFileW"));
+                auto dragQueryPoint = reinterpret_cast<DragQueryPointFunc> (shell32.findFunction ("DragQueryPoint"));
+                auto dragFinish = reinterpret_cast<DragFinishFunc> (shell32.findFunction ("DragFinish"));
+
+                POINT pt;
+                dragQueryPoint (hdrop, &pt);
+                FileDropEvent e;
+                e.x = static_cast<float> (pt.x);
+                e.y = static_cast<float> (pt.y);
+
+                auto numFiles = dragQueryFileW (hdrop, 0xffffffff, nullptr, 0);
+
+                for (UINT i = 0; i < numFiles; ++i)
+                {
+                    auto size = dragQueryFileW (hdrop, i, nullptr, 0);
+                    std::wstring path;
+                    path.resize (size + 2);
+                    dragQueryFileW (hdrop, i, path.data(), size + 1);
+                    e.filePaths.push_back (createUTF8FromUTF16 (path));
+                }
+
+                dragFinish (hdrop);
+                return fileDropCallback (e);
+            }
+        }
+
+        return false;
+    }
+
     static void enableNonClientDPIScaling (HWND h)
     {
         if (auto fn = getUser32Function<BOOL(__stdcall*)(HWND)> ("EnableNonClientDpiScaling"))
@@ -829,6 +1025,7 @@ private:
             case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
             case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
+            case WM_DROPFILES:       if (auto w = getPimpl (h)) if (w->handleFileDrop ((HANDLE) wp)) return 0; break;
             default:                 break;
         }
 
@@ -861,6 +1058,7 @@ inline void DesktopWindow::setBounds (Bounds b)                            { pim
 inline Bounds DesktopWindow::getBounds()                                   { return pimpl->getBounds(); }
 inline void DesktopWindow::centreWithSize (int w, int h)                   { pimpl->centreWithSize (w, h); }
 inline void DesktopWindow::toFront()                                       { pimpl->toFront(); }
+inline void DesktopWindow::setFileDropCallback (FileDropCallback h)         { pimpl->setFileDropCallback (std::move (h)); }
 
 } // namespace choc::ui
 
