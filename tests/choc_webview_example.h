@@ -31,6 +31,16 @@ inline int openDemoWebViewWindow()
     window.setMaximumSize (1500, 1200);
     window.windowClosed = [] { choc::messageloop::stop(); };
 
+    window.setFileDropCallback ([] (const choc::ui::DesktopWindow::FileDropEvent& e)
+    {
+        std::cout << "Files dropped at " << e.x << ", " << e.y << ":" << std::endl;
+
+        for (auto& f : e.filePaths)
+            std::cout << "  " << f << std::endl;
+
+        return true;
+    });
+
     choc::ui::WebView::Options options;
     options.enableDebugMode = true;
 
