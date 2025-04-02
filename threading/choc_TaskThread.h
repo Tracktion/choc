@@ -52,6 +52,17 @@ struct TaskThread
     /// triggered, it'll be automatically invoked again.
     /// If the thread is already running when this it called, it will
     /// first be stopped.
+    template<typename Rep, typename Period>
+    void start (std::chrono::duration<Rep, Period> repeatInterval,
+                std::function<void()> task);
+
+    /// Starts the thread running with a given interval and task function.
+    /// If repeatInterval has no length, the task function will be invoked
+    /// only when trigger() is called. If the interval is > 0, then
+    /// whenever this time has passed without it being triggered, it'll be
+    /// automatically invoked again.
+    /// If the thread is already running when this it called, it will
+    /// first be stopped.
     void start (uint32_t repeatIntervalMillisecs,
                 std::function<void()> task);
 
@@ -111,6 +122,13 @@ inline void TaskThread::start (uint32_t repeatIntervalMillisecs, std::function<v
             wait();
         }
     });
+}
+
+template<typename Rep, typename Period>
+void TaskThread::start (std::chrono::duration<Rep, Period> i, std::function<void()> task)
+{
+    start (static_cast<uint32_t> (std::chrono::duration_cast<std::chrono::milliseconds> (i).count()),
+           std::move (task));
 }
 
 inline void TaskThread::stop()

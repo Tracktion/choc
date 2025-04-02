@@ -2867,8 +2867,8 @@ inline void testThreading (choc::test::TestProgress& progress)
         choc::threading::TaskThread tt1, tt2;
         std::atomic<int> numCallbacks1 { 0 }, numCallbacks2 { 0 };
 
-        tt1.start (100, [&] { ++numCallbacks1; });
-        tt2.start (0,   [&] { ++numCallbacks2; });
+        tt1.start (std::chrono::milliseconds (100), [&] { ++numCallbacks1; });
+        tt2.start (0,                               [&] { ++numCallbacks2; });
 
         std::this_thread::sleep_for (std::chrono::milliseconds (50));
         CHOC_EXPECT_EQ (0, numCallbacks2.load());
