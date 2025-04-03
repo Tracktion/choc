@@ -234,7 +234,12 @@ inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebVi
 #include "../platform/choc_DisableAllWarnings.h"
 #include <JavaScriptCore/JavaScript.h>
 #include <webkit2/webkit2.h>
+#include <gtk/gtk.h>
+#include <gtk/gtkx.h>
+#include <gtk/gtksocket.h>
+#include <gtk/gtkplug.h>
 #include "../platform/choc_ReenableAllWarnings.h"
+#undef KeyPress
 
 struct choc::ui::WebView::Pimpl
 {
