@@ -240,6 +240,7 @@ inline std::unique_ptr<juce::Component> createJUCEWebViewHolder (choc::ui::WebVi
 #include <gtk/gtkplug.h>
 #include "../platform/choc_ReenableAllWarnings.h"
 #undef KeyPress
+#undef Status
 
 struct choc::ui::WebView::Pimpl
 {
