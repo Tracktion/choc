@@ -61,7 +61,7 @@ void sincInterpolate (DestBufferOrView&& destBuffer, const SourceBufferOrView& s
             }
             else
             {
-                choc::buffer::MonoBuffer<Sample> bandlimitedIntermediate (1, sourceSize);
+                choc::buffer::MonoBuffer<Sample> bandlimitedIntermediate (1, sourceSize, false);
                 resampleMono (bandlimitedIntermediate, sourceBuffer, static_cast<float> (destSize) / static_cast<float> (sourceSize));
                 resampleMono (destBuffer, bandlimitedIntermediate, 1.0f);
             }

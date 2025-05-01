@@ -455,7 +455,7 @@ choc::buffer::ChannelArrayBuffer<SampleType> AudioFileReader::readEntireStream()
 
     if (static_cast<choc::buffer::FrameCount> (props.numFrames) == props.numFrames)
     {
-        choc::buffer::ChannelArrayBuffer<SampleType> buffer (props.numChannels, static_cast<choc::buffer::FrameCount> (props.numFrames));
+        choc::buffer::ChannelArrayBuffer<SampleType> buffer (props.numChannels, static_cast<choc::buffer::FrameCount> (props.numFrames), false);
 
         if (readFrames (0, buffer))
             return buffer;
@@ -500,7 +500,7 @@ inline uint64_t copyAudioData (AudioFileWriter& dest, AudioFileReader& source, u
 
     auto& readerProperties = source.getProperties();
     auto framesToDo = maxNumFramesToCopy != 0 ? std::min (maxNumFramesToCopy, readerProperties.numFrames) : readerProperties.numFrames;
-    auto tempBuffer = choc::buffer::ChannelArrayBuffer<double> (readerProperties.numChannels, bufferSize);
+    auto tempBuffer = choc::buffer::ChannelArrayBuffer<double> (readerProperties.numChannels, bufferSize, false);
     uint64_t readIndex = 0;
 
     while (framesToDo != 0)
@@ -571,7 +571,7 @@ inline void AudioFileData::resample (double targetSampleRate, uint64_t maxNumFra
         if (newFrameCount != frames.getNumFrames())
         {
             using BufferType = decltype (frames);
-            BufferType resampled (frames.getNumChannels(), static_cast<uint32_t> (newFrameCount));
+            BufferType resampled (frames.getNumChannels(), static_cast<uint32_t> (newFrameCount), false);
             choc::interpolation::sincInterpolate<BufferType&, BufferType, 10> (resampled, frames);
             frames = std::move (resampled);
             sampleRate = targetSampleRate;

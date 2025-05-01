@@ -275,14 +275,12 @@ struct AllocatedBuffer
     AllocatedBuffer& operator= (AllocatedBuffer&&);
 
     /// Allocates a buffer of the given size (without clearing its content!)
-    /// For efficiency, this will allocate but not clear the data needed, so be sure to call
-    /// clear() after construction if you need an empty buffer.
-    AllocatedBuffer (Size size)  : view { size.isEmpty() ? Layout() : Layout::createAllocated (size), size } {}
+    /// For efficiency, the buffer is optionally cleaered after construction, based on the clear parameter.
+    AllocatedBuffer (Size size, bool clear = true)  : view { size.isEmpty() ? Layout() : Layout::createAllocated (size), size } { if (clear) view.clear(); }
 
     /// Allocates a buffer of the given size (without clearing its content!)
-    /// For efficiency, this will allocate but not clear the data needed, so be sure to call
-    /// clear() after construction if you need an empty buffer.
-    AllocatedBuffer (ChannelCount numChannels, FrameCount numFrames)  : AllocatedBuffer (Size { numChannels, numFrames }) {}
+    /// For efficiency, the buffer is optionally cleaered after construction, based on the clear parameter.
+    AllocatedBuffer (ChannelCount numChannels, FrameCount numFrames, bool clear = true)  : AllocatedBuffer (Size { numChannels, numFrames }, clear) {}
 
     /// Creats a buffer which is a copy of the given view.
     template <typename SourceView>
@@ -918,7 +916,7 @@ template <typename ChannelCountType, typename FrameCountType, typename Generator
 auto createInterleavedBuffer (ChannelCountType numChannels, FrameCountType numFrames, GeneratorFunction&& generateSample)
 {
     using Sample = decltype (invokeGetSample (generateSample, 0, 0, 0));
-    InterleavedBuffer<Sample> result (Size::create (numChannels, numFrames));
+    InterleavedBuffer<Sample> result (Size::create (numChannels, numFrames), false);
     setAllSamples (result, generateSample);
     return result;
 }
@@ -934,9 +932,9 @@ auto createChannelArrayBuffer (ChannelCountType numChannels, FrameCountType numF
 
 template <typename SampleType, template<typename> typename LayoutType>
 template <typename SourceView>
-AllocatedBuffer<SampleType, LayoutType>::AllocatedBuffer (const SourceView& viewToCopy)  : AllocatedBuffer (viewToCopy.getSize())
+AllocatedBuffer<SampleType, LayoutType>::AllocatedBuffer (const SourceView& viewToCopy)  : AllocatedBuffer (viewToCopy.getSize(), false)
 {
-    copy (view, viewToCopy);
+   copy (view, viewToCopy);
 }
 
 template <typename SampleType, template<typename> typename LayoutType>

@@ -136,7 +136,7 @@ void render (BufferView&& targetView, double frequency, double sampleRate)
 template <typename BufferType, typename OscillatorType>
 BufferType createBuffer (choc::buffer::Size size, double frequency, double sampleRate)
 {
-    BufferType buffer (size);
+    BufferType buffer (size, false);
     OscillatorType osc;
     osc.setFrequency (frequency, sampleRate);
     render (buffer, osc);
