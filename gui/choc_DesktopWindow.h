@@ -739,15 +739,15 @@ private:
         HWND result = {};
 
         if (IsWindow (hwnd))
-        {
-            EnumChildWindows (hwnd, +[](HWND w, LPARAM context)
-            {
-                *reinterpret_cast<HWND*> (context) = w;
-                return FALSE;
-            }, (LPARAM) &result);
-        }
+            EnumChildWindows (hwnd, findFirstWindowCallback, (LPARAM) &result);
 
         return result;
+    }
+
+    static BOOL WINAPI findFirstWindowCallback (HWND w, LPARAM context)
+    {
+        *reinterpret_cast<HWND*> (context) = w;
+        return FALSE;
     }
 
     void resizeContentToFit()
