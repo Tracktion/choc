@@ -19,6 +19,7 @@
 #ifndef CHOC_AUDIOMIDIDISPATCHER_HEADER_INCLUDED
 #define CHOC_AUDIOMIDIDISPATCHER_HEADER_INCLUDED
 
+#include <cstring>
 #include <functional>
 #include "../containers/choc_Span.h"
 #include "../containers/choc_VariableSizeFIFO.h"

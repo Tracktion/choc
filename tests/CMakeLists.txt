@@ -76,7 +76,10 @@ endif()
 
 # On OSX, need to add the WebKit framework for WebView functionality
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    target_link_libraries(choc_tests "-framework WebKit -framework CoreServices")
+    target_link_libraries(choc_tests PRIVATE "-framework WebKit")
+    target_link_libraries(choc_tests PRIVATE "-framework CoreServices")
+    target_link_libraries(choc_tests PRIVATE "-framework CoreAudio")
+    target_link_libraries(choc_tests PRIVATE "-framework CoreMIDI")
 
     if (DEFINED V8_LOCATION)
         target_include_directories(choc_tests PRIVATE "${V8_LOCATION}/v8/include")
@@ -90,7 +93,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules (gtk3 REQUIRED gtk+-3.0 IMPORTED_TARGET)
     pkg_check_modules (webkit2 REQUIRED webkit2gtk-4.1 IMPORTED_TARGET)
-    target_link_libraries (choc_tests PUBLIC pthread PkgConfig::gtk3 PkgConfig::webkit2)
+    pkg_check_modules (alsa REQUIRED alsa IMPORTED_TARGET)
+    pkg_check_modules (jack REQUIRED jack IMPORTED_TARGET)
+    target_link_libraries (choc_tests PUBLIC pthread PkgConfig::gtk3 PkgConfig::webkit2 PkgConfig::alsa PkgConfig::jack)
 endif()
 
 if (DEFINED BOOST_LOCATION)
