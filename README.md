@@ -85,6 +85,7 @@ The library is getting quite big now! Some of its many delights include:
 
 #### Audio
 
+- A cross-platform [audio/MIDI device abstraction](./audio/io/choc_AudioMIDIPlayer.h), which hides the complexity of managing and synchronising your audio and MIDI devices, allowing you to do all your audio/MIDI i/o in a single process() callback function.
 - Some [audio buffer classes](./audio/choc_SampleBuffers.h) for managing blocks of multi-channel sample data. These can flexibly handle both owned buffers and non-owned views in either packed/interleaved or separate-channel formats.
 - Utility classes for handling [MIDI messages](./audio/choc_MIDI.h), [MIDI sequences](./audio/choc_MIDISequence.h) and [MIDI files](./audio/choc_MIDIFile.h).
 - An [AudioFileFormat](./audio/choc_AudioFileFormat.h) system for reading/writing audio files, with support for WAV, FLAC, Ogg-Vorbis, and read-only support for MP3. Hopefully more formats will get added in due course.

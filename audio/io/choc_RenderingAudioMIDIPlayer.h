@@ -49,8 +49,7 @@ struct RenderingAudioMIDIPlayer  : public AudioMIDIPlayer
     RenderingAudioMIDIPlayer (const AudioDeviceOptions&, ProvideInputFn, HandleOutputFn);
     ~RenderingAudioMIDIPlayer() override;
 
-    std::string getLastError() override { return {}; }
-
+    std::string getLastError() override                             { return {}; }
     std::vector<uint32_t> getAvailableSampleRates() override        { return {}; }
     std::vector<uint32_t> getAvailableBlockSizes() override         { return {}; }
     std::vector<std::string> getAvailableAudioAPIs() override       { return {}; }
@@ -85,7 +84,8 @@ private:
 inline RenderingAudioMIDIPlayer::RenderingAudioMIDIPlayer (const AudioDeviceOptions& o, ProvideInputFn in, HandleOutputFn out)
     : AudioMIDIPlayer (o), provideInput (std::move (in)), handleOutput (std::move (out))
 {
-    // Because these can be anything, they need to be specified by the caller
+    // Because there are no restrictions on these values, they need to
+    // be specified by the caller
     CHOC_ASSERT (options.blockSize != 0);
     CHOC_ASSERT (options.sampleRate != 0);
 }

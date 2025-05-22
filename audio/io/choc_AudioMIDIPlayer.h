@@ -95,6 +95,15 @@ struct AudioMIDICallback
  *  A multi-client device abstraction that provides unified callbacks for processing
  *  blocks of audio and MIDI input/output.
  *
+ *  This is of course just a virtual base class. See RtAudioMIDIPlayer or
+ *  RenderingAudioMIDIPlayer for examples of concrete implementations.
+ *
+ *  To use one of these, just
+ *   - create an instance of a concrete subclass, giving it your AudioDeviceOptions
+ *     to tell it what devices and settings to use
+ *   - check that it opened successfully by calling getLastError()
+ *   - attach one or more AudioMIDICallback objects to it, which will then be
+ *     called repeatedly to process the audio and MIDI data
 */
 struct AudioMIDIPlayer
 {
@@ -141,12 +150,12 @@ struct AudioMIDIPlayer
 protected:
     //==============================================================================
     /// This is an abstract base class, so you don't construct one of them directly.
-    /// To get one,
+    /// To get one, use a concrete subclass like RtAudioMIDIPlayer or RenderingAudioMIDIPlayer.
     AudioMIDIPlayer (const AudioDeviceOptions&);
 
     std::vector<AudioMIDICallback*> callbacks;
     std::mutex callbackLock;
-    choc::audio::AudioMIDIBlockDispatcher dispatcher;
+    AudioMIDIBlockDispatcher dispatcher;
     uint32_t prerollFrames = 0;
 
     virtual void start() = 0;
@@ -154,7 +163,7 @@ protected:
     virtual void handleOutgoingMidiMessage (const void* data, uint32_t length) = 0;
 
     void updateSampleRate (uint32_t);
-    void addIncomingMIDIEvent (choc::audio::AudioMIDIBlockDispatcher::MIDIDeviceID, const void*, uint32_t);
+    void addIncomingMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID, const void*, uint32_t);
     void process (choc::buffer::ChannelArrayView<const float> input,
                   choc::buffer::ChannelArrayView<float> output, bool replaceOutput);
 };
@@ -192,17 +201,20 @@ inline AudioMIDIPlayer::AudioMIDIPlayer (const AudioDeviceOptions& o) : options 
 
 inline void AudioMIDIPlayer::addCallback (AudioMIDICallback& c)
 {
-    bool needToStart = false;
-
-    if (options.sampleRate != 0)
-        c.sampleRateChanged (options.sampleRate);
-
     {
         const std::scoped_lock lock (callbackLock);
 
         if (std::find (callbacks.begin(), callbacks.end(), std::addressof (c)) != callbacks.end())
             return;
+    }
 
+    if (options.sampleRate != 0)
+        c.sampleRateChanged (options.sampleRate);
+
+    bool needToStart = false;
+
+    {
+        const std::scoped_lock lock (callbackLock);
         needToStart = callbacks.empty();
         callbacks.push_back (std::addressof (c));
     }
@@ -249,9 +261,9 @@ inline void AudioMIDIPlayer::updateSampleRate (uint32_t newRate)
     }
 }
 
-inline void AudioMIDIPlayer::addIncomingMIDIEvent (choc::audio::AudioMIDIBlockDispatcher::MIDIDeviceID deviceID, const void* data, uint32_t size)
+inline void AudioMIDIPlayer::addIncomingMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID deviceID,
+                                                   const void* data, uint32_t size)
 {
-    const std::scoped_lock lock (callbackLock);
     dispatcher.addMIDIEvent (deviceID, data, size);
 }
 
@@ -259,8 +271,6 @@ inline void AudioMIDIPlayer::process (choc::buffer::ChannelArrayView<const float
                                       choc::buffer::ChannelArrayView<float> output,
                                       bool replaceOutput)
 {
-    const std::scoped_lock lock (callbackLock);
-
     if (prerollFrames != 0)
     {
         prerollFrames -= std::min (prerollFrames, input.getNumFrames());
@@ -270,6 +280,8 @@ inline void AudioMIDIPlayer::process (choc::buffer::ChannelArrayView<const float
 
         return;
     }
+
+    const std::scoped_lock lock (callbackLock);
 
     if (callbacks.empty())
     {
@@ -284,8 +296,7 @@ inline void AudioMIDIPlayer::process (choc::buffer::ChannelArrayView<const float
 
     dispatcher.setAudioBuffers (input, output);
 
-    dispatcher.processInChunks ([this, replaceOutput]
-                                (const choc::audio::AudioMIDIBlockDispatcher::Block& block)
+    dispatcher.processInChunks ([this, replaceOutput] (const AudioMIDIBlockDispatcher::Block& block)
     {
         bool replace = replaceOutput;
 
