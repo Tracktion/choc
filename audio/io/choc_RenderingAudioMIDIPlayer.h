@@ -49,12 +49,12 @@ struct RenderingAudioMIDIPlayer  : public AudioMIDIPlayer
     RenderingAudioMIDIPlayer (const AudioDeviceOptions&, ProvideInputFn, HandleOutputFn);
     ~RenderingAudioMIDIPlayer() override;
 
-    std::string getLastError() override                             { return {}; }
-    std::vector<uint32_t> getAvailableSampleRates() override        { return {}; }
-    std::vector<uint32_t> getAvailableBlockSizes() override         { return {}; }
-    std::vector<std::string> getAvailableAudioAPIs() override       { return {}; }
-    std::vector<std::string> getAvailableInputDevices() override    { return {}; }
-    std::vector<std::string> getAvailableOutputDevices() override   { return {}; }
+    std::string getLastError() override                                 { return {}; }
+    std::vector<uint32_t> getAvailableSampleRates() override            { return {}; }
+    std::vector<uint32_t> getAvailableBlockSizes() override             { return {}; }
+    std::vector<std::string> getAvailableAudioAPIs() override           { return {}; }
+    std::vector<AudioDeviceInfo> getAvailableInputDevices() override    { return {}; }
+    std::vector<AudioDeviceInfo> getAvailableOutputDevices() override   { return {}; }
 
 private:
     ProvideInputFn provideInput;
@@ -156,7 +156,7 @@ inline void RenderingAudioMIDIPlayer::render()
                 }
 
                 for (uint32_t i = midiStart; i < endOfMIDI; ++i)
-                    addIncomingMIDIEvent ({}, midiMessages[i].data(), midiMessages[i].size());
+                    addMIDIEvent ({}, midiMessages[i].data(), midiMessages[i].size());
 
                 process (audioInput.getFrameRange (chunkToDo),
                          audioOutput.getFrameRange (chunkToDo),

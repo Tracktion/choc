@@ -49,15 +49,24 @@ struct AudioDeviceOptions
     /// @seeAudioMIDIPlayer::getAvailableAudioAPIs()
     std::string audioAPI;
 
-    /// Optional input device name - leave empty for a default.
-    /// You can get these names from AudioMIDIPlayer::getAvailableInputDevices()
-    std::string inputDeviceName;
+    /// Optional input device ID - leave empty for a default.
+    /// You can get these IDs from AudioMIDIPlayer::getAvailableInputDevices()
+    std::string inputDeviceID;
 
-    /// Optional output device name - leave empty for a default.
-    /// You can get these names from AudioMIDIPlayer::getAvailableOutputDevices()
-    std::string outputDeviceName;
+    /// Optional output device ID - leave empty for a default.
+    /// You can get these IDs from AudioMIDIPlayer::getAvailableOutputDevices()
+    std::string outputDeviceID;
 };
 
+//==============================================================================
+/**
+ *  Details about an audio device, as returned by an AudioMIDIPlayer.
+ */
+struct AudioDeviceInfo
+{
+    std::string deviceID;  ///< The ID of the device, which can be used to set AudioDeviceOptions::inputDeviceID or outputDeviceID.
+    std::string name;      ///< A human-readable name for the device.
+};
 
 //==============================================================================
 /**
@@ -139,13 +148,27 @@ struct AudioMIDIPlayer
     virtual std::vector<uint32_t> getAvailableBlockSizes() = 0;
 
     /// Returns a list of devices that could be used for
-    /// AudioDeviceOptions::inputDeviceName
-    virtual std::vector<std::string> getAvailableInputDevices() = 0;
+    /// AudioDeviceOptions::inputDeviceID
+    virtual std::vector<AudioDeviceInfo> getAvailableInputDevices() = 0;
 
     /// Returns a list of devices that could be used for
-    /// AudioDeviceOptions::outputDeviceName
-    virtual std::vector<std::string> getAvailableOutputDevices() = 0;
+    /// AudioDeviceOptions::outputDeviceID
+    virtual std::vector<AudioDeviceInfo> getAvailableOutputDevices() = 0;
 
+    //==============================================================================
+    // These methods are used to inject MIDI events to the queue, which will be
+    // delivered to the callback in the next process() call.
+
+    /// Adds an incoming MIDI event to the queue. This can be called from any thread.
+    template <typename StorageType>
+    void addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID, const choc::midi::Message<StorageType>&);
+
+    /// Adds an incoming MIDI event to the queue. This can be called from any thread.
+    void addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID, const void* data, uint32_t size);
+
+    /// Adds a juce::MidiMessage to the queue. This can be called from any thread.
+    template <typename JUCECompatibleMIDIMessage>
+    void addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID, const JUCECompatibleMIDIMessage&);
 
 protected:
     //==============================================================================
@@ -163,7 +186,6 @@ protected:
     virtual void handleOutgoingMidiMessage (const void* data, uint32_t length) = 0;
 
     void updateSampleRate (uint32_t);
-    void addIncomingMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID, const void*, uint32_t);
     void process (choc::buffer::ChannelArrayView<const float> input,
                   choc::buffer::ChannelArrayView<float> output, bool replaceOutput);
 };
@@ -261,12 +283,6 @@ inline void AudioMIDIPlayer::updateSampleRate (uint32_t newRate)
     }
 }
 
-inline void AudioMIDIPlayer::addIncomingMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID deviceID,
-                                                   const void* data, uint32_t size)
-{
-    dispatcher.addMIDIEvent (deviceID, data, size);
-}
-
 inline void AudioMIDIPlayer::process (choc::buffer::ChannelArrayView<const float> input,
                                       choc::buffer::ChannelArrayView<float> output,
                                       bool replaceOutput)
@@ -309,6 +325,23 @@ inline void AudioMIDIPlayer::process (choc::buffer::ChannelArrayView<const float
 
     for (auto c : callbacks)
         c->endBlock();
+}
+
+inline void AudioMIDIPlayer::addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID deviceID, const void* data, uint32_t size)
+{
+    dispatcher.addMIDIEvent (deviceID, data, size);
+}
+
+template <typename StorageType>
+inline void AudioMIDIPlayer::addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID deviceID, const choc::midi::Message<StorageType>& message)
+{
+    dispatcher.addMIDIEvent (deviceID, message);
+}
+
+template <typename JUCECompatibleMIDIMessage>
+void AudioMIDIPlayer::addMIDIEvent (AudioMIDIBlockDispatcher::MIDIDeviceID deviceID, const JUCECompatibleMIDIMessage& message)
+{
+    dispatcher.addMIDIEvent (deviceID, message);
 }
 
 } // namespace choc::audio::io

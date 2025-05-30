@@ -99,24 +99,24 @@ struct RtAudioMIDIPlayer  : public AudioMIDIPlayer
         return result;
     }
 
-    std::vector<std::string> getAvailableInputDevices() override
+    std::vector<AudioDeviceInfo> getAvailableInputDevices() override
     {
-        std::vector<std::string> result;
+        std::vector<AudioDeviceInfo> result;
 
         for (auto& device : getAudioDeviceList())
             if (device.inputChannels != 0)
-                result.push_back (device.name);
+                result.push_back ({ std::to_string (device.ID), device.name });
 
         return result;
     }
 
-    std::vector<std::string> getAvailableOutputDevices() override
+    std::vector<AudioDeviceInfo> getAvailableOutputDevices() override
     {
-        std::vector<std::string> result;
+        std::vector<AudioDeviceInfo> result;
 
         for (auto& device : getAudioDeviceList())
             if (device.outputChannels != 0)
-                result.push_back (device.name);
+                result.push_back ({ std::to_string (device.ID), device.name });
 
         return result;
     }
@@ -214,34 +214,38 @@ private:
 
         auto devices = getAudioDeviceList();
 
-        auto getDeviceForID = [&] (unsigned int deviceID) -> RtAudio::DeviceInfo*
+        auto getDeviceForID = [&] (unsigned long defaultDeviceID, const std::string& requestedID, bool isInput) -> RtAudio::DeviceInfo*
         {
+            if (! requestedID.empty())
+            {
+                for (auto& i : devices)
+                    if (isInput ? (i.inputChannels > 0) : (i.outputChannels > 0))
+                        if (std::to_string (i.ID) == requestedID)
+                            return std::addressof (i);
+
+                // If there's no such ID, try to find a matching name as a fallback
+                for (auto& i : devices)
+                    if (isInput ? (i.inputChannels > 0) : (i.outputChannels > 0))
+                        if (i.name == requestedID)
+                            return std::addressof (i);
+            }
+
             for (auto& i : devices)
-                if (i.ID == deviceID)
+                if (i.ID == defaultDeviceID)
                     return std::addressof (i);
 
             return nullptr;
         };
 
-        auto getDeviceForName = [&] (const std::string& name, bool isInput) -> RtAudio::DeviceInfo*
-        {
-            for (auto& i : devices)
-                if (i.name == name && isInput == (i.inputChannels != 0))
-                    return std::addressof (i);
-
-            return nullptr;
-        };
-
-        auto inputDeviceInfo = options.inputDeviceName.empty() ? getDeviceForID (rtAudio->getDefaultInputDevice())
-                                                               : getDeviceForName (options.inputDeviceName, true);
-
-        auto outputDeviceInfo = options.outputDeviceName.empty() ? getDeviceForID (rtAudio->getDefaultOutputDevice())
-                                                                 : getDeviceForName (options.outputDeviceName, false);
+        auto inputDeviceInfo  = getDeviceForID (rtAudio->getDefaultInputDevice(), options.inputDeviceID, true);
+        auto outputDeviceInfo = getDeviceForID (rtAudio->getDefaultOutputDevice(), options.outputDeviceID, false);
 
         updateAvailableSampleRateList (inputDeviceInfo, outputDeviceInfo);
 
-        options.outputDeviceName = outputDeviceInfo ? outputDeviceInfo->name : std::string();
-        options.inputDeviceName  = inputDeviceInfo ? inputDeviceInfo->name : std::string();
+        options.outputDeviceID = outputDeviceInfo ? std::to_string (outputDeviceInfo->ID) : std::string();
+        options.inputDeviceID  = inputDeviceInfo ? std::to_string (inputDeviceInfo->ID) : std::string();
+        auto outputDeviceName = outputDeviceInfo ? outputDeviceInfo->name : std::string();
+        auto inputDeviceName  = inputDeviceInfo ? inputDeviceInfo->name : std::string();
 
         RtAudio::StreamParameters inParams, outParams;
 
@@ -299,8 +303,8 @@ private:
                 lastError = rtAudio->getErrorText();
 
             options.audioAPI = {};
-            options.outputDeviceName = {};
-            options.inputDeviceName  = {};
+            options.outputDeviceID = {};
+            options.inputDeviceID = {};
             options.sampleRate = {};
             options.blockSize = {};
             options.inputChannelCount = {};
@@ -321,8 +325,8 @@ private:
 
         if (log)
             log ("Audio API: " + options.audioAPI
-                  + ", Output device: " + options.outputDeviceName
-                  + ", Input device: " + options.inputDeviceName
+                  + ", Output device: " + outputDeviceName
+                  + ", Input device: " + inputDeviceName
                   + ", Rate: " + std::to_string (options.sampleRate)
                   + "Hz, Block size: " + std::to_string (options.blockSize)
                   + " frames, Latency: " + std::to_string (rtAudio->getStreamLatency())
@@ -413,7 +417,7 @@ private:
 
     void midiCallback (NamedMIDIIn& m, const void* data, uint32_t size)
     {
-        addIncomingMIDIEvent (m.name.c_str(), data, size);
+        addMIDIEvent (m.name.c_str(), data, size);
     }
 
     std::vector<RtAudio::DeviceInfo> getAudioDeviceList() const

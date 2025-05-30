@@ -33,6 +33,7 @@
 #ifndef __MINGW32__
  // This can only be included in one translation unit
  #include "../audio/io/choc_RtAudioPlayer.h"
+ #include "../audio/io/choc_RenderingAudioMIDIPlayer.h"
 #endif
 
 // This one pulls in windows.h so keep it out of choc_tests.h
