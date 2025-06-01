@@ -56,6 +56,14 @@ struct AudioDeviceOptions
     /// Optional output device ID - leave empty for a default.
     /// You can get these IDs from AudioMIDIPlayer::getAvailableOutputDevices()
     std::string outputDeviceID;
+
+    /// This optional function can be supplied to control whether a particular
+    /// MIDI input should be used. If a function is not provided, all MIDI inputs will be used.
+    std::function<bool(const std::string& name)> shouldOpenMIDIInput;
+
+    /// This optional function can be supplied to control whether a particular
+    /// MIDI output should be used. If a function is not provided, all MIDI inputs will be used.
+    std::function<bool(const std::string& name)> shouldOpenMIDIOutput;
 };
 
 //==============================================================================
@@ -154,6 +162,11 @@ struct AudioMIDIPlayer
     /// Returns a list of devices that could be used for
     /// AudioDeviceOptions::outputDeviceID
     virtual std::vector<AudioDeviceInfo> getAvailableOutputDevices() = 0;
+
+    /// Returns a list of MIDI input devices
+    virtual std::vector<std::string> getAvailableMIDIInputDevices() = 0;
+    /// Returns a list of MIDI output devices
+    virtual std::vector<std::string> getAvailableMIDIOutputDevices() = 0;
 
     //==============================================================================
     // These methods are used to inject MIDI events to the queue, which will be

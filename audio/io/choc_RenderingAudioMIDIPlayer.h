@@ -55,6 +55,8 @@ struct RenderingAudioMIDIPlayer  : public AudioMIDIPlayer
     std::vector<std::string> getAvailableAudioAPIs() override           { return {}; }
     std::vector<AudioDeviceInfo> getAvailableInputDevices() override    { return {}; }
     std::vector<AudioDeviceInfo> getAvailableOutputDevices() override   { return {}; }
+    std::vector<std::string> getAvailableMIDIInputDevices() override    { return {}; }
+    std::vector<std::string> getAvailableMIDIOutputDevices() override   { return {}; }
 
 private:
     ProvideInputFn provideInput;

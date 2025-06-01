@@ -121,6 +121,34 @@ struct RtAudioMIDIPlayer  : public AudioMIDIPlayer
         return result;
     }
 
+    std::vector<std::string> getAvailableMIDIInputDevices() override
+    {
+        std::vector<std::string> result;
+        RtMidiIn m;
+        m.setErrorCallback (rtMidiErrorCallback, this);
+
+        auto numPorts = m.getPortCount();
+
+        for (unsigned int i = 0; i < numPorts; ++i)
+            result.push_back (m.getPortName (i));
+
+        return result;
+    }
+
+    std::vector<std::string> getAvailableMIDIOutputDevices() override
+    {
+        std::vector<std::string> result;
+        RtMidiOut m;
+        m.setErrorCallback (rtMidiErrorCallback, this);
+
+        auto numPorts = m.getPortCount();
+
+        for (unsigned int i = 0; i < numPorts; ++i)
+            result.push_back (m.getPortName (i));
+
+        return result;
+    }
+
     std::string getLastError() override
     {
         return lastError;
@@ -523,15 +551,9 @@ private:
         {
             std::vector<std::string> newInputs;
 
-            {
-                RtMidiIn m;
-                m.setErrorCallback (rtMidiErrorCallback, this);
-
-                auto numPorts = m.getPortCount();
-
-                for (unsigned int i = 0; i < numPorts; ++i)
-                    newInputs.push_back (m.getPortName (i));
-            }
+            for (auto& m : getAvailableMIDIInputDevices())
+                if (! options.shouldOpenMIDIInput || options.shouldOpenMIDIInput (m))
+                    newInputs.push_back (m);
 
             for (auto i = rtMidiIns.begin(); i != rtMidiIns.end();)
             {
@@ -571,15 +593,9 @@ private:
         {
             std::vector<std::string> newOutputs;
 
-            {
-                RtMidiOut m;
-                m.setErrorCallback (rtMidiErrorCallback, this);
-
-                auto numPorts = m.getPortCount();
-
-                for (unsigned int i = 0; i < numPorts; ++i)
-                    newOutputs.push_back (m.getPortName (i));
-            }
+            for (auto& m : getAvailableMIDIOutputDevices())
+                if (! options.shouldOpenMIDIOutput || options.shouldOpenMIDIOutput (m))
+                    newOutputs.push_back (m);
 
             for (auto i = rtMidiOuts.begin(); i != rtMidiOuts.end();)
             {
