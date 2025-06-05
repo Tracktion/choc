@@ -24,11 +24,23 @@
 #include <filesystem>
 #include <variant>
 #include <optional>
+#include <map>
 #include "../text/choc_StringUtilities.h"
 #include "../platform/choc_Assert.h"
 
 namespace choc::network
 {
+
+/// This is used by HTTPServer::ClientInstance::getHTTPContent()
+struct HTTPRequest
+{
+    std::string_view method;      ///< The HTTP method used, e.g. "GET", "POST"
+    std::string_view path;        ///< The path requested by the client, e.g. "/index.html"
+    std::string_view postData;    ///< Any POST data sent by the client, if applicable
+
+    /// The headers sent by the client
+    std::map<std::string_view, std::string_view> headers;
+};
 
 /// This is used for the data returned by HTTPServer::ClientInstance::getHTTPContent()
 struct HTTPContent
@@ -51,6 +63,7 @@ struct HTTPContent
     /// Quick way to create a HTTPContent object for a file, with a default MIME type.
     static HTTPContent forFile (std::filesystem::path);
 };
+
 
 /**
     A Server object runs a HTTP server on a specific port, and creates a client handler for
@@ -76,7 +89,7 @@ public:
 
         /// This must return either a string with the file content or the location
         /// of a file to serve back to the client in response to the given path request.
-        virtual HTTPContent getHTTPContent (std::string_view requestedPath) = 0;
+        virtual HTTPContent getHTTPContent (const HTTPRequest&) = 0;
 
         // This callback indicates that the client has upgraded to a websocket with
         /// the given path.
@@ -524,16 +537,24 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                  && req.method() != http::verb::head)
                 return sendFailureResponse (req, http::status::bad_request, "Unknown HTTP-method");
 
-            auto requestPath = std::string (req.target());
+            choc::network::HTTPRequest request;
 
-            if (requestPath.empty()
-                 || requestPath[0] != '/'
-                 || requestPath.find("..") != std::string_view::npos)
+            request.path = req.target();
+
+            if (request.path.empty()
+                 || request.path[0] != '/'
+                 || request.path.find("..") != std::string_view::npos)
                 return sendFailureResponse (req, http::status::bad_request, "Illegal request-target");
 
-            auto result = clientInstance->getHTTPContent (requestPath);
+            request.method = std::string (req.method_string());
+            request.postData = req.body();
 
-            auto getMIMEType = [&] (const std::string& path) -> std::string
+            for (auto& header : req.base())
+                request.headers[header.name_string()] = header.value();
+
+            auto result = clientInstance->getHTTPContent (request);
+
+            auto getMIMEType = [&] (const std::string_view& path) -> std::string
             {
                 if (result.mimeType)
                     return *result.mimeType;
@@ -551,7 +572,7 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                                                            std::make_tuple (std::move (*result.content)),
                                                            std::make_tuple (http::status::ok, req.version()));
 
-                    res.set (http::field::content_type, getMIMEType (requestPath));
+                    res.set (http::field::content_type, getMIMEType (request.path));
                     res.content_length (size);
 
                     return sendRequestResponse (std::move (res), req.keep_alive());

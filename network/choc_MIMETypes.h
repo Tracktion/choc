@@ -27,7 +27,7 @@ namespace choc::network
     /// Makes a guess at picking a sensible MIME type from a list of common ones,
     /// based on the extension of the filename/path/URL provided. If nothing matches,
     /// it will return `resultIfNotFound`.
-    inline std::string getMIMETypeFromFilename (const std::string& filename,
+    inline std::string getMIMETypeFromFilename (std::string_view filename,
                                                 std::string_view resultIfNotFound = "application/text")
     {
         if (auto question = filename.rfind ("?"); question != std::string_view::npos)
@@ -36,7 +36,7 @@ namespace choc::network
         auto getExtension = [&] () -> std::string
         {
             if (auto lastDot = filename.rfind ("."); lastDot != std::string_view::npos)
-                return choc::text::trim (choc::text::toLowerCase (filename.substr (lastDot + 1)));
+                return choc::text::trim (choc::text::toLowerCase (std::string (filename.substr (lastDot + 1))));
 
             return {};
         };
