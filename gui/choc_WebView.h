@@ -633,7 +633,7 @@ struct choc::ui::WebView::Pimpl
     bool evaluateJavascript (const std::string& script, CompletionHandler completionHandler)
     {
         CHOC_AUTORELEASE_BEGIN
-        auto s = objc::getNSString (script);
+        id s = objc::getNSString (script);
 
         if (completionHandler)
         {
