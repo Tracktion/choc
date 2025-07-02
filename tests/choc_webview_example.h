@@ -16,7 +16,7 @@
 //   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#include "../gui/choc_DesktopWindow.h"
+#include "../choc/gui/choc_DesktopWindow.h"
 
 inline int openDemoWebViewWindow()
 {

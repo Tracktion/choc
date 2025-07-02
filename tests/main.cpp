@@ -17,7 +17,7 @@
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "choc_tests.h"
-#include "../containers/choc_ArgumentList.h"
+#include "../choc/containers/choc_ArgumentList.h"
 #include "choc_webview_example.h"
 #include "choc_webserver_example.h"
 
@@ -39,9 +39,9 @@ int main (int argc, const char** argv)
 //==============================================================================
 // include this last to make sure the tests don't rely on any of the garbage
 // that gets dragged in..
-#include "../javascript/choc_javascript_Duktape.h"
-#include "../javascript/choc_javascript_QuickJS.h"
+#include "../choc/javascript/choc_javascript_Duktape.h"
+#include "../choc/javascript/choc_javascript_QuickJS.h"
 
 #if CHOC_V8_AVAILABLE
- #include "../javascript/choc_javascript_V8.h"
+ #include "../choc/javascript/choc_javascript_V8.h"
 #endif

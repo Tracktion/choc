@@ -18,7 +18,7 @@
 
 #if __has_include(<boost/beast.hpp>) && __has_include(<boost/asio.hpp>)
 
-#include "../network/choc_HTTPServer.h"
+#include "../choc/network/choc_HTTPServer.h"
 
 static constexpr std::string_view demoPageHTML = R"xx(
 <!DOCTYPE html> <html>

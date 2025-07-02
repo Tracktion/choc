@@ -32,11 +32,11 @@
 
 #ifndef __MINGW32__
  // This can only be included in one translation unit
- #include "../audio/io/choc_RtAudioPlayer.h"
- #include "../audio/io/choc_RenderingAudioMIDIPlayer.h"
+ #include "../choc/audio/io/choc_RtAudioPlayer.h"
+ #include "../choc/audio/io/choc_RenderingAudioMIDIPlayer.h"
 #endif
 
 // This one pulls in windows.h so keep it out of choc_tests.h
-#include "../platform/choc_MemoryDLL.h"
+#include "../choc/platform/choc_MemoryDLL.h"
 
 #include "choc_tests.h"
