@@ -19,6 +19,7 @@
 #ifndef CHOC_HTML_HEADER_INCLUDED
 #define CHOC_HTML_HEADER_INCLUDED
 
+#include <cstdint>
 #include <sstream>
 #include <string_view>
 

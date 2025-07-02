@@ -21,6 +21,7 @@
 
 #include <string>
 #include <cmath>
+#include <cstdint>
 #include "../platform/choc_Assert.h"
 
 namespace choc::midi

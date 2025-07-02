@@ -16,27 +16,25 @@
 //   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 //   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-
-
-// This empty-ish file exists so that we test the inclusion of all the
-// headers in more than one compile unit, That should catch any
-// non-inlined symbols that will cause duplicate function errors
-// at link time.
-
-
-// On Windows, we'll include windows.h before the headers, in contrast to what
-// happens in main.cpp
-#if defined (_WIN32) || defined (_WIN64)
- #include <windows.h>
-#endif
-
-#ifndef __MINGW32__
- // This can only be included in one translation unit
- #include "../choc/audio/io/choc_RtAudioPlayer.h"
- #include "../choc/audio/io/choc_RenderingAudioMIDIPlayer.h"
-#endif
-
-// This one pulls in windows.h so keep it out of choc_tests.h
-#include "../choc/platform/choc_MemoryDLL.h"
-
 #include "choc_tests.h"
+#include "../choc/containers/choc_ArgumentList.h"
+
+//==============================================================================
+int main (int argc, const char** argv)
+{
+    choc::ArgumentList args (argc, argv);
+
+    choc::test::TestProgress progress;
+    return choc_unit_tests::runAllTests (progress, args.contains ("--multithread")) ? 0 : 1;
+}
+
+//==============================================================================
+// include this last to make sure the tests don't rely on any of the garbage
+// that gets dragged in..
+#include "../choc/javascript/choc_javascript_Duktape.h"
+#include "../choc/javascript/choc_javascript_QuickJS.h"
+
+#if CHOC_V8_AVAILABLE
+ #include "../choc/javascript/choc_javascript_V8.h"
+#endif
+
