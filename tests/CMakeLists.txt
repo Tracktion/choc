@@ -35,6 +35,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOC_V8_AVAILABLE=1 -DV8_COMPRESS_POINTERS=1 -DV8_ENABLE_SANDBOX=1")
         else()
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
+            target_link_libraries(choc_tests PRIVATE "-fsanitize=undefined")
         endif()
     endif()
 
