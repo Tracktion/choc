@@ -269,6 +269,99 @@ using LongMessage = Message<StringMIDIDataStorage>;
 using MessageView = Message<MIDIMessageStorageView>;
 
 
+//==============================================================================
+//
+// Message creation functions
+//
+
+/// Creates a note-on message.
+/// @param channel must be 1-16
+/// @param note must be 0-127
+/// @param velocity must be 0-127
+inline ShortMessage noteOn (uint8_t channel, uint8_t note, uint8_t velocity);
+
+/// Creates a note-off message.
+/// @param channel must be 1-16
+/// @param note must be 0-127
+/// @param velocity must be 0-127
+inline ShortMessage noteOff (uint8_t channel, uint8_t note, uint8_t velocity);
+
+/// Creates a control-change message.
+/// @param channel must be 1-16
+/// @param controller must be 0-127
+/// @param value must be 0-127
+inline ShortMessage controlChange (uint8_t channel, uint8_t controller, uint8_t value);
+
+/// Creates a program-change message.
+/// @param channel must be 1-16
+/// @param program must be 0-127
+inline ShortMessage programChange (uint8_t channel, uint8_t program);
+
+/// Creates a pitch-bend message.
+/// @param channel must be 1-16
+/// @param bend must be 0-16383
+inline ShortMessage pitchBend (uint8_t channel, uint16_t bend);
+
+/// Creates a channel-pressure message.
+/// @param channel must be 1-16
+/// @param pressure must be 0-127
+inline ShortMessage channelPressure (uint8_t channel, uint8_t pressure);
+
+/// Creates a polyphonic-aftertouch message.
+/// @param channel must be 1-16
+/// @param note must be 0-127
+/// @param pressure must be 0-127
+inline ShortMessage polyphonicAftertouch (uint8_t channel, uint8_t note, uint8_t pressure);
+
+/// Creates a sysex message.
+/// @param payloadData A pointer to the raw sysex payload
+/// @param payloadSize The size of the payload in bytes
+inline LongMessage sysex (const void* payloadData, size_t payloadSize);
+
+
+//==============================================================================
+// Channel-mode messages:
+
+/// Creates an "all notes off" message.
+/// @param channel must be 1-16
+inline ShortMessage allNotesOff (uint8_t channel);
+/// Creates an "all sound off" message.
+/// @param channel must be 1-16
+inline ShortMessage allSoundOff (uint8_t channel);
+/// Creates a "reset all controllers" message.
+/// @param channel must be 1-16
+inline ShortMessage resetAllControllers (uint8_t channel);
+/// Creates a "local control" message.
+/// @param channel must be 1-16
+inline ShortMessage localControl (uint8_t channel, bool enable);
+
+//==============================================================================
+// System-common messages:
+
+/// Creates a song-position-pointer message.
+/// @param position must be 0-16383
+inline ShortMessage songPositionPointer (uint16_t position);
+/// Creates a song-select message.
+/// @param songNumber must be 0-127
+inline ShortMessage songSelect (uint8_t songNumber);
+/// Creates a tune-request message.
+inline ShortMessage tuneRequest();
+
+//==============================================================================
+// System real-time messages:
+
+/// Creates a timing-clock message.
+inline ShortMessage timingClock();
+/// Creates a start message.
+inline ShortMessage start();
+/// Creates a continue message.
+inline ShortMessage continuePlayback();
+/// Creates a stop message.
+inline ShortMessage stop();
+/// Creates an active-sensing message.
+inline ShortMessage activeSensing();
+/// Creates a system-reset message.
+inline ShortMessage systemReset();
 
 
 
@@ -576,6 +669,97 @@ std::string_view Message<StorageType>::getMetaEventData() const
 template <typename StorageType>
 std::string Message<StorageType>::toHexString() const     { return printHexMIDIData (data(), length()); }
 
+
+//==============================================================================
+inline ShortMessage noteOn (uint8_t channel, uint8_t note, uint8_t velocity)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (note <= 127);
+    CHOC_ASSERT (velocity <= 127);
+    return ShortMessage (static_cast<uint8_t> (0x90 | (channel - 1)), note, velocity);
+}
+
+inline ShortMessage noteOff (uint8_t channel, uint8_t note, uint8_t velocity)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (note <= 127);
+    CHOC_ASSERT (velocity <= 127);
+    return ShortMessage (static_cast<uint8_t> (0x80 | (channel - 1)), note, velocity);
+}
+
+inline ShortMessage controlChange (uint8_t channel, uint8_t controller, uint8_t value)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (controller <= 127);
+    CHOC_ASSERT (value <= 127);
+    return ShortMessage (static_cast<uint8_t> (0xb0 | (channel - 1)), controller, value);
+}
+
+inline ShortMessage programChange (uint8_t channel, uint8_t program)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (program <= 127);
+    return ShortMessage (static_cast<uint8_t> (0xc0 | (channel - 1)), program, 0);
+}
+
+inline ShortMessage pitchBend (uint8_t channel, uint16_t bend)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (bend <= 16383);
+    return ShortMessage (static_cast<uint8_t> (0xe0 | (channel - 1)),
+                         static_cast<uint8_t> (bend & 0x7f),
+                         static_cast<uint8_t> (bend >> 7));
+}
+
+inline ShortMessage channelPressure (uint8_t channel, uint8_t pressure)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (pressure <= 127);
+    return ShortMessage (static_cast<uint8_t> (0xd0 | (channel - 1)), pressure, 0);
+}
+
+inline ShortMessage polyphonicAftertouch (uint8_t channel, uint8_t note, uint8_t pressure)
+{
+    CHOC_ASSERT (channel != 0 && channel <= 16);
+    CHOC_ASSERT (note <= 127);
+    CHOC_ASSERT (pressure <= 127);
+    return ShortMessage (static_cast<uint8_t> (0xa0 | (channel - 1)), note, pressure);
+}
+
+inline LongMessage sysex (const void* payloadData, size_t payloadSize)
+{
+    LongMessage m;
+    m.midiData.storage.reserve (payloadSize + 2);
+    m.midiData.storage.push_back (static_cast<char> (0xf0));
+    m.midiData.storage.append (reinterpret_cast<const char*> (payloadData), payloadSize);
+    m.midiData.storage.push_back (static_cast<char> (0xf7));
+    return m;
+}
+
+inline ShortMessage allNotesOff (uint8_t chan)              { return controlChange (chan, 123, 0); }
+inline ShortMessage allSoundOff (uint8_t chan)              { return controlChange (chan, 120, 0); }
+inline ShortMessage resetAllControllers (uint8_t chan)      { return controlChange (chan, 121, 0); }
+inline ShortMessage localControl (uint8_t chan, bool e)     { return controlChange (chan, 122, e ? 127 : 0); }
+
+inline ShortMessage songPositionPointer (uint16_t position)
+{
+    CHOC_ASSERT (position <= 16383);
+    return ShortMessage (0xf2, static_cast<uint8_t> (position & 0x7f), static_cast<uint8_t> (position >> 7));
+}
+
+inline ShortMessage songSelect (uint8_t songNumber)
+{
+    CHOC_ASSERT (songNumber <= 127);
+    return ShortMessage (0xf3, songNumber, 0);
+}
+
+inline ShortMessage tuneRequest()       { return ShortMessage (0xf6, 0, 0); }
+inline ShortMessage timingClock()       { return ShortMessage (0xf8, 0, 0); }
+inline ShortMessage start()             { return ShortMessage (0xfa, 0, 0); }
+inline ShortMessage continuePlayback()  { return ShortMessage (0xfb, 0, 0); }
+inline ShortMessage stop()              { return ShortMessage (0xfc, 0, 0); }
+inline ShortMessage activeSensing()     { return ShortMessage (0xfe, 0, 0); }
+inline ShortMessage systemReset()       { return ShortMessage (0xff, 0, 0); }
 
 } // namespace choc::midi
 

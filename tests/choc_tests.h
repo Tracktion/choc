@@ -1251,10 +1251,105 @@ inline void testMIDI (choc::test::TestProgress& progress)
     }
 
     {
-        CHOC_TEST (ShortMessages)
+        CHOC_TEST (CreationFunctions)
 
         choc::midi::ShortMessage msg;
         CHOC_EXPECT_TRUE (msg.isNull());
+
+        auto m1 = choc::midi::noteOn (2, 60, 100);
+        CHOC_EXPECT_TRUE (m1.isNoteOn());
+        CHOC_EXPECT_EQ (m1.getChannel1to16(), 2);
+        CHOC_EXPECT_EQ (m1.getNoteNumber(), 60);
+        CHOC_EXPECT_EQ (m1.getVelocity(), 100);
+
+        auto m2 = choc::midi::noteOff (3, 61, 101);
+        CHOC_EXPECT_TRUE (m2.isNoteOff());
+        CHOC_EXPECT_EQ (m2.getChannel1to16(), 3);
+        CHOC_EXPECT_EQ (m2.getNoteNumber(), 61);
+        CHOC_EXPECT_EQ (m2.getVelocity(), 101);
+
+        auto m3 = choc::midi::controlChange (4, 62, 102);
+        CHOC_EXPECT_TRUE (m3.isController());
+        CHOC_EXPECT_EQ (m3.getChannel1to16(), 4);
+        CHOC_EXPECT_EQ (m3.getControllerNumber(), 62);
+        CHOC_EXPECT_EQ (m3.getControllerValue(), 102);
+
+        auto m4 = choc::midi::programChange (5, 63);
+        CHOC_EXPECT_TRUE (m4.isProgramChange());
+        CHOC_EXPECT_EQ (m4.getChannel1to16(), 5);
+        CHOC_EXPECT_EQ (m4.getProgramChangeNumber(), 63);
+
+        auto m5 = choc::midi::pitchBend (6, 12345);
+        CHOC_EXPECT_TRUE (m5.isPitchWheel());
+        CHOC_EXPECT_EQ (m5.getChannel1to16(), 6);
+        CHOC_EXPECT_EQ (m5.getPitchWheelValue(), 12345u);
+
+        auto m6 = choc::midi::channelPressure (7, 103);
+        CHOC_EXPECT_TRUE (m6.isChannelPressure());
+        CHOC_EXPECT_EQ (m6.getChannel1to16(), 7);
+        CHOC_EXPECT_EQ (m6.getChannelPressureValue(), 103);
+
+        auto m7 = choc::midi::polyphonicAftertouch (8, 64, 104);
+        CHOC_EXPECT_TRUE (m7.isAftertouch());
+        CHOC_EXPECT_EQ (m7.getChannel1to16(), 8);
+        CHOC_EXPECT_EQ (m7.getNoteNumber(), 64);
+        CHOC_EXPECT_EQ (m7.getAfterTouchValue(), 104);
+
+        uint8_t sysexData[] = { 1, 2, 3, 4, 5 };
+        auto m8 = choc::midi::sysex (sysexData, sizeof (sysexData));
+        CHOC_EXPECT_TRUE (m8.isSysex());
+        CHOC_EXPECT_EQ (m8.size(), sizeof (sysexData) + 2);
+        CHOC_EXPECT_EQ (m8.data()[0], 0xf0);
+        CHOC_EXPECT_EQ (m8.data()[6], 0xf7);
+        CHOC_EXPECT_TRUE (memcmp (m8.data() + 1, sysexData, sizeof (sysexData)) == 0);
+
+        auto m9 = choc::midi::allNotesOff (9);
+        CHOC_EXPECT_TRUE (m9.isAllNotesOff());
+        CHOC_EXPECT_EQ (m9.getChannel1to16(), 9);
+
+        auto m10 = choc::midi::allSoundOff (10);
+        CHOC_EXPECT_TRUE (m10.isAllSoundOff());
+        CHOC_EXPECT_EQ (m10.getChannel1to16(), 10);
+
+        auto m11 = choc::midi::resetAllControllers (11);
+        CHOC_EXPECT_TRUE (m11.isController());
+        CHOC_EXPECT_EQ (m11.getChannel1to16(), 11);
+        CHOC_EXPECT_EQ (m11.getControllerNumber(), 121);
+
+        auto m12 = choc::midi::localControl (12, true);
+        CHOC_EXPECT_TRUE (m12.isController());
+        CHOC_EXPECT_EQ (m12.getChannel1to16(), 12);
+        CHOC_EXPECT_EQ (m12.getControllerNumber(), 122);
+        CHOC_EXPECT_EQ (m12.getControllerValue(), 127);
+
+        auto m13 = choc::midi::songPositionPointer (12345);
+        CHOC_EXPECT_TRUE (m13.isSongPositionPointer());
+        CHOC_EXPECT_EQ (m13.getSongPositionPointerValue(), 12345u);
+
+        auto m14 = choc::midi::songSelect (105);
+        CHOC_EXPECT_EQ (m14.data()[0], 0xf3);
+        CHOC_EXPECT_EQ (m14.data()[1], 105);
+
+        auto m15 = choc::midi::tuneRequest();
+        CHOC_EXPECT_EQ (m15.data()[0], 0xf6);
+
+        auto m16 = choc::midi::timingClock();
+        CHOC_EXPECT_TRUE (m16.isClock());
+
+        auto m17 = choc::midi::start();
+        CHOC_EXPECT_TRUE (m17.isStart());
+
+        auto m18 = choc::midi::continuePlayback();
+        CHOC_EXPECT_TRUE (m18.isContinue());
+
+        auto m19 = choc::midi::stop();
+        CHOC_EXPECT_TRUE (m19.isStop());
+
+        auto m20 = choc::midi::activeSensing();
+        CHOC_EXPECT_TRUE (m20.isActiveSense());
+
+        auto m21 = choc::midi::systemReset();
+        CHOC_EXPECT_EQ (m21.data()[0], 0xff);
     }
 }
 
