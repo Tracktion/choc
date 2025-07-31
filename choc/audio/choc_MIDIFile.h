@@ -38,14 +38,15 @@ struct File
     void clear();
 
     /// Attempts to load the given data as a MIDI file. If errors occur,
-    /// a ReadError exception will be thrown
+    /// a std::runtime_error exception will be thrown.
     void load (const void* midiFileData, size_t dataSize);
 
-    /// Exception which is thrown by load() if errors occur
-    struct ReadError : public std::runtime_error
-    {
-        ReadError (const char* error) : std::runtime_error (error) {}
-    };
+    /// Attempts to save the current state to a block of data which can be written to a file.
+    /// If errors occur, a std::runtime_error exception will be thrown.
+    std::vector<uint8_t> save() const;
+
+    /// Creates a MIDI file from a sequence.
+    File (const choc::midi::Sequence& sequence);
 
     struct Event
     {
@@ -74,6 +75,10 @@ struct File
 };
 
 
+
+
+
+
 //==============================================================================
 //        _        _           _  _
 //     __| |  ___ | |_   __ _ (_)| | ___
@@ -95,7 +100,7 @@ namespace
         void expectSize (size_t num)
         {
             if (size < num)
-                throw File::ReadError ("Unexpected end-of-file");
+                throw std::runtime_error ("Unexpected end-of-file");
         }
 
         void skip (size_t num)
@@ -138,7 +143,7 @@ namespace
                     return n;
 
                 if (++numUsed == 4)
-                    throw File::ReadError ("Error in variable-length integer");
+                    throw std::runtime_error ("Error in variable-length integer");
             }
         }
     };
@@ -165,7 +170,7 @@ namespace
         }
 
         if (chunkName != "MThd")
-            throw File::ReadError ("Unknown chunk type");
+            throw std::runtime_error ("Unknown chunk type");
 
         auto length = reader.read<uint32_t>();
         reader.expectSize (length);
@@ -176,10 +181,10 @@ namespace
         header.timeFormat = reader.read<uint16_t>();
 
         if (header.fileType > 2)
-            throw File::ReadError ("Unknown file type");
+            throw std::runtime_error ("Unknown file type");
 
         if (header.fileType == 0 && header.numTracks != 1)
-            throw File::ReadError ("Unsupported number of tracks");
+            throw std::runtime_error ("Unsupported number of tracks");
 
         return header;
     }
@@ -203,7 +208,7 @@ namespace
             }
 
             if (statusByte < 0x80)
-                throw File::ReadError ("Error in MIDI bytes");
+                throw std::runtime_error ("Error in MIDI bytes");
 
             if (statusByte == 0xff) // meta-event
             {
@@ -256,7 +261,7 @@ inline void File::load (const void* midiFileData, size_t dataSize)
         return;
 
     if (midiFileData == nullptr)
-        throw ReadError ("No data supplied");
+        throw std::runtime_error ("No data supplied");
 
     Reader reader { static_cast<const uint8_t*> (midiFileData), dataSize };
 
@@ -307,7 +312,7 @@ inline void File::iterateEvents (const std::function<void(const LongMessage&, do
             auto content = event.message.getMetaEventData();
 
             if (content.length() != 3)
-                throw File::ReadError ("Error in meta-event data");
+                throw std::runtime_error ("Error in meta-event data");
 
             uint32_t microsecondsPerQuarterNote = (uint8_t) content[0];
             microsecondsPerQuarterNote = (microsecondsPerQuarterNote << 8) | (uint8_t) content[1];
@@ -340,8 +345,120 @@ inline choc::midi::Sequence File::toSequence() const
     return sequence;
 }
 
+inline File::File (const choc::midi::Sequence& sequence)
+{
+    timeFormat = 1000; // use a timebase of 1000 ticks per quarter-note
+    tracks.resize (1);
+    auto& track = tracks.front();
+
+    for (auto& e : sequence.events)
+        track.events.push_back ({ e.message, static_cast<uint32_t> (e.timeStamp * timeFormat * 2.0) });
+}
+
+namespace
+{
+    struct Writer
+    {
+        std::vector<uint8_t> data;
+
+        void write (uint32_t value)
+        {
+            data.push_back (static_cast<uint8_t> (value >> 24));
+            data.push_back (static_cast<uint8_t> (value >> 16));
+            data.push_back (static_cast<uint8_t> (value >> 8));
+            data.push_back (static_cast<uint8_t> (value));
+        }
+
+        void write (uint16_t value)
+        {
+            data.push_back (static_cast<uint8_t> (value >> 8));
+            data.push_back (static_cast<uint8_t> (value));
+        }
+
+        void write (const void* d, size_t size)
+        {
+            auto p = static_cast<const uint8_t*> (d);
+            data.insert (data.end(), p, p + size);
+        }
+
+        void writeVariableLength (uint32_t n)
+        {
+            uint8_t buffer[4];
+            uint32_t numBytes = 0;
+
+            do
+            {
+                buffer[numBytes++] = static_cast<uint8_t> (n & 0x7fu);
+                n >>= 7;
+            }
+            while (n != 0);
+
+            while (numBytes != 0)
+            {
+                auto byte = buffer[--numBytes];
+
+                if (numBytes != 0)
+                    byte |= 0x80;
+
+                data.push_back (byte);
+            }
+        }
+    };
+}
+
+inline std::vector<uint8_t> File::save() const
+{
+    Writer writer;
+    writer.data.reserve (8192);
+
+    writer.write (static_cast<uint32_t> (0x4d546864)); // MThd
+    writer.write (static_cast<uint32_t> (6));
+    writer.write (static_cast<uint16_t> (tracks.size() > 1 ? 1 : 0));
+    writer.write (static_cast<uint16_t> (tracks.size()));
+    writer.write (static_cast<uint16_t> (timeFormat));
+
+    for (auto& track : tracks)
+    {
+        writer.write (static_cast<uint32_t> (0x4d54726b)); // MTrk
+        auto trackSizePos = writer.data.size();
+        writer.write (static_cast<uint32_t> (0)); // placeholder size
+
+        auto trackStartPos = writer.data.size();
+        uint32_t lastTick = 0;
+        uint8_t lastStatusByte = 0;
+
+        for (auto& ev : track.events)
+        {
+            writer.writeVariableLength (ev.tickPosition - lastTick);
+            lastTick = ev.tickPosition;
+
+            auto messageData = ev.message.data();
+            auto messageSize = ev.message.size();
+            auto statusByte = messageData[0];
+
+            if (statusByte != lastStatusByte)
+            {
+                writer.write (messageData, 1);
+                lastStatusByte = statusByte;
+            }
+
+            if (messageSize > 1)
+                writer.write (messageData + 1, messageSize - 1);
+        }
+
+        auto trackLength = static_cast<uint32_t> (writer.data.size() - trackStartPos);
+        auto p = writer.data.data() + trackSizePos;
+        p[0] = static_cast<uint8_t> (trackLength >> 24);
+        p[1] = static_cast<uint8_t> (trackLength >> 16);
+        p[2] = static_cast<uint8_t> (trackLength >> 8);
+        p[3] = static_cast<uint8_t> (trackLength);
+    }
+
+    return writer.data;
+}
 
 
-} // namespace choc::midi
+
+} // namespace choc::midi''
 
 #endif // CHOC_MIDIFILE_HEADER_INCLUDED

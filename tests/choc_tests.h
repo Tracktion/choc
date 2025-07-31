@@ -2171,6 +2171,21 @@ inline void testMIDIFiles (choc::test::TestProgress& progress)
             // This is just a simple regression test to see whether anything changes. Update the hash number if it does.
             CHOC_EXPECT_EQ (5294939095423848520ull, simpleHash (output1));
             CHOC_EXPECT_EQ (output1, output2);
+
+            auto savedData = mf.save();
+            choc::midi::File mf2;
+            mf2.load (savedData.data(), savedData.size());
+
+            auto sequence = mf.toSequence();
+            auto sequence2 = mf2.toSequence();
+
+            CHOC_EXPECT_EQ (sequence.events.size(), sequence2.events.size());
+
+            for (size_t i = 0; i < sequence.events.size(); ++i)
+            {
+                CHOC_EXPECT_NEAR (sequence.events[i].timeStamp, sequence2.events[i].timeStamp, 0.001);
+                CHOC_EXPECT_TRUE (sequence.events[i].message == sequence2.events[i].message);
+            }
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
 
@@ -2182,6 +2197,34 @@ inline void testMIDIFiles (choc::test::TestProgress& progress)
             CHOC_FAIL ("Expected a failure")
         }
         catch (...) {}
+    }
+
+    {
+        CHOC_TEST (MIDIFileWrite)
+
+        choc::midi::Sequence sequence;
+
+        for (int i = 0; i < 100; ++i)
+        {
+            sequence.events.push_back ({ (double) i * 0.1, choc::midi::noteOn (1, (uint8_t) (i + 20), (uint8_t) ((i % 97) + 30)) });
+            sequence.events.push_back ({ (double) i * 0.1 + 0.05, choc::midi::noteOff (1, (uint8_t) (i + 20), 0) });
+        }
+
+        choc::midi::File file (sequence);
+        auto savedData = file.save();
+
+        choc::midi::File file2;
+        file2.load (savedData.data(), savedData.size());
+
+        auto sequence2 = file2.toSequence();
+
+        CHOC_EXPECT_EQ (sequence.events.size(), sequence2.events.size());
+
+        for (size_t i = 0; i < sequence.events.size(); ++i)
+        {
+            CHOC_EXPECT_NEAR (sequence.events[i].timeStamp, sequence2.events[i].timeStamp, 0.001);
+            CHOC_EXPECT_TRUE (sequence.events[i].message == sequence2.events[i].message);
+        }
     }
 }
 

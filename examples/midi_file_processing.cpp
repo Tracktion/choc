@@ -138,7 +138,7 @@ void demonstrateMIDIFileIO()
             std::cout << "  Time " << timeInSeconds << "s: " << msg.getDescription() << "\n";
         });
     }
-    catch (const choc::midi::File::ReadError& e)
+    catch (const std::runtime_error& e)
     {
         std::cout << "Error loading MIDI file: " << e.what() << "\n";
     }
