@@ -25,6 +25,7 @@
 #include "choc_SampleBuffers.h"
 #include "choc_SincInterpolator.h"
 #include "../text/choc_StringUtilities.h"
+#include "../containers/choc_JSONValue.h"
 #include "../text/choc_JSON.h"
 
 namespace choc::audio
@@ -93,7 +94,7 @@ struct AudioFileProperties
     /// from or written to the file. The exact format of the data in here will
     /// vary wildly depending on the file format. To see the names that might
     /// be used, have a look in the individual format classes.
-    choc::value::Value metadata;
+    choc::json::Value metadata;
 
     std::string getDescription() const;
 };
