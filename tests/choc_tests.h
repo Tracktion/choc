@@ -43,6 +43,7 @@
 #include "../choc/text/choc_FloatToString.h"
 #include "../choc/text/choc_HTML.h"
 #include "../choc/text/choc_JSON.h"
+#include "../choc/containers/choc_JSONValue.h"
 #include "../choc/text/choc_StringUtilities.h"
 #include "../choc/text/choc_UTF8.h"
 #include "../choc/text/choc_TextTable.h"
@@ -1114,13 +1115,13 @@ inline void testJSON (choc::test::TestProgress& progress)
         CHOC_EXPECT_EQ (-1234, v["negativeInt64"].get<int64_t>());
         CHOC_EXPECT_TRUE (v["largestInt64Possible"].isInt64());
         CHOC_EXPECT_EQ (9223372036854775806, v["largestInt64Possible"].get<int64_t>());
-        CHOC_EXPECT_TRUE (v["largestInt64"].isFloat64());
+        CHOC_EXPECT_TRUE (v["largestInt64"].isFloat());
         CHOC_EXPECT_NEAR (9223372036854775807.0, v["largestInt64"].get<double>(), 0.0001);
-        CHOC_EXPECT_TRUE (v["veryLarge"].isFloat64());
+        CHOC_EXPECT_TRUE (v["veryLarge"].isFloat());
         CHOC_EXPECT_NEAR (1.2345678901234567e+49, v["veryLarge"].get<double>(), 0.0001);
-        CHOC_EXPECT_TRUE (v["veryVeryLarge"].isFloat64());
+        CHOC_EXPECT_TRUE (v["veryVeryLarge"].isFloat());
         CHOC_EXPECT_EQ (INFINITY, v["veryVeryLarge"].get<double>());
-        CHOC_EXPECT_TRUE (v["scientificNotation"].isFloat64());
+        CHOC_EXPECT_TRUE (v["scientificNotation"].isFloat());
         CHOC_EXPECT_NEAR (1e5, v["scientificNotation"].get<double>(), 0.0001);
         CHOC_EXPECT_TRUE (v["booleanTrue"].isBool());
         CHOC_EXPECT_TRUE (v["booleanTrue"].get<bool>());
@@ -1189,6 +1190,533 @@ inline void testJSON (choc::test::TestProgress& progress)
         auto holder = choc::json::parse (json);
         auto output = choc::json::toString (holder.getView());
         CHOC_EXPECT_EQ (json, output);
+    }
+}
+
+//==============================================================================
+inline void testJSONValue (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (JSONValue);
+
+    {
+        CHOC_TEST (SizeConstraint)
+        static_assert (sizeof (choc::json::Value) <= 24, "Value must be no more than 24 bytes");
+        CHOC_EXPECT_TRUE (sizeof (choc::json::Value) <= 24);
+    }
+
+    {
+        CHOC_TEST (BasicTypes)
+
+        // Test undefined/null
+        choc::json::Value undefined;
+        CHOC_EXPECT_TRUE (undefined.isUndefined());
+        CHOC_EXPECT_FALSE (undefined.isNull());
+
+        auto null = choc::json::createNull();
+        CHOC_EXPECT_TRUE (null.isNull());
+        CHOC_EXPECT_FALSE (null.isUndefined());
+
+        // Test boolean
+        auto boolTrue = choc::json::Value (true);
+        auto boolFalse = choc::json::createBool (false);
+        CHOC_EXPECT_TRUE (boolTrue.isBool());
+        CHOC_EXPECT_TRUE (boolFalse.isBool());
+        CHOC_EXPECT_TRUE (boolTrue.getBool());
+        CHOC_EXPECT_FALSE (boolFalse.getBool());
+
+        // Test integers
+        auto int32Val = choc::json::Value (static_cast<int32_t> (42));
+        auto int64Val = choc::json::createInt (1234567890123LL);
+        CHOC_EXPECT_TRUE (int32Val.isInt32());
+        CHOC_EXPECT_TRUE (int64Val.isInt64());
+        CHOC_EXPECT_EQ (42, int32Val.getInt32());
+        CHOC_EXPECT_EQ (1234567890123LL, int64Val.getInt64());
+
+        // Test floats
+        auto float32Val = choc::json::Value (3.14f);
+        auto float64Val = choc::json::createFloat (2.718281828);
+        CHOC_EXPECT_TRUE (float32Val.isFloat());
+        CHOC_EXPECT_TRUE (float64Val.isFloat());
+        CHOC_EXPECT_NEAR (3.14f, float32Val.getFloat32(), 0.001f);
+        CHOC_EXPECT_NEAR (2.718281828, float64Val.getFloat64(), 0.000001);
+    }
+
+    {
+        CHOC_TEST (SmallStringOptimization)
+
+        // Test short string (stored inline)
+        auto shortStr = choc::json::Value ("short string");
+        CHOC_EXPECT_TRUE (shortStr.isString());
+        CHOC_EXPECT_EQ ("short string", std::string (shortStr.getString()));
+        CHOC_EXPECT_EQ (12u, shortStr.size());
+
+        // Test exactly at boundary (22 chars)
+        std::string boundaryStr (22, 'a');
+        auto boundaryVal = choc::json::createString (boundaryStr);
+        CHOC_EXPECT_TRUE (boundaryVal.isString());
+        CHOC_EXPECT_EQ (boundaryStr, std::string (boundaryVal.getString()));
+        CHOC_EXPECT_EQ (22u, boundaryVal.size());
+
+        // Test long string (heap allocated)
+        std::string longStr (100, 'b');
+        auto longVal = choc::json::Value (longStr);
+        CHOC_EXPECT_TRUE (longVal.isString());
+        CHOC_EXPECT_EQ (longStr, std::string (longVal.getString()));
+        CHOC_EXPECT_EQ (100u, longVal.size());
+    }
+
+    {
+        CHOC_TEST (Arrays)
+
+        auto arr = choc::json::createEmptyArray();
+        CHOC_EXPECT_TRUE (arr.isArray());
+        CHOC_EXPECT_EQ (0u, arr.size());
+
+        // Add elements
+        arr.addArrayElement (choc::json::Value (42));
+        arr.addArrayElement (choc::json::createString ("hello"));
+        arr.addArrayElement (choc::json::createBool (true));
+
+        CHOC_EXPECT_EQ (3u, arr.size());
+        CHOC_EXPECT_EQ (42, arr[0].getInt32());
+        CHOC_EXPECT_EQ ("hello", std::string (arr[1].getString()));
+        CHOC_EXPECT_TRUE (arr[2].getBool());
+
+        // Test iteration
+        size_t count = 0;
+        for (const auto& item : arr)
+        {
+            ++count;
+            if (count == 1) CHOC_EXPECT_TRUE (item.isInt32());
+            if (count == 2) CHOC_EXPECT_TRUE (item.isString());
+            if (count == 3) CHOC_EXPECT_TRUE (item.isBool());
+        }
+        CHOC_EXPECT_EQ (3u, count);
+    }
+
+    {
+        CHOC_TEST (Objects)
+
+        auto obj = choc::json::createObject();
+        CHOC_EXPECT_TRUE (obj.isObject());
+        CHOC_EXPECT_EQ (0u, obj.size());
+
+        // Add members
+        obj.addMember ("number", choc::json::Value (123));
+        obj.addMember ("text", choc::json::createString ("world"));
+        obj.addMember ("flag", choc::json::createBool (false));
+
+        CHOC_EXPECT_EQ (3u, obj.size());
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("number"));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("text"));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("flag"));
+        CHOC_EXPECT_FALSE (obj.hasObjectMember ("missing"));
+
+        CHOC_EXPECT_EQ (123, obj["number"].getInt32());
+        CHOC_EXPECT_EQ ("world", std::string (obj["text"].getString()));
+        CHOC_EXPECT_FALSE (obj["flag"].getBool());
+
+        // Test member access by index
+        auto member0 = obj.getObjectMemberAt (0);
+        CHOC_EXPECT_EQ ("number", std::string (member0.name));
+        CHOC_EXPECT_EQ (123, member0.value.getInt32());
+
+        // Test iteration
+        size_t count = 0;
+        for (auto it = obj.begin(); it != obj.end(); ++it)
+        {
+            ++count;
+            auto member = it.getObjectMember();
+            if (member.name == "number") CHOC_EXPECT_EQ (123, member.value.getInt32());
+            if (member.name == "text") CHOC_EXPECT_EQ ("world", std::string (member.value.getString()));
+            if (member.name == "flag") CHOC_EXPECT_FALSE (member.value.getBool());
+        }
+        CHOC_EXPECT_EQ (3u, count);
+    }
+
+    {
+        CHOC_TEST (ParserCompatibility)
+
+        // Test parsing into json::Value
+        auto jsonStr = R"({"number": 42, "text": "hello", "array": [1, 2, 3], "null": null, "bool": true})";
+        auto parsed = choc::json::parseAs<choc::json::Value> (jsonStr);
+
+        CHOC_EXPECT_TRUE (parsed.isObject());
+        CHOC_EXPECT_EQ (42, parsed["number"].getInt());
+        CHOC_EXPECT_EQ ("hello", std::string (parsed["text"].getString()));
+        CHOC_EXPECT_TRUE (parsed["array"].isArray());
+        CHOC_EXPECT_EQ (3u, parsed["array"].size());
+        CHOC_EXPECT_EQ (1, parsed["array"][0].getInt());
+        CHOC_EXPECT_EQ (2, parsed["array"][1].getInt());
+        CHOC_EXPECT_EQ (3, parsed["array"][2].getInt());
+        CHOC_EXPECT_TRUE (parsed["null"].isNull());
+        CHOC_EXPECT_TRUE (parsed["bool"].getBool());
+
+        // Test bare value parsing
+        auto bareValue = choc::json::parseValueAs<choc::json::Value> ("123.45");
+        CHOC_EXPECT_TRUE (bareValue.isFloat());
+        CHOC_EXPECT_NEAR (123.45, bareValue.getFloat64(), 0.001);
+    }
+
+    {
+        CHOC_TEST (ErrorHandling)
+
+        auto value = choc::json::Value (42);
+
+        try { value.getBool(); CHOC_FAIL ("Should have thrown"); }
+        catch (const std::runtime_error&) {}
+
+        try { value.getString(); CHOC_FAIL ("Should have thrown"); }
+        catch (const std::runtime_error&) {}
+
+        auto arr = choc::json::createEmptyArray();
+        try { arr[0]; CHOC_FAIL ("Should have thrown"); }
+        catch (const std::runtime_error&) {}
+
+        auto obj = choc::json::createObject();
+        try { obj["missing"]; CHOC_FAIL ("Should have thrown"); }
+        catch (const std::runtime_error&) {}
+    }
+
+    {
+        CHOC_TEST (CopyAndMove)
+
+        auto original = choc::json::createObject();
+        original.addMember ("key", choc::json::Value (123));
+
+        // Copy constructor
+        auto copied (original);
+        CHOC_EXPECT_EQ (123, copied["key"].getInt32());
+        CHOC_EXPECT_EQ (123, original["key"].getInt32()); // Original unchanged
+
+        // Move constructor
+        auto moved (std::move (original));
+        CHOC_EXPECT_EQ (123, moved["key"].getInt32());
+        CHOC_EXPECT_TRUE (original.isUndefined()); // Original should be undefined after move
+
+        // Copy assignment
+        auto assigned = choc::json::createEmptyArray();
+        assigned = copied;
+        CHOC_EXPECT_EQ (123, assigned["key"].getInt32());
+
+        // Move assignment
+        auto moveAssigned = choc::json::createEmptyArray();
+        moveAssigned = std::move (copied);
+        CHOC_EXPECT_EQ (123, moveAssigned["key"].getInt32());
+        CHOC_EXPECT_TRUE (copied.isUndefined()); // Copied should be undefined after move
+    }
+
+    {
+        CHOC_TEST (WithDefault)
+
+        auto intVal = choc::json::Value (42);
+        auto strVal = choc::json::Value ("hello");
+        auto boolVal = choc::json::Value (true);
+
+        CHOC_EXPECT_EQ (42, intVal.getWithDefault (0));
+        CHOC_EXPECT_EQ (0, strVal.getWithDefault (0)); // Wrong type, returns default
+
+        CHOC_EXPECT_EQ ("hello", strVal.getWithDefault (std::string ("default")));
+        CHOC_EXPECT_EQ ("default", intVal.getWithDefault (std::string ("default")));
+
+        CHOC_EXPECT_TRUE (boolVal.getWithDefault (false));
+        CHOC_EXPECT_FALSE (intVal.getWithDefault (false));
+    }
+
+    {
+        CHOC_TEST (ArraySplice)
+
+        // Test basic splice (removal only)
+        auto arr = choc::json::createEmptyArray();
+        for (int i = 0; i < 5; ++i)
+            arr.addArrayElement (choc::json::Value (i));
+
+        CHOC_EXPECT_EQ (5u, arr.size());
+
+        // Remove 2 elements starting at index 1
+        auto removed = arr.splice (1, 2);
+
+        CHOC_EXPECT_EQ (3u, arr.size());
+        CHOC_EXPECT_EQ (2u, removed.size());
+
+        // Check remaining array contents
+        CHOC_EXPECT_EQ (0, arr[0].getInt32());
+        CHOC_EXPECT_EQ (3, arr[1].getInt32());
+        CHOC_EXPECT_EQ (4, arr[2].getInt32());
+
+        // Check removed contents
+        CHOC_EXPECT_EQ (1, removed[0].getInt32());
+        CHOC_EXPECT_EQ (2, removed[1].getInt32());
+
+        // Test splice with insertion
+        auto arr2 = choc::json::createEmptyArray();
+        arr2.addArrayElement (choc::json::Value (10));
+        arr2.addArrayElement (choc::json::Value (20));
+        arr2.addArrayElement (choc::json::Value (30));
+
+        auto removed2 = arr2.splice (1, 1, 100, 200, 300);
+
+        CHOC_EXPECT_EQ (5u, arr2.size());  // 3 - 1 + 3 = 5
+        CHOC_EXPECT_EQ (1u, removed2.size());
+
+        // Check array after splice with insertion
+        CHOC_EXPECT_EQ (10, arr2[0].getInt32());
+        CHOC_EXPECT_EQ (100, arr2[1].getInt32());
+        CHOC_EXPECT_EQ (200, arr2[2].getInt32());
+        CHOC_EXPECT_EQ (300, arr2[3].getInt32());
+        CHOC_EXPECT_EQ (30, arr2[4].getInt32());
+
+        CHOC_EXPECT_EQ (20, removed2[0].getInt32());
+
+        // Test edge cases
+        auto arr3 = choc::json::createEmptyArray();
+        arr3.addArrayElement (choc::json::Value (1));
+        arr3.addArrayElement (choc::json::Value (2));
+
+        // Splice beyond array bounds
+        auto removed3 = arr3.splice (10, 5);
+        CHOC_EXPECT_EQ (0u, removed3.size());
+        CHOC_EXPECT_EQ (2u, arr3.size());
+
+        // Splice with deleteCount larger than remaining elements
+        auto removed4 = arr3.splice (1, 10);
+        CHOC_EXPECT_EQ (1u, removed4.size());
+        CHOC_EXPECT_EQ (1u, arr3.size());
+        CHOC_EXPECT_EQ (2, removed4[0].getInt32());
+
+        // Test splice on non-array
+        auto notArray = choc::json::Value (42);
+        bool threw = false;
+        try
+        {
+            notArray.splice (0, 1);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+        CHOC_EXPECT_TRUE (threw);
+    }
+
+    {
+        CHOC_TEST (SpliceElementShifting)
+        
+        auto arr = choc::json::createEmptyArray();
+        for (int i = 1; i <= 10; ++i)
+            arr.addArrayElement (choc::json::Value (i));
+
+        // Remove 3 elements starting at index 2 (removes 3, 4, 5)
+        // Should leave [1, 2, 6, 7, 8, 9, 10] 
+        auto removed = arr.splice (2, 3);
+
+        // Verify removed elements
+        CHOC_EXPECT_EQ (3u, removed.size());
+        CHOC_EXPECT_EQ (3, removed[0].getInt32());
+        CHOC_EXPECT_EQ (4, removed[1].getInt32());
+        CHOC_EXPECT_EQ (5, removed[2].getInt32());
+
+        // Verify remaining array contents - this should fail with the bug
+        CHOC_EXPECT_EQ (7u, arr.size());
+        CHOC_EXPECT_EQ (1, arr[0].getInt32());
+        CHOC_EXPECT_EQ (2, arr[1].getInt32());
+        CHOC_EXPECT_EQ (6, arr[2].getInt32());
+        CHOC_EXPECT_EQ (7, arr[3].getInt32());
+        CHOC_EXPECT_EQ (8, arr[4].getInt32());
+        CHOC_EXPECT_EQ (9, arr[5].getInt32());
+        CHOC_EXPECT_EQ (10, arr[6].getInt32());
+    }
+
+    {
+        CHOC_TEST (ObjectRemoveMember)
+
+        // Test basic removeMember
+        auto obj = choc::json::create ("a", 1, "b", 2, "c", 3);
+
+        CHOC_EXPECT_EQ (3u, obj.size());
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("b"));
+
+        // Remove existing member
+        bool removed1 = obj.removeMember ("b");
+        CHOC_EXPECT_TRUE (removed1);
+        CHOC_EXPECT_EQ (2u, obj.size());
+        CHOC_EXPECT_FALSE (obj.hasObjectMember ("b"));
+
+        // Try to remove non-existent member
+        bool removed2 = obj.removeMember ("nonexistent");
+        CHOC_EXPECT_FALSE (removed2);
+        CHOC_EXPECT_EQ (2u, obj.size());
+
+        // Check remaining members
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("a"));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember ("c"));
+        CHOC_EXPECT_EQ (1, obj["a"].getInt32());
+        CHOC_EXPECT_EQ (3, obj["c"].getInt32());
+
+        // Verify member order is preserved
+        auto member0 = obj.getObjectMemberAt (0);
+        auto member1 = obj.getObjectMemberAt (1);
+        CHOC_EXPECT_EQ ("a", member0.name);
+        CHOC_EXPECT_EQ (1, member0.value.getInt32());
+        CHOC_EXPECT_EQ ("c", member1.name);
+        CHOC_EXPECT_EQ (3, member1.value.getInt32());
+
+        // Remove first member
+        bool removed3 = obj.removeMember ("a");
+        CHOC_EXPECT_TRUE (removed3);
+        CHOC_EXPECT_EQ (1u, obj.size());
+
+        auto finalMember = obj.getObjectMemberAt (0);
+        CHOC_EXPECT_EQ ("c", finalMember.name);
+        CHOC_EXPECT_EQ (3, finalMember.value.getInt32());
+
+        // Remove last member
+        bool removed4 = obj.removeMember ("c");
+        CHOC_EXPECT_TRUE (removed4);
+        CHOC_EXPECT_EQ (0u, obj.size());
+
+        // Test removeMember on non-object
+        auto notObject = choc::json::Value (42);
+        bool removed5 = notObject.removeMember ("key");
+        CHOC_EXPECT_FALSE (removed5);
+    }
+
+    {
+        CHOC_TEST (LongMemberNames)
+        
+        // Test MemberKey short string optimization vs long string allocation
+        // MemberKey has 24-byte buffer, so maxShortLength = 23 chars
+        auto obj = choc::json::createObject();
+        
+        // Short member name (should use short string optimization)
+        std::string shortName = "shortMemberName";  // 15 chars - should be short
+        obj.addMember (shortName, 100);
+        
+        // Long member name (should use heap allocation)
+        std::string longName (25, 'x');  // 25 'x' characters - exceeds 23 char limit  
+        obj.addMember (longName, 200);
+        
+        // Boundary case - exactly 23 chars (should still be short)
+        std::string boundaryName (23, 'y');  // exactly 23 chars
+        obj.addMember (boundaryName, 300);
+        
+        // Very long name
+        std::string veryLongName (100, 'z');  // 100 chars - definitely long
+        obj.addMember (veryLongName, 400);
+        
+        // Test all names can be found
+        CHOC_EXPECT_TRUE (obj.hasObjectMember (shortName));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember (longName));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember (boundaryName));
+        CHOC_EXPECT_TRUE (obj.hasObjectMember (veryLongName));
+        
+        // Test values are correct
+        CHOC_EXPECT_EQ (100, obj[shortName].getInt32());
+        CHOC_EXPECT_EQ (200, obj[longName].getInt32());
+        CHOC_EXPECT_EQ (300, obj[boundaryName].getInt32());
+        CHOC_EXPECT_EQ (400, obj[veryLongName].getInt32());
+        
+        // Test iteration works with long names
+        CHOC_EXPECT_EQ (4u, obj.size());
+        for (uint32_t i = 0; i < obj.size(); ++i)
+        {
+            auto member = obj.getObjectMemberAt (i);
+            CHOC_EXPECT_TRUE (member.name.length() > 0);
+            CHOC_EXPECT_TRUE (member.value.isInt32());
+        }
+        
+        // Test removal of long names
+        CHOC_EXPECT_TRUE (obj.removeMember (longName));
+        CHOC_EXPECT_FALSE (obj.hasObjectMember (longName));
+        CHOC_EXPECT_EQ (3u, obj.size());
+        
+        CHOC_EXPECT_TRUE (obj.removeMember (veryLongName));
+        CHOC_EXPECT_FALSE (obj.hasObjectMember (veryLongName));
+        CHOC_EXPECT_EQ (2u, obj.size());
+    }
+
+    {
+        CHOC_TEST (ReserveCapacity)
+
+        // Test array reservation
+        auto arr = choc::json::createEmptyArray();
+        arr.reserveArray (100);
+
+        // Add elements without triggering reallocation
+        for (int i = 0; i < 50; ++i)
+            arr.addArrayElement (choc::json::Value (i));
+
+        CHOC_EXPECT_EQ (50u, arr.size());
+        CHOC_EXPECT_EQ (25, arr[25].getInt32());
+
+        // Test object reservation
+        auto obj = choc::json::createObject();
+        obj.reserveObject (10);
+
+        for (int i = 0; i < 5; ++i)
+        {
+            auto key = "key" + std::to_string (i);
+            obj.addMember (key, i);
+        }
+
+        CHOC_EXPECT_EQ (5u, obj.size());
+        CHOC_EXPECT_EQ (3, obj["key3"].getInt32());
+
+        // Test reserve on existing data
+        arr.reserveArray (200);  // Should not affect existing elements
+        CHOC_EXPECT_EQ (50u, arr.size());
+        CHOC_EXPECT_EQ (25, arr[25].getInt32());
+
+        // Test reserve with smaller capacity (should be no-op)
+        obj.reserveObject (2);  // Smaller than current size, should do nothing
+        CHOC_EXPECT_EQ (5u, obj.size());
+    }
+
+    {
+        CHOC_TEST (EdgeCases)
+
+        // Test empty array operations
+        auto emptyArr = choc::json::createEmptyArray();
+        auto spliceResult = emptyArr.splice (0, 5);
+        CHOC_EXPECT_EQ (0u, spliceResult.size());
+        CHOC_EXPECT_EQ (0u, emptyArr.size());
+
+        // Test empty object operations
+        auto emptyObj = choc::json::createObject();
+        bool removed = emptyObj.removeMember ("nonexistent");
+        CHOC_EXPECT_FALSE (removed);
+
+        // Test splice with zero deleteCount
+        auto arr = choc::json::createEmptyArray();
+        arr.addArrayElement (choc::json::Value (1));
+        arr.addArrayElement (choc::json::Value (2));
+
+        auto noRemoval = arr.splice (1, 0, 99);
+        CHOC_EXPECT_EQ (0u, noRemoval.size());
+        CHOC_EXPECT_EQ (3u, arr.size());
+        CHOC_EXPECT_EQ (1, arr[0].getInt32());
+        CHOC_EXPECT_EQ (99, arr[1].getInt32());
+        CHOC_EXPECT_EQ (2, arr[2].getInt32());
+
+        // Test splice insertion at end
+        auto insertAtEnd = arr.splice (3, 0, 100, 101);
+        CHOC_EXPECT_EQ (0u, insertAtEnd.size());
+        CHOC_EXPECT_EQ (5u, arr.size());
+        CHOC_EXPECT_EQ (100, arr[3].getInt32());
+        CHOC_EXPECT_EQ (101, arr[4].getInt32());
+
+        // Test large deleteCount
+        auto largeDelete = arr.splice (2, 1000);
+        CHOC_EXPECT_EQ (3u, largeDelete.size());  // Should only remove available elements
+        CHOC_EXPECT_EQ (2u, arr.size());
+
+        // Test string types in containers
+        auto strArr = choc::json::createEmptyArray();
+        strArr.addArrayElement (choc::json::Value ("hello"));
+        strArr.addArrayElement (choc::json::Value ("world"));
+
+        auto strRemoved = strArr.splice (0, 1);
+        CHOC_EXPECT_EQ ("hello", strRemoved[0].getString());
+        CHOC_EXPECT_EQ ("world", strArr[0].getString());
     }
 }
 
@@ -3548,6 +4076,7 @@ inline bool runAllTests (choc::test::TestProgress& progress, bool multithread)
         testFileUtilities,
         testValues,
         testJSON,
+        testJSONValue,
         testMIDI,
         testAudioBuffers,
         testIntToFloat,
