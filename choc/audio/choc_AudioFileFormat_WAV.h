@@ -358,11 +358,11 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             if (getPosition() + numLoops * 24 > chunkRange.getEnd())
                 throwFormatException();
 
-            auto loops = choc::value::createEmptyArray();
+            auto loops = choc::json::createEmptyArray();
 
             for (uint32_t i = 0; i < numLoops; ++i)
             {
-                auto loop = choc::value::createObject ({});
+                auto loop = choc::json::createObject();
 
                 loop.setMember ("ID",                static_cast<int64_t> (readInt<uint32_t>()));
                 loop.setMember ("loopType",          static_cast<int64_t> (readInt<uint32_t>()));
@@ -406,11 +406,11 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             if (getPosition() + numCues * 24 > chunkRange.getEnd())
                 throwFormatException();
 
-            auto cues = choc::value::createEmptyArray();
+            auto cues = choc::json::createEmptyArray();
 
             for (uint32_t i = 0; i < numCues; ++i)
             {
-                auto c = choc::value::createObject ({});
+                auto c = choc::json::createObject();
                 c.setMember ("ID",            static_cast<int64_t> (readInt<uint32_t>()));
                 c.setMember ("position",      static_cast<int64_t> (readInt<uint32_t>()));
                 c.setMember ("dataChunkID",   static_cast<int64_t> (readInt<uint32_t>()));
@@ -432,7 +432,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
 
             if (subChunkType == "info" || subChunkType == "INFO")
             {
-                auto listInfoItems = choc::value::createEmptyArray();
+                auto listInfoItems = choc::json::createEmptyArray();
 
                 while (getPosition() < chunkRange.getEnd())
                 {
@@ -555,10 +555,10 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return choc::base64::encodeToString (data);
         }
 
-        void addMetadata (choc::value::Value&& v)
+        void addMetadata (choc::json::Value&& v)
         {
             if (! properties.metadata.isArray())
-                properties.metadata = choc::value::createEmptyArray();
+                properties.metadata = choc::json::createEmptyArray();
 
             properties.metadata.addArrayElement (std::move (v));
         }
@@ -742,7 +742,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             writeChunkNameAndSize ("data", isRF64 ? 0xffffffffu : static_cast<uint32_t> (getTotalAudioDataSize()));
         }
 
-        uint32_t getMetadataChunkSize (const choc::value::ValueView& chunk) const
+        uint32_t getMetadataChunkSize (const choc::json::Value& chunk) const
         {
             auto type = chunk["type"].toString();
 
@@ -761,7 +761,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return getMetadataSize_Unknown  (chunk);
         }
 
-        void writeMetadataChunk (const choc::value::ValueView& chunk)
+        void writeMetadataChunk (const choc::json::Value& chunk)
         {
             auto size = getMetadataChunkSize (chunk);
             auto type = chunk["type"].toString();
@@ -797,13 +797,13 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                     writeMetadataChunk (meta);
         }
 
-        static uint32_t getMetadataSize_BWAV (const choc::value::ValueView& bwav)
+        static uint32_t getMetadataSize_BWAV (const choc::json::Value& bwav)
         {
             return 256 + 32 + 32 + 10 + 8 + 8 + 2 + 64 + 2 + 2 + 2 + 2 + 2 + 180
                     + static_cast<uint32_t> (bwav["codingHistory"].toString().length());
         }
 
-        void writeMetadata_BWAV (const choc::value::ValueView& bwav)
+        void writeMetadata_BWAV (const choc::json::Value& bwav)
         {
             auto writeUMID = [this] (std::string_view umid)
             {
@@ -834,7 +834,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             writeData (bwav["codingHistory"].toString());
         }
 
-        static uint32_t getMetadataSize_SMPL (const choc::value::ValueView& smpl)
+        static uint32_t getMetadataSize_SMPL (const choc::json::Value& smpl)
         {
             const auto& loops = smpl["loops"];
 
@@ -843,7 +843,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                     + getDecodedBase64Size (smpl, "samplerData");
         }
 
-        void writeMetadata_SMPL (const choc::value::ValueView& smpl)
+        void writeMetadata_SMPL (const choc::json::Value& smpl)
         {
             auto samplerData = getDecodedBase64 (smpl, "samplerData");
             const auto& loops = smpl["loops"];
@@ -879,7 +879,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return 7;
         }
 
-        void writeMetadata_INST (const choc::value::ValueView& inst)
+        void writeMetadata_INST (const choc::json::Value& inst)
         {
             writeInt<uint8_t> (static_cast<uint8_t> (inst["baseNote"].getWithDefault<int64_t> (0)));
             writeInt<int8_t>  (static_cast<int8_t>  (inst["fineTuning"].getWithDefault<int64_t> (0)));
@@ -890,13 +890,13 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             writeInt<uint8_t> (static_cast<uint8_t> (inst["highVelocity"].getWithDefault<int64_t> (0)));
         }
 
-        static uint32_t getMetadataSize_Cue (const choc::value::ValueView& cue)
+        static uint32_t getMetadataSize_Cue (const choc::json::Value& cue)
         {
             const auto& cues = cue["cues"];
             return 4 + static_cast<uint32_t> (cues.isArray() ? cues.size() : 0) * 4 * 6;
         }
 
-        void writeMetadata_Cue (const choc::value::ValueView& cue)
+        void writeMetadata_Cue (const choc::json::Value& cue)
         {
             const auto& cues = cue["cues"];
             writeInt<uint32_t> (static_cast<uint32_t> (cues.size()));
@@ -912,7 +912,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             }
         }
 
-        static uint32_t getMetadataSize_LIST (const choc::value::ValueView& list)
+        static uint32_t getMetadataSize_LIST (const choc::json::Value& list)
         {
             const auto& dataBase64 = list["data"];
 
@@ -932,7 +932,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return total;
         }
 
-        void writeMetadata_LIST (const choc::value::ValueView& list)
+        void writeMetadata_LIST (const choc::json::Value& list)
         {
             writeChunkName (list["type"].toString());
 
@@ -965,7 +965,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return 4 + 2 + 6 + 4 + 2 + 2 + 4;
         }
 
-        void writeMetadata_ACID (const choc::value::ValueView& acid)
+        void writeMetadata_ACID (const choc::json::Value& acid)
         {
             writeInt<uint32_t> ((acid["isOneShot"].getWithDefault<bool> (false)     ? 1u  : 0u)
                               | (acid["isRootNoteSet"].getWithDefault<bool> (false) ? 2u  : 0u)
@@ -980,14 +980,14 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             writeInt<uint32_t> (choc::memory::bit_cast<uint32_t> (acid["tempo"].getWithDefault<float> (0)));
         }
 
-        static uint32_t getMetadataSize_Unknown (const choc::value::ValueView& u)  { return 8u + getDecodedBase64Size (u, "content"); }
-        void writeMetadata_Unknown (const choc::value::ValueView& u)               { writeData (getDecodedBase64 (u, "content")); }
+        static uint32_t getMetadataSize_Unknown (const choc::json::Value& u)  { return 8u + getDecodedBase64Size (u, "content"); }
+        void writeMetadata_Unknown (const choc::json::Value& u)               { writeData (getDecodedBase64 (u, "content")); }
 
-        static uint32_t getMetadataSize_Trkn (const choc::value::ValueView& trkn)  { return 4u + static_cast<uint32_t> (trkn["content"].toString().size()); }
-        void writeMetadata_Trkn (const choc::value::ValueView& trkn)               { writeData (trkn["content"].toString()); }
+        static uint32_t getMetadataSize_Trkn (const choc::json::Value& trkn)  { return 4u + static_cast<uint32_t> (trkn["content"].toString().size()); }
+        void writeMetadata_Trkn (const choc::json::Value& trkn)               { writeData (trkn["content"].toString()); }
 
-        static uint32_t getMetadataSize_AXML (const choc::value::ValueView& axml)  { return 4u + static_cast<uint32_t> (axml["content"].toString().size()); }
-        void writeMetadata_AXML (const choc::value::ValueView& axml)               { writeData (axml["content"].toString()); }
+        static uint32_t getMetadataSize_AXML (const choc::json::Value& axml)  { return 4u + static_cast<uint32_t> (axml["content"].toString().size()); }
+        void writeMetadata_AXML (const choc::json::Value& axml)               { writeData (axml["content"].toString()); }
 
         void writeChunkName (std::string_view name)
         {
@@ -1023,7 +1023,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             stream->write (s.data(), static_cast<std::streamsize> (s.size()));
         }
 
-        void writePaddedString (const choc::value::ValueView& chunk, const char* name, uint32_t totalSize)
+        void writePaddedString (const choc::json::Value& chunk, const char* name, uint32_t totalSize)
         {
             auto s = chunk[name].toString();
             auto sizeToWrite = std::min (totalSize, static_cast<uint32_t> (s.length()));
@@ -1033,7 +1033,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
                 writeZeros (totalSize - sizeToWrite);
         }
 
-        static std::vector<char> getDecodedBase64 (const choc::value::ValueView& v, const char* name)
+        static std::vector<char> getDecodedBase64 (const choc::json::Value& v, const char* name)
         {
             auto asBase64 = v[name].toString();
             std::vector<char> data;
@@ -1044,7 +1044,7 @@ struct WAVAudioFileFormat<supportWriting>::Implementation
             return {};
         }
 
-        static uint32_t getDecodedBase64Size (const choc::value::ValueView& v, const char* name)
+        static uint32_t getDecodedBase64Size (const choc::json::Value& v, const char* name)
         {
             return static_cast<uint32_t> (getDecodedBase64 (v, name).size());
         }

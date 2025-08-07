@@ -27,6 +27,7 @@
 #include "choc_UTF8.h"
 #include "choc_FloatToString.h"
 #include "../containers/choc_Value.h"
+#include "../containers/choc_JSONValue.h"
 
 #undef max   // It's never a smart idea to include any C headers before your C++ ones, as it
 #undef min   // risks polluting your namespace with all kinds of dangerous macros like these ones.
@@ -55,19 +56,24 @@ struct ParseError  : public std::runtime_error
 /// Attempts to parse a bare JSON value such as a number, string, object etc
 [[nodiscard]] value::Value parseValue (std::string_view);
 
-/// A helper function to create a JSON-friendly Value object with a set of properties.
-/// The argument list must be contain pairs of names and values, e.g.
-///
-///  auto myObject = choc::json::create ("property1", 1234,
-///                                      "property2", "hello",
-///                                      "property3", 100.0f);
-///
-/// Essentially, this is a shorthand for calling choc::value::createObject()
-/// and passing it an empty type name.
-template <typename... Properties>
-[[nodiscard]] value::Value create (Properties&&... propertyNamesAndValues);
+/// Template function to parse JSON into any supported Value type
+template <typename ValueType>
+[[nodiscard]] ValueType parseAs (text::UTF8Pointer);
+
+/// Template function to parse JSON into any supported Value type
+template <typename ValueType>
+[[nodiscard]] ValueType parseAs (std::string_view);
+
+/// Template function to parse a bare JSON value into any supported Value type
+template <typename ValueType>
+[[nodiscard]] ValueType parseValueAs (std::string_view);
 
 //==============================================================================
+/// Formats a value as a JSON string.
+/// If useLineBreaks is true, it'll be formatted as multi-line JSON, if false it'll
+/// just be returned as a single line.
+[[nodiscard]] std::string toString (const json::Value&, bool useLineBreaks = false);
+
 /// Formats a value as a JSON string.
 /// If useLineBreaks is true, it'll be formatted as multi-line JSON, if false it'll
 /// just be returned as a single line.
@@ -187,7 +193,7 @@ inline std::string doubleToString (double value)
 }
 
 //==============================================================================
-template <typename Stream>
+template <typename Stream, typename ValueType>
 struct Writer
 {
     Stream& out;
@@ -198,18 +204,21 @@ struct Writer
     void startIndent()                    { currentIndent += indentSize; out << newLine << getIndent(); }
     void endIndent()                      { currentIndent -= indentSize; out << newLine << getIndent(); }
 
-    void dump (const value::ValueView& v)
+    void dump (const ValueType& v)
     {
         if (v.isVoid())                   { out << "null"; return; }
         if (v.isString())                 { out << getEscapedQuotedString (v.getString()); return; }
         if (v.isBool())                   { out << (v.getBool() ? "true" : "false"); return; }
-        if (v.isFloat())                  { out << doubleToString (v.get<double>()); return; }
-        if (v.isInt())                    { out << v.get<int64_t>(); return; }
+        if (v.isFloat())                  { out << doubleToString (v.template get<double>()); return; }
+        if (v.isInt())                    { out << v.template get<int64_t>(); return; }
         if (v.isObject())                 return dumpObject (v);
-        if (v.isArray() || v.isVector())  return dumpArrayOrVector (v);
+        if (v.isArray())                  return dumpArrayOrVector (v);
+
+        if constexpr (std::is_same<const choc::value::Value, const ValueType>::value)
+            if (v.isVector())  return dumpArrayOrVector (v);
     }
 
-    void dumpArrayOrVector (const value::ValueView& v)
+    void dumpArrayOrVector (const ValueType& v)
     {
         out << '[';
         auto numElements = v.size();
@@ -240,7 +249,7 @@ struct Writer
         out << ']';
     }
 
-    void dumpObject (const value::ValueView& object)
+    void dumpObject (const ValueType& object)
     {
         out << '{';
         auto numMembers = object.size();
@@ -277,10 +286,17 @@ struct Writer
     }
 };
 
-template <typename Stream>
-void writeAsJSON (Stream& output, const value::ValueView& value, bool useMultipleLines)
+template <typename Stream, typename ValueType>
+void writeAsJSON (Stream& output, const ValueType& value, bool useMultipleLines)
 {
-    Writer<Stream> { output, useMultipleLines ? 2u : 0u }.dump (value);
+    Writer<Stream, ValueType> { output, useMultipleLines ? 2u : 0u }.dump (value);
+}
+
+inline std::string toString (const json::Value& v, bool useLineBreaks)
+{
+    std::ostringstream out (std::ios::binary);
+    writeAsJSON (out, v, useLineBreaks);
+    return out.str();
 }
 
 inline std::string toString (const value::ValueView& v, bool useLineBreaks)
@@ -296,242 +312,305 @@ inline std::string toString (const value::ValueView& v, bool useLineBreaks)
     throw ParseError (error, text::findLineAndColumn (source, errorPos));
 }
 
-inline value::Value parse (text::UTF8Pointer text, bool parseBareValue)
+//==============================================================================
+// Generic parser implementation for different Value types
+namespace ParserImpl
 {
-    struct Parser
+
+//==============================================================================
+/// Generic parser traits for different Value types
+template <typename ValueType>
+struct ParserTraits;
+
+//==============================================================================
+/// Specialization for choc::value::Value
+template <>
+struct ParserTraits<choc::value::Value>
+{
+    using ValueType = choc::value::Value;
+    using ArrayBuilder = ValueType;
+    using ObjectBuilder = ValueType;
+
+    static ValueType createNull()                   { return {}; }
+    static ValueType createBool (bool v)            { return choc::value::createBool (v); }
+    static ValueType createInt64 (int64_t v)        { return choc::value::createInt64 (v); }
+    static ValueType createFloat64 (double v)       { return choc::value::createFloat64 (v); }
+    static ValueType createString (std::string s)   { return choc::value::createString (std::move (s)); }
+
+    static ArrayBuilder createArrayBuilder()                                     { return choc::value::createEmptyArray(); }
+    static void addToArray (ArrayBuilder& b, ValueType&& value)                  { b.addArrayElement (std::move (value)); }
+    static ValueType finaliseArray (ArrayBuilder& b)                             { return std::move (b); }
+    static ObjectBuilder createObjectBuilder()                                   { return choc::value::createObject ({}); }
+    static void addToObject (ObjectBuilder& b, std::string&& key, ValueType&& v) { b.addMember (std::move (key), std::move (v)); }
+    static ValueType finaliseObject (ObjectBuilder& b)                           { return std::move (b); }
+};
+
+//==============================================================================
+/// Specialization for choc::json::Value
+template <>
+struct ParserTraits<choc::json::Value>
+{
+    using ValueType = choc::json::Value;
+    using ArrayBuilder = ValueType;
+    using ObjectBuilder = ValueType;
+
+    static ValueType createNull()                   { return choc::json::createNull(); }
+    static ValueType createBool (bool v)            { return choc::json::createBool (v); }
+    static ValueType createInt64 (int64_t v)        { return choc::json::createInt (v); }
+    static ValueType createFloat64 (double v)       { return choc::json::createFloat (v); }
+    static ValueType createString (std::string s)   { return choc::json::createString (std::move (s)); }
+
+    static ArrayBuilder createArrayBuilder()                                        { return choc::json::createEmptyArray(); }
+    static void addToArray (ArrayBuilder& b, ValueType&& value)                     { b.addArrayElement (std::move (value)); }
+    static ValueType finaliseArray (ArrayBuilder& b)                                { return std::move (b); }
+    static ObjectBuilder createObjectBuilder()                                      { return choc::json::createObject(); }
+    static void addToObject (ObjectBuilder& b, std::string&& key, ValueType&& v)    { b.addMember (std::move (key), std::move (v)); }
+    static ValueType finaliseObject (ObjectBuilder& b)                              { return std::move (b); }
+};
+
+//==============================================================================
+/// Generic parser implementation
+template <typename ValueType>
+struct Parser
+{
+    using Traits = ParserTraits<ValueType>;
+    text::UTF8Pointer source, current;
+
+    bool isEOF() const            { return current.empty(); }
+    uint32_t peek() const         { return *current; }
+    uint32_t pop()                { return current.popFirstChar(); }
+    bool popIf (char c)           { return current.skipIfStartsWith (c); }
+    bool popIf (const char* c)    { return current.skipIfStartsWith (c); }
+
+    static bool isWhitespace (uint32_t c)   { return c == ' ' || (c <= 13 && c >= 9); }
+    void skipWhitespace()                   { auto p = current; while (isWhitespace (p.popFirstChar())) current = p; }
+
+    [[noreturn]] void throwError (const char* error, text::UTF8Pointer errorPos)    { throwParseError (error, source, errorPos); }
+    [[noreturn]] void throwError (const char* error)                                { throwError (error, current); }
+
+    ValueType parseTopLevel()
     {
-        text::UTF8Pointer source, current;
+        skipWhitespace();
 
-        bool isEOF() const            { return current.empty(); }
-        uint32_t peek() const         { return *current; }
-        uint32_t pop()                { return current.popFirstChar(); }
-        bool popIf (char c)           { return current.skipIfStartsWith (c); }
-        bool popIf (const char* c)    { return current.skipIfStartsWith (c); }
+        if (popIf ('[')) return parseArray();
+        if (popIf ('{')) return parseObject();
+        if (! isEOF()) throwError ("Expected an object or array");
+        return Traits::createNull();
+    }
 
-        static bool isWhitespace (uint32_t c)   { return c == ' ' || (c <= 13 && c >= 9); }
-        void skipWhitespace()                   { auto p = current; while (isWhitespace (p.popFirstChar())) current = p; }
+    ValueType parseArray()
+    {
+        auto result = Traits::createArrayBuilder();
+        auto arrayStart = current;
 
-        [[noreturn]] void throwError (const char* error, text::UTF8Pointer errorPos)    { throwParseError (error, source, errorPos); }
-        [[noreturn]] void throwError (const char* error)                                { throwError (error, current); }
+        skipWhitespace();
+        if (popIf (']')) return Traits::finaliseArray (result);
 
-        value::Value parseTopLevel()
+        for (;;)
         {
             skipWhitespace();
+            if (isEOF())  throwError ("Unexpected EOF in array declaration", arrayStart);
 
-            if (popIf ('[')) return parseArray();
-            if (popIf ('{')) return parseObject();
-            if (! isEOF()) throwError ("Expected an object or array");
-            return {};
+            Traits::addToArray (result, parseValue());
+            skipWhitespace();
+
+            if (popIf (',')) continue;
+            if (popIf (']')) break;
+            throwError ("Expected ',' or ']'");
         }
 
-        value::Value parseArray()
+        return Traits::finaliseArray (result);
+    }
+
+    ValueType parseObject()
+    {
+        auto result = Traits::createObjectBuilder();
+        auto objectStart = current;
+
+        skipWhitespace();
+        if (popIf ('}')) return Traits::finaliseObject (result);
+
+        for (;;)
         {
-            auto result = value::createEmptyArray();
-            auto arrayStart = current;
+            skipWhitespace();
+            if (isEOF())  throwError ("Unexpected EOF in object declaration", objectStart);
+
+            if (! popIf ('"')) throwError ("Expected a name");
+            auto errorPos = current;
+            auto name = parseString();
+
+            if (name.empty())
+                throwError ("Property names cannot be empty", errorPos);
 
             skipWhitespace();
-            if (popIf (']')) return result;
+            errorPos = current;
+            if (! popIf (':')) throwError ("Expected ':'");
+            Traits::addToObject (result, std::move (name), parseValue());
+            skipWhitespace();
 
-            for (;;)
+            if (popIf (',')) continue;
+            if (popIf ('}')) break;
+            throwError ("Expected ',' or '}'");
+        }
+
+        return Traits::finaliseObject (result);
+    }
+
+    ValueType parseValue()
+    {
+        skipWhitespace();
+        auto startPos = current;
+
+        switch (pop())
+        {
+            case '[':    return parseArray();
+            case '{':    return parseObject();
+            case '"':    return Traits::createString (parseString());
+            case '-':    skipWhitespace(); return parseNumber (true);
+            case 'n':    if (popIf ("ull")) return Traits::createNull(); break;
+            case 't':    if (popIf ("rue"))  return Traits::createBool (true); break;
+            case 'f':    if (popIf ("alse")) return Traits::createBool (false); break;
+
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
+                current = startPos;
+                return parseNumber (false);
+
+            default: break;
+        }
+
+        throwError ("Syntax error", startPos);
+    }
+
+    ValueType parseNumber (bool negate)
+    {
+        auto startPos = current;
+        bool hadDot = false, hadExponent = false;
+
+        for (;;)
+        {
+            auto lastPos = current;
+            auto c = pop();
+
+            if (c >= '0' && c <= '9')  continue;
+            if (c == '.' && ! hadDot)  { hadDot = true; continue; }
+
+            if (! hadExponent && (c == 'e' || c == 'E'))
             {
-                skipWhitespace();
-                if (isEOF())  throwError ("Unexpected EOF in array declaration", arrayStart);
-
-                result.addArrayElement (parseValue());
-                skipWhitespace();
-
-                if (popIf (',')) continue;
-                if (popIf (']')) break;
-                throwError ("Expected ',' or ']'");
+                hadDot = true;
+                hadExponent = true;
+                popIf ('-');
+                continue;
             }
 
-            return result;
-        }
-
-        value::Value parseObject()
-        {
-            auto result = value::createObject ({});
-            auto objectStart = current;
-
-            skipWhitespace();
-            if (popIf ('}')) return result;
-
-            for (;;)
+            if (isWhitespace (c) || c == ',' || c == '}' || c == ']' || c == 0)
             {
-                skipWhitespace();
-                if (isEOF())  throwError ("Unexpected EOF in object declaration", objectStart);
+                current = lastPos;
+                char* endOfParsedNumber = nullptr;
 
-                if (! popIf ('"')) throwError ("Expected a name");
-                auto errorPos = current;
-                auto name = parseString();
-
-                if (name.empty())
-                    throwError ("Property names cannot be empty", errorPos);
-
-                skipWhitespace();
-                errorPos = current;
-                if (! popIf (':')) throwError ("Expected ':'");
-                result.addMember (std::move (name), parseValue());
-                skipWhitespace();
-
-                if (popIf (',')) continue;
-                if (popIf ('}')) break;
-                throwError ("Expected ',' or '}'");
-            }
-
-            return result;
-        }
-
-        value::Value parseValue()
-        {
-            skipWhitespace();
-            auto startPos = current;
-
-            switch (pop())
-            {
-                case '[':    return parseArray();
-                case '{':    return parseObject();
-                case '"':    return value::createString (parseString());
-                case '-':    skipWhitespace(); return parseNumber (true);
-                case 'n':    if (popIf ("ull")) return {}; break;
-                case 't':    if (popIf ("rue"))  return value::createBool (true); break;
-                case 'f':    if (popIf ("alse")) return value::createBool (false); break;
-
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7': case '8': case '9':
-                    current = startPos;
-                    return parseNumber (false);
-
-                default: break;
-            }
-
-            throwError ("Syntax error", startPos);
-        }
-
-        value::Value parseNumber (bool negate)
-        {
-            auto startPos = current;
-            bool hadDot = false, hadExponent = false;
-
-            for (;;)
-            {
-                auto lastPos = current;
-                auto c = pop();
-
-                if (c >= '0' && c <= '9')  continue;
-                if (c == '.' && ! hadDot)  { hadDot = true; continue; }
-
-                if (! hadExponent && (c == 'e' || c == 'E'))
+                if (! (hadDot || hadExponent))
                 {
-                    hadDot = true;
-                    hadExponent = true;
-                    popIf ('-');
-                    continue;
+                    auto v = std::strtoll (startPos.data(), &endOfParsedNumber, 10);
+
+                    if (endOfParsedNumber == lastPos.data()
+                         && v != std::numeric_limits<long long>::max()
+                         && v != std::numeric_limits<long long>::min())
+                        return Traits::createInt64 (static_cast<int64_t> (negate ? -v : v));
                 }
 
-                if (isWhitespace (c) || c == ',' || c == '}' || c == ']' || c == 0)
-                {
-                    current = lastPos;
-                    char* endOfParsedNumber = nullptr;
+                auto v = std::strtod (startPos.data(), &endOfParsedNumber);
 
-                    if (! (hadDot || hadExponent))
-                    {
-                        auto v = std::strtoll (startPos.data(), &endOfParsedNumber, 10);
-
-                        if (endOfParsedNumber == lastPos.data()
-                             && v != std::numeric_limits<long long>::max()
-                             && v != std::numeric_limits<long long>::min())
-                            return value::createInt64 (static_cast<int64_t> (negate ? -v : v));
-                    }
-
-                    auto v = std::strtod (startPos.data(), &endOfParsedNumber);
-
-                    if (endOfParsedNumber == lastPos.data())
-                        return value::createFloat64 (negate ? -v : v);
-                }
-
-                throwError ("Syntax error in number", lastPos);
-            }
-        }
-
-        std::string parseString()
-        {
-            std::ostringstream s (std::ios::binary);
-
-            for (;;)
-            {
-                auto c = pop();
-
-                if (c == '"')
-                    break;
-
-                if (c == '\\')
-                {
-                    auto errorPos = current;
-                    c = pop();
-
-                    switch (c)
-                    {
-                        case 'a':  c = '\a'; break;
-                        case 'b':  c = '\b'; break;
-                        case 'f':  c = '\f'; break;
-                        case 'n':  c = '\n'; break;
-                        case 'r':  c = '\r'; break;
-                        case 't':  c = '\t'; break;
-                        case 'u':  c = parseUnicodeCharacterNumber (false); break;
-                        case 0:    throwError ("Unexpected EOF in string constant", errorPos);
-                        default:   break;
-                    }
-                }
-
-                char utf8Bytes[8];
-                auto numBytes = text::convertUnicodeCodepointToUTF8 (utf8Bytes, c);
-
-                for (uint32_t i = 0; i < numBytes; ++i)
-                    s << utf8Bytes[i];
+                if (endOfParsedNumber == lastPos.data())
+                    return Traits::createFloat64 (negate ? -v : v);
             }
 
-            return s.str();
+            throwError ("Syntax error in number", lastPos);
         }
+    }
 
-        uint32_t parseUnicodeCharacterNumber (bool isLowSurrogate)
+    std::string parseString()
+    {
+        std::ostringstream s (std::ios::binary);
+
+        for (;;)
         {
-            uint32_t result = 0;
+            auto c = pop();
 
-            for (int i = 4; --i >= 0;)
+            if (c == '"')
+                break;
+
+            if (c == '\\')
             {
                 auto errorPos = current;
-                auto digit = pop();
+                c = pop();
 
-                if (digit >= '0' && digit <= '9')         digit -= '0';
-                else if (digit >= 'a' && digit <= 'f')    digit = 10 + (digit - 'a');
-                else if (digit >= 'A' && digit <= 'F')    digit = 10 + (digit - 'A');
-                else throwError ("Syntax error in unicode character", errorPos);
-
-                result = (result << 4) + digit;
+                switch (c)
+                {
+                    case 'a':  c = '\a'; break;
+                    case 'b':  c = '\b'; break;
+                    case 'f':  c = '\f'; break;
+                    case 'n':  c = '\n'; break;
+                    case 'r':  c = '\r'; break;
+                    case 't':  c = '\t'; break;
+                    case 'u':  c = parseUnicodeCharacterNumber (false); break;
+                    case 0:    throwError ("Unexpected EOF in string constant", errorPos);
+                    default:   break;
+                }
             }
 
-            if (isLowSurrogate && ! text::isUnicodeLowSurrogate (result))
-                throwError ("Expected a unicode low surrogate codepoint");
+            char utf8Bytes[8];
+            auto numBytes = text::convertUnicodeCodepointToUTF8 (utf8Bytes, c);
 
-            if (text::isUnicodeHighSurrogate (result))
-            {
-                if (! isLowSurrogate && popIf ("\\u"))
-                    return text::createUnicodeFromHighAndLowSurrogates ({ result, parseUnicodeCharacterNumber (true) });
-
-                throwError ("Expected a unicode low surrogate codepoint");
-            }
-
-            return result;
+            for (uint32_t i = 0; i < numBytes; ++i)
+                s << utf8Bytes[i];
         }
-    };
 
-    Parser p { text, text };
-    return parseBareValue ? p.parseValue()
-                          : p.parseTopLevel();
+        return s.str();
+    }
+
+    uint32_t parseUnicodeCharacterNumber (bool isLowSurrogate)
+    {
+        uint32_t result = 0;
+
+        for (int i = 4; --i >= 0;)
+        {
+            auto errorPos = current;
+            auto digit = pop();
+
+            if (digit >= '0' && digit <= '9')         digit -= '0';
+            else if (digit >= 'a' && digit <= 'f')    digit = 10 + (digit - 'a');
+            else if (digit >= 'A' && digit <= 'F')    digit = 10 + (digit - 'A');
+            else throwError ("Syntax error in unicode character", errorPos);
+
+            result = (result << 4) + digit;
+        }
+
+        if (isLowSurrogate && ! text::isUnicodeLowSurrogate (result))
+            throwError ("Expected a unicode low surrogate codepoint");
+
+        if (text::isUnicodeHighSurrogate (result))
+        {
+            if (! isLowSurrogate && popIf ("\\u"))
+                return text::createUnicodeFromHighAndLowSurrogates ({ result, parseUnicodeCharacterNumber (true) });
+
+            throwError ("Expected a unicode low surrogate codepoint");
+        }
+
+        return result;
+    }
+};
+
+//==============================================================================
+/// Parse functions that use the generic parser
+template <typename ValueType>
+ValueType parseGeneric (text::UTF8Pointer text, bool parseBareValue)
+{
+    Parser<ValueType> p { text, text };
+    return parseBareValue ? p.parseValue() : p.parseTopLevel();
 }
 
-inline value::Value parse (const char* text, size_t numbytes, bool parseBareValue)
+template <typename ValueType>
+ValueType parseGeneric (const char* text, size_t numbytes, bool parseBareValue)
 {
     if (text == nullptr)
     {
@@ -542,19 +621,41 @@ inline value::Value parse (const char* text, size_t numbytes, bool parseBareValu
     if (auto error = text::findInvalidUTF8Data (text, numbytes))
         throwParseError ("Illegal UTF8 data", text::UTF8Pointer (text), text::UTF8Pointer (error));
 
-    return parse (text::UTF8Pointer (text), parseBareValue);
+    return parseGeneric<ValueType> (text::UTF8Pointer (text), parseBareValue);
 }
 
-inline value::Value parse (std::string_view text)       { return parse (text.data(), text.length(), false); }
-inline value::Value parseValue (std::string_view text)  { return parse (text.data(), text.length(), true); }
+} // namespace ParserImpl
 
-template <typename... Properties>
-value::Value create (Properties&&... properties)
+//==============================================================================
+// Template implementations using the generic parser
+template <typename ValueType>
+inline ValueType parseAs (text::UTF8Pointer text)
 {
-    static_assert ((sizeof...(properties) & 1) == 0, "The arguments must be a sequence of name, value pairs");
-    return choc::value::createObject ({}, std::forward<Properties> (properties)...);
+    return ParserImpl::parseGeneric<ValueType> (text, false);
 }
 
+template <typename ValueType>
+inline ValueType parseAs (std::string_view text)
+{
+    return ParserImpl::parseGeneric<ValueType> (text.data(), text.length(), false);
+}
+
+template <typename ValueType>
+inline ValueType parseValueAs (std::string_view text)
+{
+    return ParserImpl::parseGeneric<ValueType> (text.data(), text.length(), true);
+}
+
+//==============================================================================
+// Backward-compatible overloads for choc::value::Value
+inline value::Value parse (const char* text, size_t numbytes, bool parseBareValue)
+{
+    return ParserImpl::parseGeneric<value::Value> (text, numbytes, parseBareValue);
+}
+
+inline value::Value parse (text::UTF8Pointer text)      { return parseAs<value::Value> (text); }
+inline value::Value parse (std::string_view text)       { return parseAs<value::Value> (text); }
+inline value::Value parseValue (std::string_view text)  { return parseValueAs<value::Value> (text); }
 
 } // namespace choc::json
 
