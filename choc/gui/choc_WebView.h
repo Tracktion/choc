@@ -24,6 +24,7 @@
 #include <vector>
 #include <functional>
 #include "../platform/choc_Platform.h"
+#include "../containers/choc_JSONValue.h"
 #include "../text/choc_JSON.h"
 
 //==============================================================================
@@ -168,7 +169,7 @@ public:
 
     /// This function type is used by evaluateJavascript().
     using CompletionHandler = std::function<void(const std::string& error,
-                                                 const choc::value::ValueView& result)>;
+                                                 const choc::json::Value& result)>;
 
     /// Asynchronously evaluates some javascript.
     /// If you want to find out the result of the expression (or whether there
@@ -182,7 +183,7 @@ public:
     bool navigate (const std::string& url);
 
     /// A callback function which can be passed to bind().
-    using CallbackFn = std::function<choc::value::Value(const choc::value::ValueView& args)>;
+    using CallbackFn = std::function<choc::json::Value(const choc::json::Value& args)>;
     /// Binds a C++ function to a named javascript function that can be called
     /// by code running in the browser.
     bool bind (const std::string& functionName, CallbackFn&& function);
@@ -393,7 +394,7 @@ struct choc::ui::WebView::Pimpl
     static void evaluationCompleteCallback (GObject* object, GAsyncResult* result, gpointer userData)
     {
         std::unique_ptr<CompletionHandler> completionHandler (reinterpret_cast<CompletionHandler*> (userData));
-        choc::value::Value value;
+        choc::json::Value value;
         std::string errorMessage;
         GError* error = {};
 
@@ -643,7 +644,7 @@ struct choc::ui::WebView::Pimpl
                                   CHOC_AUTORELEASE_BEGIN
 
                                   auto errorMessage = getMessageFromNSError (error);
-                                  choc::value::Value value;
+                                  choc::json::Value value;
 
                                   try
                                   {
@@ -1781,7 +1782,7 @@ private:
         HRESULT STDMETHODCALLTYPE Invoke (HRESULT hr, LPCWSTR resultJSON) override
         {
             std::string errorMessage = getMessageFromHRESULT (hr);
-            choc::value::Value value;
+            choc::json::Value value;
 
             if (resultJSON != nullptr)
             {

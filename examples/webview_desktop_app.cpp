@@ -82,30 +82,31 @@ private:
     void setupJavaScriptBindings (choc::ui::WebView& view)
     {
         // Bind C++ functions to be callable from JavaScript
-        view.bind ("cpp_getCurrentTime", [](const choc::value::ValueView& args) -> choc::value::Value
+        view.bind ("cpp_getCurrentTime", [] (const choc::json::Value&) -> choc::json::Value
         {
             auto now = std::chrono::system_clock::now();
             auto time_t = std::chrono::system_clock::to_time_t (now);
-            return choc::value::Value (std::to_string (time_t));
+            return choc::json::Value (std::to_string (time_t));
         });
 
-        view.bind ("cpp_showAlert", [](const choc::value::ValueView& args) -> choc::value::Value
+        view.bind ("cpp_showAlert", [] (const choc::json::Value& args) -> choc::json::Value
         {
             if (args.isArray() && args.size() > 0)
             {
-                std::string message = args[0].getWithDefault<std::string>("No message");
+                std::string message = args[0].getWithDefault<std::string> ("No message");
                 std::cout << "Alert from JavaScript: " << message << "\n";
             }
-            return choc::value::Value();
+
+            return choc::json::Value();
         });
 
-        view.bind ("cpp_calculate", [](const choc::value::ValueView& args) -> choc::value::Value
+        view.bind ("cpp_calculate", [] (const choc::json::Value& args) -> choc::json::Value
         {
             if (args.isArray() && args.size() >= 3)
             {
-                double a = args[0].getWithDefault<double>(0.0);
-                std::string op = args[1].getWithDefault<std::string>("+");
-                double b = args[2].getWithDefault<double>(0.0);
+                double a = args[0].getWithDefault<double> (0.0);
+                std::string op = args[1].getWithDefault<std::string> ("+");
+                double b = args[2].getWithDefault<double> (0.0);
 
                 double result = 0.0;
                 if (op == "+") result = a + b;
@@ -113,28 +114,24 @@ private:
                 else if (op == "*") result = a * b;
                 else if (op == "/") result = b != 0.0 ? a / b : 0.0;
 
-                auto response = choc::value::createObject ("result");
-                response.setMember ("value", choc::value::Value (result));
-                response.setMember ("expression", choc::value::Value (std::to_string (a) + " " + op + " " + std::to_string (b)));
-                return response;
+                return choc::json::create ("value", result,
+                                           "expression", std::to_string (a) + " " + op + " " + std::to_string (b));
             }
-            return choc::value::Value();
+
+            return choc::json::Value();
         });
 
-        view.bind ("cpp_getSystemInfo", [](const choc::value::ValueView& args) -> choc::value::Value
+        view.bind ("cpp_getSystemInfo", [] (const choc::json::Value&) -> choc::json::Value
         {
-            auto info = choc::value::createObject ("systemInfo");
-            info.setMember ("platform", choc::value::Value (std::string (CHOC_OPERATING_SYSTEM_NAME)));
-            info.setMember ("timestamp", choc::value::Value (std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count()));
+            auto features = choc::json::createEmptyArray();
+            features.addArrayElement (choc::json::Value ("WebView"));
+            features.addArrayElement (choc::json::Value ("Desktop Window"));
+            features.addArrayElement (choc::json::Value ("JavaScript Binding"));
 
-            auto features = choc::value::createEmptyArray();
-            features.addArrayElement (choc::value::Value ("WebView"));
-            features.addArrayElement (choc::value::Value ("Desktop Window"));
-            features.addArrayElement (choc::value::Value ("JavaScript Binding"));
-            info.setMember ("features", features);
-
-            return info;
+            return choc::json::create ("platform", std::string (CHOC_OPERATING_SYSTEM_NAME),
+                                       "timestamp", std::chrono::duration_cast<std::chrono::seconds>(
+                                           std::chrono::system_clock::now().time_since_epoch()).count(),
+                                       "features", features);
         });
     }
 
