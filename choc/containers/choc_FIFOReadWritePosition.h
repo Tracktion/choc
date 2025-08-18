@@ -73,7 +73,7 @@ struct FIFOReadWritePosition
     /// Attempts to get a slot into which the next item can be pushed.
     /// The WriteSlot object that is returned must be checked for validity by using its
     /// cast to bool operator - if the FIFO is full, it will be invalid. If it's valid
-    /// then the caller must read what it needs from the slot at the index provided, and
+    /// then the caller must write what it wants to in the slot at the index provided, and
     /// then immediately afterwards call unlock() to release the slot.
     WriteSlot lockSlotForWriting();
 
