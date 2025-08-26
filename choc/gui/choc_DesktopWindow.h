@@ -76,6 +76,9 @@ struct DesktopWindow
     /// Changes the window's position
     void setBounds (Bounds);
 
+    /// Returns the window's current position and size.
+    Bounds getBounds();
+
     /// Enables/disables user resizing of the window
     void setResizable (bool);
 
@@ -236,6 +239,14 @@ struct choc::ui::DesktopWindow::Pimpl
         gtk_window_activate_default (GTK_WINDOW (window));
     }
 
+    Bounds getBounds()
+    {
+        int x = 0, y = 0, w = 0, h = 0;
+        gtk_window_get_position (GTK_WINDOW (window), &x, &y);
+        gtk_window_get_size (GTK_WINDOW (window), &w, &h);
+        return { x, y, w, h };
+    }
+
     DesktopWindow& owner;
     GtkWidget* window = {};
     GtkWidget* content = {};
@@ -363,6 +374,17 @@ struct DesktopWindow::Pimpl
         objc::call<void> (objc::getSharedNSApplication(), "activateIgnoringOtherApps:", (BOOL) 1);
         objc::call<void> (window, "makeKeyAndOrderFront:", (id) nullptr);
         CHOC_AUTORELEASE_END
+    }
+
+    Bounds getBounds()
+    {
+        auto frame = objc::call<objc::CGRect> (window, "frame");
+        auto contentRect = objc::call<objc::CGRect> (window, "contentRectForFrameRect:", frame);
+
+        return Bounds { (int) contentRect.origin.x,
+                        (int) contentRect.origin.y,
+                        (int) contentRect.size.width,
+                        (int) contentRect.size.height };
     }
 
     static Pimpl& getPimplFromContext (id self)
@@ -718,6 +740,14 @@ struct DesktopWindow::Pimpl
         BringWindowToTop (hwnd);
     }
 
+    Bounds getBounds()
+    {
+        RECT r;
+        GetWindowRect (hwnd, &r);
+        auto scale = 96.0 / getWindowDPI();
+        return scaleBounds ({ r.left, r.top, r.right - r.left, r.bottom - r.top }, scale);
+    }
+
 private:
     DesktopWindow& owner;
     HWNDHolder hwnd;
@@ -828,6 +858,7 @@ inline void DesktopWindow::setMaximumSize (int w, int h)                   { pim
 inline void DesktopWindow::setResizable (bool b)                           { pimpl->setResizable (b); }
 inline void DesktopWindow::setClosable (bool b)                            { pimpl->setClosable (b); }
 inline void DesktopWindow::setBounds (Bounds b)                            { pimpl->setBounds (b); }
+inline Bounds DesktopWindow::getBounds()                                   { return pimpl->getBounds(); }
 inline void DesktopWindow::centreWithSize (int w, int h)                   { pimpl->centreWithSize (w, h); }
 inline void DesktopWindow::toFront()                                       { pimpl->toFront(); }
 
