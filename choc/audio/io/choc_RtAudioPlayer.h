@@ -35,7 +35,9 @@
 
 #define INCLUDED_VIA_CHOC_RTAUDIO 1
 #include "../../platform/choc_DisableAllWarnings.h"
+#define UNICODE
 #include "rtaudio/RtAudio.cpp"
+#undef UNICODE
 #include "rtaudio/RtMidi.cpp"
 #include "../../platform/choc_ReenableAllWarnings.h"
 #undef INCLUDED_VIA_CHOC_RTAUDIO
