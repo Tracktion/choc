@@ -23,6 +23,7 @@
 #include <vector>
 #include <array>
 #include <cstdlib>
+#include <cstring>
 #include "../platform/choc_Assert.h"
 
 namespace choc::memory
