@@ -1292,6 +1292,21 @@ public:
 namespace choc::ui
 {
 
+     template<typename Handler, typename Args>
+     struct Callback final : public Handler {
+     public:
+         explicit Callback(std::function<HRESULT(ICoreWebView2*, Args*)>&& callback) : m_callback(std::move(callback)) {
+
+         }
+
+         auto Invoke(ICoreWebView2* webview, Args* args) -> HRESULT {
+             return m_callback(webview, args);
+         }
+
+     private:
+         std::function<HRESULT(ICoreWebView2*, Args*)> m_callback;
+     };
+
 //==============================================================================
 struct WebView::Pimpl
 {
@@ -1319,6 +1334,7 @@ struct WebView::Pimpl
         setHTMLURI = defaultURI + "getHTMLInternal";
 
         SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR) this);
+
 
         if (createEmbeddedWebView())
         {
@@ -1395,6 +1411,16 @@ struct WebView::Pimpl
         return true;
     }
 
+    void tryHandleKeyEvent (choc::value::Value& json) {
+        std::string msgId;
+        if (msgId = json["msg"].getWithDefault<std::string>(""); msgId != "SKPFUI") {
+            return;
+        }
+        if (json["keyCode"].get<std::uint32_t>() == VK_SPACE) {
+            PostMessage(hwnd, WM_KEYDOWN, VK_SPACE, 0);
+        }
+    }
+
 private:
     Options options;
     ::HBRUSH m_brush{ nullptr };
@@ -1402,6 +1428,7 @@ private:
     HWNDHolder hwnd;
     std::string defaultURI, setHTMLURI;
     WebView::Options::Resource pageHTML;
+    EventRegistrationToken m_webMessageReceivedEventToken;
 
     //==============================================================================
     template <typename Type>
@@ -1497,6 +1524,12 @@ private:
 
                     EventRegistrationToken token;
                     coreWebView->add_WebResourceRequested (handler, std::addressof (token));
+                    std::string MHSendMessageJs = "function MHSendMessage(m) { window.chrome.webview.postMessage(m); };";
+                    coreWebView->AddScriptToExecuteOnDocumentCreated(createUTF16StringFromUTF8(MHSendMessageJs).c_str(), nullptr);
+                    std::string keyListenerJs = "document.addEventListener('keydown', function(e) { console.log(e); MHSendMessage(\"{\\\"msg\\\": \\\"SKPFUI\\\", \\\"keyCode\\\":\" +  e.keyCode + \", \\\"utf8\\\": \\\"\" + e.key + \"\\\", \\\"S\\\": \" +  e.shiftKey + \", \\\"C\\\": \" +  e.ctrlKey + \", \\\"A\\\": \" +  e.altKey + \", \\\"isUp\\\": false}\"); });";
+                    // std::string keyListenerJs = "document.addEventListener('keydown', function(e) { console.log(e); })";
+                    coreWebView->AddScriptToExecuteOnDocumentCreated(createUTF16StringFromUTF8(keyListenerJs).c_str(), nullptr);
+
                     if(options.initScript) {
                         addInitScript(*(options.initScript));
                     }
@@ -1509,6 +1542,7 @@ private:
                          && settings != nullptr)
                     {
                         settings->put_AreDevToolsEnabled (options.enableDebugMode);
+                        settings->put_IsWebMessageEnabled(true);
 
                         if (! options.customUserAgent.empty())
                         {
@@ -1525,6 +1559,7 @@ private:
                             }
                         }
                     }
+
 
                     return true;
                 }
@@ -1725,7 +1760,9 @@ private:
                 return E_FAIL;
 
             LPWSTR message = {};
-            args->TryGetWebMessageAsString (std::addressof (message));
+            if (args->TryGetWebMessageAsString (std::addressof (message)) == E_INVALIDARG) {
+                return S_OK;
+            }
             ownerPimpl.owner.invokeBinding (createUTF8FromUTF16 (message));
             sender->PostWebMessageAsString (message);
             CoTaskMemFree (message);
@@ -1926,11 +1963,16 @@ inline void WebView::invokeBinding (const std::string& msg)
     try
     {
         auto json = choc::json::parse (msg);
-        auto b = bindings.find (std::string (json["fn"].getString()));
         auto callbackID = json["id"].getWithDefault<int64_t>(0);
-
-        if (callbackID == 0 || b == bindings.end())
+        const auto fn = json["fn"].getWithDefault<std::string>("");
+        if (callbackID == 0 || fn.empty()) {
+            pimpl->tryHandleKeyEvent(json);
             return;
+        }
+        auto b = bindings.find (fn);
+        if (b == bindings.end()) {
+            return;
+        }
 
         auto callbackItem = "window._fnBindings[" + std::to_string (callbackID) + "]";
 
@@ -1952,8 +1994,10 @@ inline void WebView::invokeBinding (const std::string& msg)
         auto call = callbackItem + ".reject(); delete " + callbackItem + ";";
         evaluateJavascript (call);
     }
-    catch (const std::exception&)
-    {}
+    catch (const std::exception&) {
+        std::cout << "fuck";
+        auto json = choc::json::parse (msg);
+    }
 }
 
 inline std::string WebView::getURIHome (const Options& options)
