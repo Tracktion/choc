@@ -1292,21 +1292,6 @@ public:
 namespace choc::ui
 {
 
-     template<typename Handler, typename Args>
-     struct Callback final : public Handler {
-     public:
-         explicit Callback(std::function<HRESULT(ICoreWebView2*, Args*)>&& callback) : m_callback(std::move(callback)) {
-
-         }
-
-         auto Invoke(ICoreWebView2* webview, Args* args) -> HRESULT {
-             return m_callback(webview, args);
-         }
-
-     private:
-         std::function<HRESULT(ICoreWebView2*, Args*)> m_callback;
-     };
-
 //==============================================================================
 struct WebView::Pimpl
 {
@@ -1428,7 +1413,6 @@ private:
     HWNDHolder hwnd;
     std::string defaultURI, setHTMLURI;
     WebView::Options::Resource pageHTML;
-    EventRegistrationToken m_webMessageReceivedEventToken;
 
     //==============================================================================
     template <typename Type>
@@ -1542,7 +1526,6 @@ private:
                          && settings != nullptr)
                     {
                         settings->put_AreDevToolsEnabled (options.enableDebugMode);
-                        settings->put_IsWebMessageEnabled(true);
 
                         if (! options.customUserAgent.empty())
                         {
@@ -1995,8 +1978,6 @@ inline void WebView::invokeBinding (const std::string& msg)
         evaluateJavascript (call);
     }
     catch (const std::exception&) {
-        std::cout << "fuck";
-        auto json = choc::json::parse (msg);
     }
 }
 
