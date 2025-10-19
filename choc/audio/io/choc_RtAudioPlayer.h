@@ -28,6 +28,7 @@
  #define __MACOSX_CORE__ 1
 #elif CHOC_WINDOWS
  #define __WINDOWS_WASAPI__ 1
+ #define __WINDOWS_MM__ 1
 #elif CHOC_LINUX
  #define __LINUX_ALSA__
  #define __UNIX_JACK__ 1
