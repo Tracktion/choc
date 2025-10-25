@@ -5,12 +5,12 @@ project(choc_tests)
 add_executable(choc_tests choc_tests.cpp)
 
 # To test V8, there needs to be a suitable folder somewhere with a build
-# set(V8_LOCATION "/Users/jules/code/v8")
+# set(V8_LOCATION "/path_to_your_v8_folder/v8")
 # set(V8_BUILD_NAME "arm64.release")
 
 # To test the HTTP server, you'll need boost beast and its dependencies, in a
 # folder at this location:
-# set(BOOST_LOCATION "/Users/jules/code/cmajor-dev/cmajor/3rdParty/boost")
+# set(BOOST_LOCATION "/path_to_your_boost_installation/boost")
 
 target_compile_features(choc_tests PRIVATE cxx_std_20)
 
