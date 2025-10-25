@@ -19,6 +19,7 @@
 #ifndef CHOC_VALUE_POOL_HEADER_INCLUDED
 #define CHOC_VALUE_POOL_HEADER_INCLUDED
 
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <cstring>

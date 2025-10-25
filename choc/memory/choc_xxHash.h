@@ -19,6 +19,7 @@
 #ifndef CHOC_XXHASH_HEADER_INCLUDED
 #define CHOC_XXHASH_HEADER_INCLUDED
 
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string_view>

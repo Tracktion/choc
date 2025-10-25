@@ -19,6 +19,7 @@
 #ifndef CHOC_SAMPLE_BUFFERS_HEADER_INCLUDED
 #define CHOC_SAMPLE_BUFFERS_HEADER_INCLUDED
 
+#include <cstdint>
 #include <memory>
 #include <algorithm>
 #include "../platform/choc_Assert.h"
