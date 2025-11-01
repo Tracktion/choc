@@ -584,6 +584,9 @@ struct choc::ui::WebView::Pimpl
         CHOC_AUTORELEASE_END
     }
 
+    void tryHandleKeyEvent (choc::value::Value& /*json*/) {
+    }
+
     bool evaluateJavascript (const std::string& script, CompletionHandler completionHandler)
     {
         CHOC_AUTORELEASE_BEGIN
