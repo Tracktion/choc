@@ -43,11 +43,11 @@ struct Error  : public std::runtime_error
 /// (or nullptr if it can't provide a suitable buffer, in which case nothing will be done).
 /// Returns the number of bytes successfully read.
 template <typename GetDestBufferFn>
-size_t readFileContent (const std::string& filename, GetDestBufferFn&&);
+size_t readFileContent (const std::filesystem::path& filename, GetDestBufferFn&&);
 
 /// Attempts to load the contents of the given filename into a string,
 /// throwing an Error exception if anything goes wrong.
-std::string loadFileAsString (const std::string& filename);
+std::string loadFileAsString (const std::filesystem::path& filename);
 
 /// Attempts to create or overwrite the specified file with some new data.
 /// This will attempt to create and parent folders needed for the file, and will
@@ -124,7 +124,7 @@ struct TempFile
 //==============================================================================
 
 template <typename GetDestBufferFn>
-size_t readFileContent (const std::string& filename, GetDestBufferFn&& getBuffer)
+size_t readFileContent (const std::filesystem::path& filename, GetDestBufferFn&& getBuffer)
 {
     if (filename.empty())
         throw Error ("Illegal filename");
@@ -137,16 +137,16 @@ size_t readFileContent (const std::string& filename, GetDestBufferFn&& getBuffer
 
         if (! stream.is_open())
         {
-            if (! exists (std::filesystem::path (filename)))
-                throw Error ("File does not exist: " + filename);
+            if (! exists (filename))
+                throw Error ("File does not exist: " + filename.string());
 
-            throw Error ("Failed to open file: " + filename);
+            throw Error ("Failed to open file: " + filename.string());
         }
 
         auto fileSize = stream.tellg();
 
         if (fileSize < 0)
-            throw Error ("Failed to read from file: " + filename);
+            throw Error ("Failed to read from file: " + filename.string());
 
         if (fileSize == 0)
             return {};
@@ -158,18 +158,18 @@ size_t readFileContent (const std::string& filename, GetDestBufferFn&& getBuffer
             if (stream.read (static_cast<std::ifstream::char_type*> (destBuffer), static_cast<std::streamsize> (fileSize)))
                 return static_cast<size_t> (fileSize);
 
-            throw Error ("Failed to read from file: " + filename);
+            throw Error ("Failed to read from file: " + filename.string());
         }
     }
     catch (const std::ios_base::failure& e)
     {
-        throw Error ("Failed to read from file: " + filename + ": " + e.what());
+        throw Error ("Failed to read from file: " + filename.string() + ": " + e.what());
     }
 
     return 0;
 }
 
-inline std::string loadFileAsString (const std::string& filename)
+inline std::string loadFileAsString (const std::filesystem::path& filename)
 {
     std::string result;
 
@@ -197,7 +197,7 @@ void createAndWriteToFile (const std::filesystem::path& path, WriteFn&& write)
 
         std::ofstream stream;
         stream.exceptions (std::ofstream::failbit | std::ofstream::badbit);
-        stream.open (path.string(), std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
+        stream.open (path, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
         write (stream);
     }
     catch (const std::ios_base::failure& e)
