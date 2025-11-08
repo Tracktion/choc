@@ -506,10 +506,10 @@ private:
 
         auto m = std::make_unique<NamedMIDIIn>();
         m->owner = this;
-        m->midiIn = std::make_unique<RtMidiIn> (RtMidi::Api::UNSPECIFIED, "Cmajor", queueSize);
+        m->midiIn = std::make_unique<RtMidiIn> (RtMidi::Api::UNSPECIFIED, options.midiClientName, queueSize);
         m->midiIn->setCallback (rtMidiCallback, m.get());
         m->midiIn->setErrorCallback (rtMidiErrorCallback, m.get());
-        m->midiIn->openPort (portNum, "Cmajor Input");
+        m->midiIn->openPort (portNum, options.midiClientName + " Input");
         m->name = m->midiIn->getPortName (portNum);
         return m;
     }
@@ -526,9 +526,9 @@ private:
     NamedMIDIOut openMIDIOut (unsigned int portNum)
     {
         NamedMIDIOut m;
-        m.midiOut = std::make_unique<RtMidiOut> (RtMidi::Api::UNSPECIFIED, "Cmajor");
+        m.midiOut = std::make_unique<RtMidiOut> (RtMidi::Api::UNSPECIFIED, options.midiClientName);
         m.midiOut->setErrorCallback (rtMidiErrorCallback, this);
-        m.midiOut->openPort (portNum, "Cmajor Input");
+        m.midiOut->openPort (portNum, options.midiClientName + " Input");
         m.name = m.midiOut->getPortName (portNum);
         return m;
     }

@@ -64,6 +64,9 @@ struct AudioDeviceOptions
     /// This optional function can be supplied to control whether a particular
     /// MIDI output should be used. If a function is not provided, all MIDI inputs will be used.
     std::function<bool(const std::string& name)> shouldOpenMIDIOutput;
+
+    /// Some MIDI devices use a custom client name in their properties
+    std::string midiClientName = "CHOC";
 };
 
 //==============================================================================
