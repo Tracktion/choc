@@ -514,7 +514,14 @@ struct DesktopWindow::Pimpl
 
     static Pimpl& getPimplFromContext (id self)
     {
+       #if defined(__clang__)
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wcast-align"
+       #endif
         auto view = (CHOC_OBJC_CAST_BRIDGED Pimpl*) objc_getAssociatedObject (self, "choc_window");
+       #if defined(__clang__)
+        #pragma clang diagnostic pop
+       #endif
         CHOC_ASSERT (view != nullptr);
         return *view;
     }
