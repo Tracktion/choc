@@ -627,6 +627,29 @@ struct DesktopWindow::Pimpl
 
 namespace choc::ui
 {
+namespace detail
+{
+    inline COLORREF getDefaultWindowColour()
+    {
+        return RGB(25, 25, 25);
+    }
+
+    inline HBRUSH getDefaultWindowBrush()
+    {
+        static HBRUSH brush = CreateSolidBrush(getDefaultWindowColour());
+        return brush;
+    }
+
+    inline void paintWindowBackground(HWND hwnd, HDC dc)
+    {
+        if (!dc)
+            return;
+
+        RECT r{};
+        GetClientRect(hwnd, &r);
+        FillRect(dc, &r, getDefaultWindowBrush());
+    }
+}
 
 static RECT boundsToRect (Bounds b)
 {
@@ -686,6 +709,7 @@ struct WindowClass
         wc.hIcon = icon;
         wc.hIconSm = icon;
         wc.lpfnWndProc = wndProc;
+        wc.hbrBackground = detail::getDefaultWindowBrush();
 
         classAtom = (LPCWSTR) (uintptr_t) RegisterClassExW (&wc);
         CHOC_ASSERT (classAtom != 0);
@@ -771,9 +795,6 @@ struct DesktopWindow::Pimpl
             return;
 
         setBounds (b);
-        ShowWindow (hwnd, SW_SHOW);
-        UpdateWindow (hwnd);
-        SetFocus (hwnd);
     }
 
     ~Pimpl()
@@ -810,8 +831,15 @@ struct DesktopWindow::Pimpl
     {
         ShowWindow (hwnd, visible ? SW_SHOW : SW_HIDE);
 
+        if (auto child = getFirstChildWindow())
+            ShowWindow (child, visible ? SW_SHOW : SW_HIDE);
+
         if (visible)
+        {
             InvalidateRect (hwnd, nullptr, 0);
+            UpdateWindow (hwnd);
+            SetFocus (hwnd);
+        }
     }
 
     void setResizable (bool b)
@@ -1021,6 +1049,7 @@ private:
     {
         switch (msg)
         {
+            case WM_ERASEBKGND:     detail::paintWindowBackground (h, reinterpret_cast<HDC> (wp)); return 1;
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
             case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
             case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
