@@ -149,6 +149,24 @@ inline void testPlatform (choc::test::TestProgress& progress)
         // For the purpose of testing, we'll assume you always do a fresh build
         // before running this.
         CHOC_EXPECT_TRUE (choc::getDaysSinceBuildDate() < 5);
+
+        // Verify that the build date includes time information, not just the date
+        auto buildDate = choc::getBuildDate();
+        auto duration = buildDate.time_since_epoch();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds> (duration).count();
+
+        // The time should not be exactly at midnight (which would indicate missing time)
+        // We check that seconds modulo 86400 (seconds in a day) is not zero
+        auto secondsInDay = seconds % 86400;
+        CHOC_EXPECT_TRUE (secondsInDay != 0); // Should have actual time, not 00:00:00
+
+        // The build date should not be in the future
+        auto now = std::chrono::system_clock::now();
+        CHOC_EXPECT_TRUE (buildDate <= now);
+
+        // The build date should be recent (within the last week)
+        auto oneWeekAgo = now - std::chrono::hours (24 * 7);
+        CHOC_EXPECT_TRUE (buildDate >= oneWeekAgo);
     }
 
     {

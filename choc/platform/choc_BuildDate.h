@@ -23,8 +23,8 @@
 
 namespace choc
 {
-    /// Returns the date of the day on which this function was compiled, by
-    /// parsing the __DATE__ macro into a std::chrono timepoint.
+    /// Returns the date and time at which this function was compiled, by
+    /// parsing the __DATE__ and __TIME__ macros into a std::chrono timepoint.
     constexpr std::chrono::system_clock::time_point getBuildDate()
     {
         using namespace std::chrono;
@@ -49,9 +49,16 @@ namespace choc
                             + (__DATE__[9] - '0') * 10
                             + (__DATE__[10] - '0'));
 
-        constexpr auto count = sys_days (year_month_day (y, m, d));
+        constexpr auto hrs = static_cast<unsigned> ((__TIME__[0] - '0') * 10 + (__TIME__[1] - '0'));
+        constexpr auto min = static_cast<unsigned> ((__TIME__[3] - '0') * 10 + (__TIME__[4] - '0'));
+        constexpr auto sec = static_cast<unsigned> ((__TIME__[6] - '0') * 10 + (__TIME__[7] - '0'));
 
-        return time_point<system_clock, days> (count);
+        constexpr auto count = sys_days (year_month_day (y, m, d))
+                                + hours (hrs)
+                                + minutes (min)
+                                + seconds (sec);
+
+        return time_point<system_clock, seconds> (count);
     }
 
     /// Returns the number of whole days that have elapsed since this
