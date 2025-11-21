@@ -414,7 +414,7 @@ async function calculate() {
         const operation = document.getElementById ('operation').value;
         const num2 = parseFloat (document.getElementById ('num2').value) || 0;
 
-        const result = await cpp_calculate ([num1, operation, num2]);
+        const result = await cpp_calculate (num1, operation, num2);
         const resultDiv = document.getElementById ('calcResult');
         resultDiv.className = 'info-box success';
         resultDiv.textContent = `${result.expression} = ${result.value}`;
