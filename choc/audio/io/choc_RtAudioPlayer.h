@@ -271,6 +271,11 @@ private:
         auto inputDeviceInfo  = getDeviceForID (rtAudio->getDefaultInputDevice(), options.inputDeviceID, true);
         auto outputDeviceInfo = getDeviceForID (rtAudio->getDefaultOutputDevice(), options.outputDeviceID, false);
 
+        // If we found valid devices, clear any warnings from device enumeration, as these are
+        // probably irrelevant to the device we're after.
+        if (outputDeviceInfo != nullptr || inputDeviceInfo != nullptr)
+            lastError = {};
+
         updateAvailableSampleRateList (inputDeviceInfo, outputDeviceInfo);
 
         options.outputDeviceID = outputDeviceInfo ? std::to_string (outputDeviceInfo->ID) : std::string();
