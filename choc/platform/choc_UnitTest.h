@@ -23,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include "choc_Assert.h"
 
 /**
     Maybe the world's smallest, simplest unit-test framework :)
