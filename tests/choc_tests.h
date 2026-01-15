@@ -3230,8 +3230,9 @@ static void testZLIB (choc::test::TestProgress& progress)
         auto performTest = [&] (size_t dataSize, choc::zlib::DeflaterStream::CompressionLevel compression)
         {
             performTestWithBits (dataSize, compression, 0, choc::zlib::InflaterStream::FormatType::zlib);
-            performTestWithBits (dataSize, compression, -15, choc::zlib::InflaterStream::FormatType::zlib);
+            performTestWithBits (dataSize, compression, -15, choc::zlib::InflaterStream::FormatType::deflate);
         };
+
 
         for (auto compression = choc::zlib::DeflaterStream::CompressionLevel::none;
              compression <= choc::zlib::DeflaterStream::CompressionLevel::best;
@@ -3334,8 +3335,372 @@ static void testZipFile (choc::test::TestProgress& progress)
             }
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
+
+    }
+
+    {
+        CHOC_TEST (ZipWriter_BasicFile)
+
+        try
+        {
+            // Create a simple zip with one file
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("test.txt", "Hello, World!", choc::zip::ZipWriter::CompressionLevel::uncompressed);
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+            CHOC_EXPECT_EQ (zipFile.items[0].filename, "test.txt");
+            CHOC_EXPECT_EQ (zipFile.items[0].uncompressedSize, 13u);
+            CHOC_EXPECT_FALSE (zipFile.items[0].isCompressed);
+
+            auto reader = zipFile.items[0].createReader();
+            std::string content;
+            content.resize (13);
+            reader->read (content.data(), 13);
+            CHOC_EXPECT_EQ (content, "Hello, World!");
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_CompressedFile)
+
+        try
+        {
+            // Create a zip with compressed file
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                std::string largeContent (10000, 'A');
+                writer.addFile ("large.txt", largeContent, choc::zip::ZipWriter::CompressionLevel::best);
+                writer.flush();
+                writer.flush();
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+            CHOC_EXPECT_EQ (zipFile.items[0].filename, "large.txt");
+            CHOC_EXPECT_EQ (zipFile.items[0].uncompressedSize, 10000u);
+            CHOC_EXPECT_TRUE (zipFile.items[0].isCompressed);
+            CHOC_EXPECT_TRUE (zipFile.items[0].compressedSize < zipFile.items[0].uncompressedSize);
+
+            auto reader = zipFile.items[0].createReader();
+            std::string content;
+            content.resize (10000);
+            reader->read (content.data(), 10000);
+            CHOC_EXPECT_EQ (content, std::string (10000, 'A'));
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_MultipleFiles)
+
+        try
+        {
+            // Create a zip with multiple files and folders
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFolder ("folder1/");
+                writer.addFile ("folder1/file1.txt", "Content 1");
+                writer.addFolder ("folder2/");
+                writer.addFile ("folder2/file2.txt", "Content 2");
+                writer.addFile ("root.txt", "Root content");
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 5u);
+
+            // Check folders
+            bool foundFolder1 = false, foundFolder2 = false;
+            int fileCount = 0;
+
+            for (const auto& item : zipFile.items)
+            {
+                if (item.filename == "folder1/")
+                {
+                    foundFolder1 = true;
+                    CHOC_EXPECT_TRUE (item.isFolder());
+                }
+                else if (item.filename == "folder2/")
+                {
+                    foundFolder2 = true;
+                    CHOC_EXPECT_TRUE (item.isFolder());
+                }
+                else if (item.filename == "folder1/file1.txt")
+                {
+                    fileCount++;
+                    auto reader = item.createReader();
+                    std::string content;
+                    content.resize (item.uncompressedSize);
+                    reader->read (content.data(), static_cast<std::streamsize> (item.uncompressedSize));
+                    CHOC_EXPECT_EQ (content, "Content 1");
+                }
+                else if (item.filename == "folder2/file2.txt")
+                {
+                    fileCount++;
+                    auto reader = item.createReader();
+                    std::string content;
+                    content.resize (item.uncompressedSize);
+                    reader->read (content.data(), static_cast<std::streamsize> (item.uncompressedSize));
+                    CHOC_EXPECT_EQ (content, "Content 2");
+                }
+                else if (item.filename == "root.txt")
+                {
+                    fileCount++;
+                    auto reader = item.createReader();
+                    std::string content;
+                    content.resize (item.uncompressedSize);
+                    reader->read (content.data(), static_cast<std::streamsize> (item.uncompressedSize));
+                    CHOC_EXPECT_EQ (content, "Root content");
+                }
+            }
+
+            CHOC_EXPECT_TRUE (foundFolder1);
+            CHOC_EXPECT_TRUE (foundFolder2);
+            CHOC_EXPECT_EQ (fileCount, 3);
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_FromStream)
+
+        try
+        {
+            // Create a zip reading from a stream
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+
+                // Create source data stream
+                std::string sourceData (5000, 'X');
+                std::istringstream sourceStream (sourceData, std::ios::binary);
+
+                writer.addFileFromStream ("streamed.dat", sourceStream, choc::zip::ZipWriter::CompressionLevel::normal);
+                writer.flush();
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+            CHOC_EXPECT_EQ (zipFile.items[0].uncompressedSize, 5000u);
+
+            auto reader = zipFile.items[0].createReader();
+            std::string content;
+            content.resize (5000);
+            reader->read (content.data(), 5000);
+            CHOC_EXPECT_EQ (content, std::string (5000, 'X'));
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_CompressionLevels)
+
+        try
+        {
+            // Test different compression levels
+            std::string testData (1000, 'Z');
+
+            for (auto level : { choc::zip::ZipWriter::CompressionLevel::uncompressed,
+                                choc::zip::ZipWriter::CompressionLevel::fastest,
+                                choc::zip::ZipWriter::CompressionLevel::normal,
+                                choc::zip::ZipWriter::CompressionLevel::best })
+            {
+                auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+                {
+                    choc::zip::ZipWriter writer (stream);
+                    writer.addFile ("test.txt", testData, level);
+                }
+
+                auto zipData = stream->str();
+                auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+                choc::zip::ZipFile zipFile (readStream);
+
+                CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+                CHOC_EXPECT_EQ (zipFile.items[0].uncompressedSize, 1000u);
+
+                if (level == choc::zip::ZipWriter::CompressionLevel::uncompressed)
+                {
+                    CHOC_EXPECT_FALSE (zipFile.items[0].isCompressed);
+                }
+                else
+                {
+                    CHOC_EXPECT_TRUE (zipFile.items[0].isCompressed);
+                }
+
+                auto reader = zipFile.items[0].createReader();
+                std::string content;
+                content.resize (1000);
+                reader->read (content.data(), 1000);
+                CHOC_EXPECT_EQ (content, testData);
+            }
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+
+    {
+        CHOC_TEST (ZipWriter_EmptyFile)
+
+        try
+        {
+            // Test empty file handling
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("empty.txt", "", choc::zip::ZipWriter::CompressionLevel::uncompressed);
+                writer.flush();
+                writer.addFile ("nonempty.txt", "content");
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 2u);
+
+            // Find and check empty file
+            for (const auto& item : zipFile.items)
+            {
+                if (item.filename == "empty.txt")
+                {
+                    CHOC_EXPECT_EQ (item.uncompressedSize, 0u);
+                    CHOC_EXPECT_EQ (item.compressedSize, 0u);
+                    CHOC_EXPECT_FALSE (item.isCompressed);
+
+                    auto reader = item.createReader();
+                    CHOC_EXPECT_EQ (reader->gcount(), 0);
+
+                }
+                else if (item.filename == "nonempty.txt")
+                {
+                    CHOC_EXPECT_EQ (item.uncompressedSize, 7u);
+                }
+            }
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_RoundTrip)
+
+        try
+        {
+            // Create files similar to the original test
+            struct File
+            {
+                std::string name, data;
+            };
+
+            auto generateFile = [] (uint32_t seed)
+            {
+                File file;
+                auto len = std::max (1u, std::min (8192u, seed * 13));
+
+                for (uint32_t i = 0; i < len; ++i)
+                {
+                    seed = ((seed * 3 + seed * 17) ^ seed) + 1;
+                    file.data += (char) seed;
+
+                    if ((seed & 4) == 0)
+                        for (uint32_t n = 0; n < 1 + (seed / 10) % 30; ++n)
+                            file.data += (char) seed;
+                }
+
+                file.name = "zip/folder" + std::to_string (seed % 3) + "/file" + std::to_string (seed);
+                return file;
+            };
+
+            std::vector<File> files;
+
+            for (uint32_t i = 0; i < 10; ++i)
+                files.push_back (generateFile ((1 + (i * 13)) ^ ((i * 17) + i)));
+
+            // Create ZIP
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+
+                // Add folders first
+                writer.addFolder ("zip/");
+                writer.addFolder ("zip/folder0/");
+                writer.addFolder ("zip/folder1/");
+                writer.addFolder ("zip/folder2/");
+
+                // Add files with compression
+                for (const auto& file : files)
+                {
+                    writer.addFile (file.name, file.data);
+                    writer.flush();
+                }
+            }
+
+            // Read it back
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            // Verify files
+            for (const auto& item : zipFile.items)
+            {
+                if (item.isFolder())
+                    continue;
+
+                bool found = false;
+
+                for (const auto& original : files)
+                {
+                    if (original.name == item.filename)
+                    {
+                        found = true;
+                        CHOC_EXPECT_EQ (item.uncompressedSize, original.data.size());
+
+                        auto reader = item.createReader();
+                        std::string content;
+                        content.resize (item.uncompressedSize);
+                        reader->read (content.data(), static_cast<std::streamsize> (item.uncompressedSize));
+                        CHOC_EXPECT_EQ (content, original.data);
+                        break;
+                    }
+                }
+
+                CHOC_EXPECT_TRUE (found);
+            }
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
 }
+
+
 
 //==============================================================================
 static void testExecute (choc::test::TestProgress& progress)

@@ -107,6 +107,62 @@ private:
     void readChunk (void* dest, int64_t pos, size_t size);
 };
 
+//==============================================================================
+/**
+    A class for creating .zip files.
+
+    You can create one of these objects, giving it a stream to write to,
+    and then add files to it. Calling flush() or deleting the ZipWriter
+    will write the central directory and complete the archive.
+*/
+struct ZipWriter
+{
+    /// Compression level for files added to the archive.
+    enum class CompressionLevel
+    {
+        uncompressed  = 0,    ///< No compression (store only)
+        fastest       = 1,    ///< Fastest compression
+        normal        = 6,    ///< Balanced compression/speed
+        best          = 9,    ///< Maximum compression (slowest)
+        defaultLevel  = -1    ///< Use default compression level
+    };
+
+    /// Creates a ZipWriter that will write to the given stream.
+    ZipWriter (std::shared_ptr<std::ostream> outputStream);
+    ~ZipWriter();
+
+    ZipWriter (const ZipWriter&) = delete;
+    ZipWriter (ZipWriter&&) = default;
+    ZipWriter& operator= (ZipWriter&&) = default;
+    ZipWriter& operator= (const ZipWriter&) = delete;
+
+    /// Adds a file to the archive with the given path and content.
+    void addFile (std::string_view path,
+                  std::string_view content,
+                  CompressionLevel compressionLevel = CompressionLevel::defaultLevel);
+
+
+    /// Adds a file to the archive by reading from a stream.
+    /// The stream will be read until EOF.
+    void addFileFromStream (std::string_view path,
+                            std::istream& source,
+                            CompressionLevel compressionLevel = CompressionLevel::defaultLevel);
+
+    /// Adds a folder to the archive. A trailing '/' will be added if not present.
+    void addFolder (std::string_view path);
+
+
+    /// Flushes the archive by writing the central directory - you can call
+    // this manually, or let the destructor take care of it.
+    void flush();
+
+private:
+    struct Impl;
+    std::unique_ptr<ZipWriter::Impl> pimpl;
+};
+
+
+
 
 
 
@@ -382,6 +438,315 @@ inline bool ZipFile::Item::uncompressToFile (const std::filesystem::path& target
         last_write_time (targetFile, getFileTime());
 
     return true;
+}
+
+
+//==============================================================================
+// ZipWriter implementation
+//==============================================================================
+
+struct ZipWriter::Impl
+{
+    struct FileEntry
+    {
+        std::string filename;
+        uint64_t localHeaderOffset = 0;
+        uint64_t compressedSize = 0;
+        uint64_t uncompressedSize = 0;
+        uint32_t crc32 = 0;
+        uint16_t compressionMethod = 0;
+        uint16_t modTime = 0;
+        uint16_t modDate = 0;
+    };
+
+    std::shared_ptr<std::ostream> stream;
+    std::vector<FileEntry> entries;
+    int64_t centralDirectoryStart = -1;
+
+    Impl (std::shared_ptr<std::ostream> s) : stream (std::move (s))
+    {
+        CHOC_ASSERT (stream != nullptr);
+        stream->exceptions (std::ostream::failbit);
+    }
+
+    static void applyCurrentTime (FileEntry& entry)
+    {
+        auto now = std::chrono::system_clock::now();
+        auto timeT = std::chrono::system_clock::to_time_t (now);
+        std::tm tm {};
+
+       #if defined(_WIN32) || defined(_WIN64)
+        localtime_s (&tm, &timeT);
+       #else
+        localtime_r (&timeT, &tm);
+       #endif
+
+        entry.modDate = static_cast<uint16_t> (((tm.tm_year + 1900 - 1980) << 9)
+                                                 | ((tm.tm_mon + 1) << 5)
+                                                 | tm.tm_mday);
+
+        entry.modTime = static_cast<uint16_t> ((tm.tm_hour << 11)
+                                                | (tm.tm_min << 5)
+                                                | (tm.tm_sec / 2));
+    }
+
+    void writeLocalFileHeader (const std::string& filename,
+                               uint16_t compressionMethod,
+                               uint16_t modTime,
+                               uint16_t modDate,
+                               uint32_t crc32,
+                               uint64_t compressedSize,
+                               uint64_t uncompressedSize)
+    {
+        writeUInt32 (0x04034b50); // Local file header signature
+        writeUInt16 (20); // Version needed to extract (2.0)
+        writeUInt16 (0); // General purpose bit flag
+        writeUInt16 (compressionMethod);
+        writeUInt16 (modTime);
+        writeUInt16 (modDate);
+        writeUInt32 (crc32);
+        writeUInt32 (static_cast<uint32_t> (compressedSize));
+        writeUInt32 (static_cast<uint32_t> (uncompressedSize));
+        writeUInt16 (static_cast<uint16_t> (filename.length()));
+        writeUInt16 (0); // Extra field length
+        stream->write (filename.data(), static_cast<std::streamsize> (filename.length()));
+    }
+
+    void writeCentralDirectory()
+    {
+        if (centralDirectoryStart >= 0)
+            return;
+
+        auto centralDirOffset = static_cast<uint64_t> (stream->tellp());
+        centralDirectoryStart = static_cast<int64_t> (centralDirOffset);
+
+        for (const auto& entry : entries)
+            writeCentralDirectoryHeader (entry);
+
+        auto centralDirEnd = static_cast<uint64_t> (stream->tellp());
+        auto centralDirSize = centralDirEnd - centralDirOffset;
+
+        // Write end of central directory record
+        writeEndOfCentralDirectory (centralDirOffset, centralDirSize);
+
+        stream->flush();
+    }
+
+    void writeCentralDirectoryHeader (const FileEntry& entry)
+    {
+        writeUInt32 (0x02014b50); // Central directory file header signature
+        writeUInt16 (0x031e); // Version made by (Unix)
+        writeUInt16 (20); // Version needed to extract
+        writeUInt16 (0); // General purpose bit flag
+        writeUInt16 (entry.compressionMethod);
+        writeUInt16 (entry.modTime);
+        writeUInt16 (entry.modDate);
+        writeUInt32 (entry.crc32);
+        writeUInt32 (static_cast<uint32_t> (entry.compressedSize));
+        writeUInt32 (static_cast<uint32_t> (entry.uncompressedSize));
+        writeUInt16 (static_cast<uint16_t> (entry.filename.length()));
+        writeUInt16 (0); // Extra field length
+        writeUInt16 (0); // File comment length
+        writeUInt16 (0); // Disk number start
+        writeUInt16 (0); // Internal file attributes
+
+        // External file attributes (Unix file permissions in upper 16 bits)
+        // For files: 0644 (readable by all, writable by owner)
+        // For folders: 0755 (readable/executable by all, writable by owner)
+        writeUInt32 (entry.filename.empty() || entry.filename.back() != '/'
+                        ? 0x81A40000   // Regular file: -rw-r--r--
+                        : 0x41ED0000); // Directory: drwxr-xr-x
+
+        writeUInt32 (static_cast<uint32_t> (entry.localHeaderOffset)); // Relative offset of local header
+        stream->write (entry.filename.data(), static_cast<std::streamsize> (entry.filename.length()));
+    }
+
+    void writeEndOfCentralDirectory (uint64_t centralDirOffset, uint64_t centralDirSize)
+    {
+        writeUInt32 (0x06054b50); // End of central directory signature
+        writeUInt16 (0); // Number of this disk
+        writeUInt16 (0); // Disk where central directory starts
+        writeUInt16 (static_cast<uint16_t> (entries.size())); // Number of central directory records on this disk
+        writeUInt16 (static_cast<uint16_t> (entries.size())); // Total number of central directory records
+        writeUInt32 (static_cast<uint32_t> (centralDirSize));
+        writeUInt32 (static_cast<uint32_t> (centralDirOffset));
+        writeUInt16 (0); // ZIP file comment length
+    }
+
+    void writeUInt16 (uint16_t value)
+    {
+        uint8_t buffer[2];
+        choc::memory::writeLittleEndian (buffer, value);
+        stream->write (reinterpret_cast<const char*> (buffer), 2);
+    }
+
+    void writeUInt32 (uint32_t value)
+    {
+        uint8_t buffer[4];
+        choc::memory::writeLittleEndian (buffer, value);
+        stream->write (reinterpret_cast<const char*> (buffer), 4);
+    }
+
+    void removeCentralDirectoryIfPresent()
+    {
+        if (centralDirectoryStart >= 0)
+        {
+            stream->seekp (centralDirectoryStart);
+            centralDirectoryStart = -1;
+        }
+    }
+
+    void addFileImpl (std::string_view path,
+                      std::istream* sourceStream,
+                      std::string_view content,
+                      ZipWriter::CompressionLevel compressionLevel)
+    {
+        removeCentralDirectoryIfPresent();
+
+        FileEntry entry;
+        entry.filename = std::string (path);
+        entry.localHeaderOffset = static_cast<uint64_t> (stream->tellp());
+
+        applyCurrentTime (entry);
+
+        auto level = static_cast<choc::zlib::DeflaterStream::CompressionLevel> (compressionLevel);
+        bool useCompression = (level != 0);
+        entry.compressionMethod = useCompression ? 8 : 0; // 8 = deflate, 0 = store
+
+        // Write header with placeholder CRC32 and compressed size
+        auto headerPos = stream->tellp();
+        writeLocalFileHeader (entry.filename, entry.compressionMethod, entry.modTime,
+                              entry.modDate, 0, 0, 0);
+
+        auto dataStartPos = stream->tellp();
+
+        if (useCompression)
+        {
+            choc::zlib::DeflaterStream deflater (stream, level, -15); // -15 = raw deflate
+            writeContent (entry, deflater, sourceStream, content);
+        }
+        else
+        {
+            // Store uncompressed
+            writeContent (entry, *stream, sourceStream, content);
+        }
+
+        stream->flush(); // Ensure all compressed data is written before measuring position
+        auto dataEndPos = stream->tellp();
+        entry.compressedSize = static_cast<uint64_t> (dataEndPos - dataStartPos);
+
+        // Go back and update the header with the actual CRC32 and compressed size
+        stream->seekp (headerPos);
+        writeLocalFileHeader (entry.filename, entry.compressionMethod, entry.modTime,
+                              entry.modDate, entry.crc32, entry.compressedSize, entry.uncompressedSize);
+        stream->seekp (dataEndPos);
+
+        entries.push_back (entry);
+    }
+
+    void addFolder (std::string_view path)
+    {
+        removeCentralDirectoryIfPresent();
+
+        FileEntry entry;
+        entry.filename = std::string (path);
+
+        if (! entry.filename.empty() && entry.filename.back() != '/')
+            entry.filename += '/';
+
+        entry.localHeaderOffset = static_cast<uint64_t> (stream->tellp());
+        entry.uncompressedSize = 0;
+        entry.compressedSize = 0;
+        entry.crc32 = 0;
+        entry.compressionMethod = 0;
+
+        applyCurrentTime (entry);
+
+        writeLocalFileHeader (entry.filename, entry.compressionMethod, entry.modTime,
+                              entry.modDate, entry.crc32, entry.compressedSize, entry.uncompressedSize);
+
+        entries.push_back (entry);
+    }
+
+    static void writeContent (FileEntry& entry,
+                              std::ostream& destStream,
+                              std::istream* sourceStream,
+                              std::string_view content)
+    {
+        if (sourceStream != nullptr)
+        {
+            constexpr size_t bufferSize = 8192;
+            std::vector<char> buffer (bufferSize);
+
+            for (;;)
+            {
+                try
+                {
+                    sourceStream->read (buffer.data(), static_cast<std::streamsize> (bufferSize));
+                }
+                catch (...) {}
+
+                auto actuallyRead = static_cast<size_t> (sourceStream->gcount());
+
+                if (actuallyRead == 0)
+                    break;
+
+                // Calculate CRC32 on uncompressed data
+                entry.crc32 = static_cast<uint32_t> (choc::zlib::zlib::Checksum::crc32 (entry.crc32,
+                                                                                        reinterpret_cast<const uint8_t*> (buffer.data()),
+                                                                                        static_cast<unsigned> (actuallyRead)));
+                entry.uncompressedSize += actuallyRead;
+                destStream.write (buffer.data(), static_cast<std::streamsize> (actuallyRead));
+            }
+        }
+        else
+        {
+            entry.uncompressedSize = content.size();
+            destStream.write (content.data(), static_cast<std::streamsize> (content.size()));
+            entry.crc32 = static_cast<uint32_t> (choc::zlib::zlib::Checksum::crc32 (0,
+                                                                                    reinterpret_cast<const uint8_t*> (content.data()),
+                                                                                    static_cast<unsigned> (content.size())));
+        }
+    }
+};
+
+
+inline ZipWriter::ZipWriter (std::shared_ptr<std::ostream> outputStream)
+    : pimpl (std::make_unique<ZipWriter::Impl> (std::move (outputStream)))
+{
+}
+
+inline ZipWriter::~ZipWriter()
+{
+    try
+    {
+        flush();
+    }
+    catch (...) {}
+}
+
+inline void ZipWriter::addFile (std::string_view path,
+                                std::string_view content,
+                                ZipWriter::CompressionLevel level)
+{
+    pimpl->addFileImpl (path, nullptr, content, level);
+}
+
+inline void ZipWriter::addFileFromStream (std::string_view path,
+                                          std::istream& source,
+                                          ZipWriter::CompressionLevel level)
+{
+    pimpl->addFileImpl (path, &source, {}, level);
+}
+
+inline void ZipWriter::addFolder (std::string_view path)
+{
+    pimpl->addFolder (path);
+}
+
+inline void ZipWriter::flush()
+{
+    pimpl->writeCentralDirectory();
 }
 
 } // namespace choc::zip

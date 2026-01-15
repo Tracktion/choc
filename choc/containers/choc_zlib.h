@@ -3892,7 +3892,7 @@ struct DeflaterStream::Pimpl
        : dest (std::move (d)),
          compressionLevel (comp >= 0 && comp <= 10 ? comp : 6)
     {
-        if (windowBits <= 0)
+        if (windowBits == 0)
             windowBits = zlib::MAX_WBITS;
 
         streamIsValid = (deflateStream.initialise (compressionLevel, zlib::Z_DEFLATED,
