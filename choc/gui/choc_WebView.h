@@ -1469,7 +1469,12 @@ private:
             if (controller->QueryInterface (ICoreWebView2Controller2::getIID(), (void**) controller2.getAddress()) == S_OK
                   && controller2 != nullptr)
             {
-                controller2->put_DefaultBackgroundColor ({ 0, 0, 0, 0 });
+                auto colour = detail::getDefaultWindowColour();
+                COREWEBVIEW2_COLOR background { 0xff,
+                                                static_cast<BYTE> (GetRValue (colour)),
+                                                static_cast<BYTE> (GetGValue (colour)),
+                                                static_cast<BYTE> (GetBValue (colour)) };
+                controller2->put_DefaultBackgroundColor (background);
             }
         }
 
@@ -1567,6 +1572,12 @@ private:
         if (msg == WM_SHOWWINDOW)
             if (auto w = getPimpl (h))
                 w->setVisible (wp != 0);
+
+        if (msg == WM_ERASEBKGND)
+        {
+            detail::paintWindowBackground (h, reinterpret_cast<HDC> (wp));
+            return 1;
+        }
 
         return DefWindowProcW (h, msg, wp, lp);
     }
