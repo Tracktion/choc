@@ -96,6 +96,7 @@ private:
     std::unique_ptr<Pimpl> pimpl;
 
     int overflow (int) override;
+    std::streamsize xsputn (const char_type* s, std::streamsize n) override;
 };
 
 
@@ -120,7 +121,7 @@ struct zlib
 // I even started trying to improve some of the appalling variable names,
 // but honestly, life's too short..
 
-CHOC_REGISTER_OPEN_SOURCE_LICENCE (QuickJS, R"(
+CHOC_REGISTER_OPEN_SOURCE_LICENCE (ZLIB, R"(
 ==============================================================================
 ZLIB License:
 
@@ -3989,6 +3990,11 @@ inline DeflaterStream::~DeflaterStream() = default;
 
 inline int DeflaterStream::overflow (int c) { return pimpl->overflow (c); }
 
+inline std::streamsize DeflaterStream::xsputn (const char_type* s, std::streamsize n)
+{
+    return pimpl->write (reinterpret_cast<const uint8_t*> (s),
+                         static_cast<size_t> (n)) ? n : 0;
+}
 
 } // namespace choc::gzip
 
