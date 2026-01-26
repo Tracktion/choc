@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <random>
 #include <filesystem>
+#include "../platform/choc_Platform.h"
 #include "../text/choc_UTF8.h"
 
 namespace choc::file
@@ -178,6 +179,16 @@ inline std::string loadFileAsString (const std::filesystem::path& filename)
         result.resize (static_cast<std::string::size_type> (size));
         return result.data();
     });
+
+   #if CHOC_LINUX || CHOC_ANDROID
+    // some system pseudo-files report zero size but contain data
+    if (result.empty())
+    {
+        std::ifstream stream (filename, std::ios::binary);
+        result.assign (std::istreambuf_iterator<char> (stream),
+                       std::istreambuf_iterator<char>());
+    }
+   #endif
 
     return result;
 }

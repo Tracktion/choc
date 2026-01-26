@@ -724,6 +724,18 @@ inline void testFileUtilities (choc::test::TestProgress& progress)
         CHOC_EXPECT_TRUE (p4.matches ("abcd.x"));
         CHOC_EXPECT_FALSE (p4.matches ("abcd.X") || p4.matches ("abcdd.x") || p4.matches ("abc.x"));
     }
+
+   #if CHOC_LINUX || CHOC_ANDROID
+    {
+        CHOC_TEST (ProcFileReading)
+
+        // /proc files report 0 size but contain data - test that loadFileAsString handles this
+        auto content = choc::file::loadFileAsString ("/proc/self/status");
+        CHOC_EXPECT_FALSE (content.empty());
+        CHOC_EXPECT_TRUE (content.find ("Name:") != std::string::npos);
+        CHOC_EXPECT_TRUE (content.find ("TracerPid:") != std::string::npos);
+    }
+   #endif
 }
 
 //==============================================================================
