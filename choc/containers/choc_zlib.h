@@ -911,13 +911,15 @@ private:
                 /* strstart == 0 is possible when wraparound on 16-bit machine */
                 s->lookahead = (uint32_t) (s->strstart - max_start);
                 s->strstart = (uint32_t) max_start;
-                s->flushBlock (0);
+                if (! s->flushBlock (false))
+                    return BlockStatus::need_more;  // Output buffer full, need to flush
             }
             /* Flush if we may have to slide, otherwise block_start may become
             * negative and the data will be gone:
             */
             if (s->strstart - (uint32_t) s->block_start >= s->MAX_DIST())
-                s->flushBlock (0);
+                if (! s->flushBlock (false))
+                    return BlockStatus::need_more;  // Output buffer full, need to flush
         }
         s->flushBlock (flush == FlushState::Z_FINISH);
         return flush == FlushState::Z_FINISH ? BlockStatus::finish_done
@@ -1499,7 +1501,7 @@ private:
         last_lit = 0;
     }
 
-    void flushBlock (bool eof)
+    bool flushBlock (bool eof)
     {
         flushCurrentBlock (block_start >= 0 ? (uint8_t*) &window[(uint32_t) block_start]
                                             : (uint8_t*) nullptr,
@@ -1507,6 +1509,7 @@ private:
                            eof);
         block_start = (long) strstart;
         flushPending();
+        return pending == 0;  // Return true if all data was flushed
     }
 
     void initialiseTrees()
