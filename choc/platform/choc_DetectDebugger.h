@@ -71,7 +71,7 @@ inline bool choc::isDebuggerActive()
 }
 
 //==============================================================================
-#elif CHOC_LINUX
+#elif CHOC_LINUX || CHOC_ANDROID
 
 #include "../text/choc_Files.h"
 #include "../text/choc_StringUtilities.h"
@@ -88,7 +88,7 @@ inline bool choc::isDebuggerActive()
 
             if (choc::text::startsWith (line, item))
             {
-                auto remainder = choc::text::trimStart (item.substr (item.length()));
+                auto remainder = choc::text::trimStart (line.substr (item.length()));
 
                 if (! remainder.empty() && remainder[0] == ':')
                     return std::string (choc::text::trim (remainder.substr (1)));
