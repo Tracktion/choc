@@ -164,6 +164,29 @@ size_t readFileContent (const std::filesystem::path& filename, GetDestBufferFn&&
     }
     catch (const std::ios_base::failure& e)
     {
+       #if CHOC_LINUX || CHOC_ANDROID
+        // Virtual filesystem files (e.g., /proc/, /sys/) don't support seeking.
+        // Retry with streaming read for these special files.
+        try
+        {
+            std::ifstream stream (filename, std::ios::binary);
+            std::string content { std::istreambuf_iterator<char> (stream),
+                                  std::istreambuf_iterator<char>() };
+
+            if (content.empty())
+                return 0;
+
+            if (auto destBuffer = getBuffer (static_cast<uint64_t> (content.size())))
+            {
+                std::memcpy (destBuffer, content.data(), content.size());
+                return content.size();
+            }
+        }
+        catch (...)
+        {
+            // If retry also fails, throw the original error
+        }
+       #endif
         throw Error ("Failed to read from file: " + filename.string() + ": " + e.what());
     }
 
@@ -179,16 +202,6 @@ inline std::string loadFileAsString (const std::filesystem::path& filename)
         result.resize (static_cast<std::string::size_type> (size));
         return result.data();
     });
-
-   #if CHOC_LINUX || CHOC_ANDROID
-    // some system pseudo-files report zero size but contain data
-    if (result.empty())
-    {
-        std::ifstream stream (filename, std::ios::binary);
-        result.assign (std::istreambuf_iterator<char> (stream),
-                       std::istreambuf_iterator<char>());
-    }
-   #endif
 
     return result;
 }
