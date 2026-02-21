@@ -3812,9 +3812,10 @@ struct InflaterStream::Pimpl
 };
 
 inline InflaterStream::InflaterStream (std::shared_ptr<std::istream> source, FormatType format)
-   : std::istream (this),
+   : std::istream (nullptr),
      pimpl (std::make_unique<Pimpl> (std::move (source), format))
 {
+    rdbuf (this);
 }
 
 inline InflaterStream::~InflaterStream() = default;
@@ -3985,9 +3986,11 @@ struct DeflaterStream::Pimpl
 };
 
 inline DeflaterStream::DeflaterStream (std::shared_ptr<std::ostream> d, CompressionLevel c, int w)
-    : std::ostream (this),
+    : std::ostream (nullptr),
       pimpl (std::make_unique<Pimpl> (std::move (d), c, w))
-{}
+{
+    rdbuf (this);
+}
 
 inline DeflaterStream::~DeflaterStream() = default;
 
