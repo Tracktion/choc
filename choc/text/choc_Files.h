@@ -21,6 +21,7 @@
 
 #include <fstream>
 #include <functional>
+#include <cstring>
 #include <cwctype>
 #include <stdexcept>
 #include <random>
@@ -146,51 +147,26 @@ size_t readFileContent (const std::filesystem::path& filename, GetDestBufferFn&&
 
         auto fileSize = stream.tellg();
 
-        if (fileSize < 0)
-            throw Error ("Failed to read from file: " + filename.string());
-
         if (fileSize == 0)
-            return {};
+            return 0;
 
-        if (auto destBuffer = getBuffer (static_cast<uint64_t> (fileSize)))
+        if (fileSize > 0)
         {
-            stream.seekg (0);
+            if (auto destBuffer = getBuffer (static_cast<uint64_t> (fileSize)))
+            {
+                stream.seekg (0);
 
-            if (stream.read (static_cast<std::ifstream::char_type*> (destBuffer), static_cast<std::streamsize> (fileSize)))
-                return static_cast<size_t> (fileSize);
-
-            throw Error ("Failed to read from file: " + filename.string());
+                if (stream.read (static_cast<std::ifstream::char_type*> (destBuffer), static_cast<std::streamsize> (fileSize)))
+                    return static_cast<size_t> (fileSize);
+            }
         }
+
+        throw Error ("Failed to read from file: " + filename.string());
     }
     catch (const std::ios_base::failure& e)
     {
-       #if CHOC_LINUX || CHOC_ANDROID
-        // Virtual filesystem files (e.g., /proc/, /sys/) don't support seeking.
-        // Retry with streaming read for these special files.
-        try
-        {
-            std::ifstream stream (filename, std::ios::binary);
-            std::string content { std::istreambuf_iterator<char> (stream),
-                                  std::istreambuf_iterator<char>() };
-
-            if (content.empty())
-                return 0;
-
-            if (auto destBuffer = getBuffer (static_cast<uint64_t> (content.size())))
-            {
-                std::memcpy (destBuffer, content.data(), content.size());
-                return content.size();
-            }
-        }
-        catch (...)
-        {
-            // If retry also fails, throw the original error
-        }
-       #endif
         throw Error ("Failed to read from file: " + filename.string() + ": " + e.what());
     }
-
-    return 0;
 }
 
 inline std::string loadFileAsString (const std::filesystem::path& filename)
