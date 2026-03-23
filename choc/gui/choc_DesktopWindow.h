@@ -204,10 +204,10 @@ struct choc::ui::DesktopWindow::Pimpl
 
     void windowDestroyEvent()
     {
-        g_clear_object (&window);
-
         if (owner.windowClosed != nullptr)
             owner.windowClosed();
+
+        g_clear_object (&window);
     }
 
     void* getWindowHandle() const     { return (void*) window; }
@@ -572,10 +572,11 @@ struct DesktopWindow::Pimpl
                              {
                                  CHOC_AUTORELEASE_BEGIN
                                  auto& p = getPimplFromContext (self);
-                                 p.window = {};
 
                                  if (auto callback = p.owner.windowClosed)
                                      choc::messageloop::postMessage ([callback] { callback(); });
+
+                                 p.window = {};
 
                                  CHOC_AUTORELEASE_END
                                  return TRUE;
