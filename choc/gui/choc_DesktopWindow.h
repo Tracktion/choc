@@ -103,6 +103,8 @@ struct DesktopWindow
 
     /// An optional callback that will be called when the parent window is resized
     std::function<void()> windowResized;
+    /// An optional callback that will be called when the parent window is moved
+    std::function<void()> windowMoved;
     /// An optional callback that will be called when the parent window is closed
     std::function<void()> windowClosed;
 
@@ -166,12 +168,34 @@ struct choc::ui::DesktopWindow::Pimpl
                                                  static_cast<Pimpl*> (arg)->windowDestroyEvent();
                                              }),
                                              this);
+
+        configureHandlerID = g_signal_connect (G_OBJECT (window), "configure-event",
+                                               G_CALLBACK (+[](GtkWidget*, GdkEventConfigure* event, gpointer arg) -> gboolean
+                                               {
+                                                   auto* p = static_cast<Pimpl*> (arg);
+
+                                                   if (event->x != p->lastX || event->y != p->lastY)
+                                                   {
+                                                       p->lastX = event->x;
+                                                       p->lastY = event->y;
+
+                                                       if (p->owner.windowMoved)
+                                                           p->owner.windowMoved();
+                                                   }
+
+                                                   return FALSE;
+                                               }),
+                                               this);
+
         setBounds (bounds);
         setVisible (true);
     }
 
     ~Pimpl()
     {
+        if (configureHandlerID != 0 && window != nullptr)
+            g_signal_handler_disconnect (G_OBJECT (window), configureHandlerID);
+
         if (destroyHandlerID != 0 && window != nullptr)
             g_signal_handler_disconnect (G_OBJECT (window), destroyHandlerID);
 
@@ -319,6 +343,8 @@ struct choc::ui::DesktopWindow::Pimpl
     GtkWidget* window = {};
     GtkWidget* content = {};
     unsigned long destroyHandlerID = 0;
+    unsigned long configureHandlerID = 0;
+    int lastX = 0, lastY = 0;
     FileDropCallback fileDropCallback;
 };
 
@@ -562,6 +588,18 @@ struct DesktopWindow::Pimpl
                                  CHOC_AUTORELEASE_BEGIN
 
                                  if (auto callback = getPimplFromContext (self).owner.windowResized)
+                                     callback();
+
+                                 CHOC_AUTORELEASE_END
+                             }),
+                             "v@:@");
+
+            class_addMethod (delegateClass, sel_registerName ("windowDidMove:"),
+                             (IMP) (+[](id self, SEL, id)
+                             {
+                                 CHOC_AUTORELEASE_BEGIN
+
+                                 if (auto callback = getPimplFromContext (self).owner.windowMoved)
                                      callback();
 
                                  CHOC_AUTORELEASE_END
@@ -962,6 +1000,12 @@ private:
             owner.windowResized();
     }
 
+    void handleMove()
+    {
+        if (owner.windowMoved != nullptr)
+            owner.windowMoved();
+    }
+
     bool handleFileDrop (HANDLE hdrop)
     {
         typedef UINT (WINAPI *DragQueryFileWFunc)(HANDLE, UINT, LPWSTR, UINT);
@@ -1023,6 +1067,7 @@ private:
         {
             case WM_NCCREATE:        enableNonClientDPIScaling (h); break;
             case WM_SIZE:            if (auto w = getPimpl (h)) w->handleSizeChange(); break;
+            case WM_MOVE:            if (auto w = getPimpl (h)) w->handleMove(); break;
             case WM_CLOSE:           if (auto w = getPimpl (h)) w->handleClose(); return 0;
             case WM_GETMINMAXINFO:   if (auto w = getPimpl (h)) w->getMinMaxInfo (*(LPMINMAXINFO) lp); return 0;
             case WM_DROPFILES:       if (auto w = getPimpl (h)) if (w->handleFileDrop ((HANDLE) wp)) return 0; break;
