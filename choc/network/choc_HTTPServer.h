@@ -546,7 +546,7 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
                  || request.path.find("..") != std::string_view::npos)
                 return sendFailureResponse (req, http::status::bad_request, "Illegal request-target");
 
-            request.method = std::string (req.method_string());
+            request.method = req.method_string();
             request.postData = req.body();
 
             for (auto& header : req.base())
