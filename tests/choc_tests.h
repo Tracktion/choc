@@ -2560,6 +2560,36 @@ inline void testJavascriptPlatform (choc::test::TestProgress& progress, std::fun
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
+
+    {
+        CHOC_TEST (CircularReferences)
+
+        try
+        {
+            auto context = createContext();
+
+            // Self-referencing object should not crash
+            auto result = context.evaluateExpression ("var x = {}; x.self = x; x");
+            CHOC_EXPECT_TRUE (result.isObject());
+
+            // Mutual circular reference should not crash
+            auto result2 = context.evaluateExpression ("var a = {}; var b = {}; a.child = b; b.parent = a; a");
+            CHOC_EXPECT_TRUE (result2.isObject());
+            CHOC_EXPECT_TRUE (result2["child"].isObject());
+
+            if (! isDuktape)
+            {
+                // Circular reference in array should not crash
+                auto result3 = context.evaluateExpression ("var arr = [1, 2]; arr.push(arr); arr");
+                CHOC_EXPECT_TRUE (result3.isArray());
+            }
+
+            // Deep but non-circular nesting should still work
+            auto result4 = context.evaluateExpression ("var o = {v:1}; for (var i = 0; i < 20; i++) o = {child:o}; o");
+            CHOC_EXPECT_TRUE (result4.isObject());
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
 }
 
 inline void testJavascript (choc::test::TestProgress& progress)
