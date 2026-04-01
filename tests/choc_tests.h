@@ -3297,6 +3297,123 @@ static void testZLIB (choc::test::TestProgress& progress)
                 performTest (1 + (size_t) ((rand() & 8191) + (rand() & 7) * 1233), compression);
         }
     }
+
+    {
+        CHOC_TEST (InflaterSeekEnd)
+
+        auto performSeekTest = [&] (size_t dataSize, choc::zlib::DeflaterStream::CompressionLevel compression)
+        {
+            const auto original = createRandomData (dataSize);
+
+            std::string compressed;
+
+            {
+                auto out = std::make_shared<std::ostringstream> (std::ios::binary);
+
+                {
+                    choc::zlib::DeflaterStream deflater (out, compression, -15);
+                    deflater.write (original.data(), static_cast<std::streamsize> (original.size()));
+                }
+
+                compressed = out->str();
+            }
+
+            CHOC_ASSERT (! compressed.empty() || dataSize == 0);
+
+            auto uncompressedSize = static_cast<choc::zlib::InflaterStream::off_type> (dataSize);
+
+            // Seek to end returns correct position
+            {
+                choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary),
+                                               choc::zlib::InflaterStream::FormatType::deflate,
+                                               uncompressedSize);
+
+                in.seekg (0, std::ios_base::end);
+                CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (dataSize));
+            }
+
+            // Seek to end then read returns EOF
+            {
+                choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary),
+                                               choc::zlib::InflaterStream::FormatType::deflate,
+                                               uncompressedSize);
+
+                in.seekg (0, std::ios_base::end);
+                char c;
+                CHOC_EXPECT_FALSE (static_cast<bool> (in.get (c)));
+            }
+
+            if (dataSize >= 20)
+            {
+                // Seek from end to a mid-stream position, then read and verify content
+                choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary),
+                                               choc::zlib::InflaterStream::FormatType::deflate,
+                                               uncompressedSize);
+
+                auto midOffset = static_cast<std::istream::off_type> (dataSize / 2);
+
+                in.seekg (-midOffset, std::ios_base::end);
+                auto expectedPos = static_cast<std::istream::off_type> (dataSize) - midOffset;
+                CHOC_EXPECT_EQ (in.tellg(), expectedPos);
+
+                std::vector<char> buffer (10);
+                in.read (buffer.data(), 10);
+                CHOC_EXPECT_EQ (in.gcount(), 10);
+                CHOC_EXPECT_TRUE (std::string (buffer.data(), 10) == original.substr (static_cast<size_t> (expectedPos), 10));
+
+                // Now seek forward from current position to near the end and verify
+                in.seekg (-10, std::ios_base::end);
+                CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (dataSize - 10));
+
+                in.read (buffer.data(), 10);
+                CHOC_EXPECT_EQ (in.gcount(), 10);
+                CHOC_EXPECT_TRUE (std::string (buffer.data(), 10) == original.substr (dataSize - 10, 10));
+
+                // Seek backward from current end to an earlier mid-stream position and verify
+                auto quarterPos = dataSize / 4;
+                in.seekg (static_cast<std::istream::off_type> (quarterPos), std::ios_base::beg);
+                CHOC_EXPECT_EQ (in.tellg(), static_cast<std::istream::off_type> (quarterPos));
+
+                in.read (buffer.data(), 10);
+                CHOC_EXPECT_EQ (in.gcount(), 10);
+                CHOC_EXPECT_TRUE (std::string (buffer.data(), 10) == original.substr (quarterPos, 10));
+            }
+
+            // Seek to end then backward to 0 reads all data correctly
+            {
+                choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary),
+                                               choc::zlib::InflaterStream::FormatType::deflate,
+                                               uncompressedSize);
+
+                in.seekg (0, std::ios_base::end);
+                in.seekg (0, std::ios_base::beg);
+                CHOC_EXPECT_EQ (in.tellg(), 0);
+
+                std::vector<char> buffer (dataSize);
+
+                if (dataSize > 0)
+                {
+                    in.read (buffer.data(), static_cast<std::streamsize> (dataSize));
+                    CHOC_EXPECT_EQ (in.gcount(), static_cast<std::istream::off_type> (dataSize));
+                    CHOC_EXPECT_TRUE (std::string (buffer.data(), dataSize) == original);
+                }
+            }
+
+            // Without known size, end seek fails
+            {
+                choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (compressed, std::ios::binary),
+                                               choc::zlib::InflaterStream::FormatType::deflate);
+
+                in.seekg (0, std::ios_base::end);
+                CHOC_EXPECT_EQ (in.tellg(), -1);
+            }
+        };
+
+        performSeekTest (0, choc::zlib::DeflaterStream::CompressionLevel::fastest);
+        performSeekTest (1, choc::zlib::DeflaterStream::CompressionLevel::fastest);
+        performSeekTest (100, choc::zlib::DeflaterStream::CompressionLevel::medium);
+        performSeekTest (128 * 1024, choc::zlib::DeflaterStream::CompressionLevel::best);
+    }
 }
 
 static void testZipFile (choc::test::TestProgress& progress)
@@ -3744,6 +3861,55 @@ static void testZipFile (choc::test::TestProgress& progress)
 
                 CHOC_EXPECT_TRUE (found);
             }
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipFile_SeekEnd)
+
+        try
+        {
+            // Create a zip with a compressed file
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+            std::string largeContent (10000, 'B');
+
+            for (size_t i = 0; i < largeContent.size(); ++i)
+                largeContent[i] = static_cast<char> (i * 7 + i * 3);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("seektest.bin", largeContent, choc::zip::ZipWriter::CompressionLevel::best);
+            }
+
+            auto zipData = stream->str();
+            auto readStream = std::make_shared<std::istringstream> (zipData, std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+            CHOC_EXPECT_TRUE (zipFile.items[0].isCompressed);
+
+            auto reader = zipFile.items[0].createReader();
+
+            // Seek to end reports correct position
+            reader->seekg (0, std::ios_base::end);
+            CHOC_EXPECT_EQ (reader->tellg(), static_cast<std::istream::off_type> (zipFile.items[0].uncompressedSize));
+
+            // Seek back to start and read everything
+            reader->seekg (0, std::ios_base::beg);
+            std::string content;
+            content.resize (largeContent.size());
+            reader->read (content.data(), static_cast<std::streamsize> (content.size()));
+            CHOC_EXPECT_EQ (content, largeContent);
+
+            // Negative offset from end
+            reader->seekg (-100, std::ios_base::end);
+            CHOC_EXPECT_EQ (reader->tellg(), static_cast<std::istream::off_type> (largeContent.size() - 100));
+
+            std::vector<char> tail (100);
+            reader->read (tail.data(), 100);
+            CHOC_EXPECT_EQ (reader->gcount(), 100);
+            CHOC_EXPECT_TRUE (std::string (tail.data(), 100) == largeContent.substr (largeContent.size() - 100));
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }
