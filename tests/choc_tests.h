@@ -76,6 +76,7 @@
 #include "../choc/javascript/choc_javascript.h"
 #include "../choc/javascript/choc_javascript_Timer.h"
 #include "../choc/javascript/choc_javascript_Console.h"
+#include "../choc/containers/choc_ArgumentList.h"
 
 #if CHOC_ENABLE_HTTP_SERVER_TEST
  #include "../choc/network/choc_HTTPServer.h"
@@ -1380,6 +1381,187 @@ inline void testMIDI (choc::test::TestProgress& progress)
 
         auto m21 = choc::midi::systemReset();
         CHOC_EXPECT_EQ (m21.data()[0], 0xff);
+    }
+}
+
+//==============================================================================
+inline void testArgumentList (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (ArgumentList);
+
+    {
+        CHOC_TEST (ArgcvParsingDoubleDash)
+
+        const char* argv[] = { "executableName", "other1", "--flag1", "other2", "--param1=foo", "--flag2", "--param2=bar", "--param3=42", "other3" };
+
+        choc::ArgumentList args (9, argv);
+
+        CHOC_EXPECT_TRUE (args.contains ("--flag1"));
+        CHOC_EXPECT_TRUE (args.contains ("--param1"));
+        CHOC_EXPECT_TRUE (args.contains ("--flag2"));
+        CHOC_EXPECT_TRUE (args.contains ("--param2"));
+        CHOC_EXPECT_TRUE (args.contains ("--param3"));
+        CHOC_EXPECT_FALSE (args.contains ("--flag3"));
+
+        CHOC_EXPECT_EQ (args.indexOf ("--flag1"), 1);
+        CHOC_EXPECT_EQ (args.indexOf ("--param1"), 3);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag2"), 4);
+        CHOC_EXPECT_EQ (args.indexOf ("--param2"), 5);
+        CHOC_EXPECT_EQ (args.indexOf ("--param3"), 6);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag3"), -1);
+
+        CHOC_EXPECT_EQ (args.getValueFor ("--param1", false).value(), "foo");
+        CHOC_EXPECT_EQ (args.getValueFor ("--param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("--param3", false).value(), "42");
+
+        CHOC_EXPECT_TRUE (args.removeIfFound ("--flag1"));
+        CHOC_EXPECT_TRUE (args.removeIfFound ("--param1"));
+
+        CHOC_EXPECT_FALSE (args.getValueFor ("--param1", false).has_value());
+        CHOC_EXPECT_EQ (args.getValueFor ("--param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("--param3", false).value(), "42");
+
+        CHOC_EXPECT_EQ (args.removeValueFor ("--param2", "default"), "bar");
+        CHOC_EXPECT_EQ (args.removeValueFor ("--param2", "default"), "default");
+        CHOC_EXPECT_FALSE (args.removeValueFor ("--param2").has_value());
+        CHOC_EXPECT_FALSE (args.getValueFor ("--param2", false).has_value());
+
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("--param3", 101), 42);
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("--param3", 101), 101);
+
+        CHOC_EXPECT_EQ (args.indexOf ("--flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag2"), 2);
+        CHOC_EXPECT_EQ (args.indexOf ("--param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag3"), -1);
+
+        args.removeIndex (2);
+
+        CHOC_EXPECT_EQ (args.indexOf ("--flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("--flag3"), -1);
+    }
+
+    {
+        CHOC_TEST (ArgcvParsingSingleDash)
+
+        const char* argv[] = { "executableName", "other1", "-flag1", "other2", "-param1", "foo", "-flag2", "-param2", "bar", "-param3", "42", "other3" };
+
+        choc::ArgumentList args (12, argv);
+
+        CHOC_EXPECT_TRUE (args.contains ("-flag1"));
+        CHOC_EXPECT_TRUE (args.contains ("-param1"));
+        CHOC_EXPECT_TRUE (args.contains ("-flag2"));
+        CHOC_EXPECT_TRUE (args.contains ("-param2"));
+        CHOC_EXPECT_TRUE (args.contains ("-param3"));
+        CHOC_EXPECT_FALSE (args.contains ("-flag3"));
+
+        CHOC_EXPECT_EQ (args.indexOf ("-flag1"), 1);
+        CHOC_EXPECT_EQ (args.indexOf ("-param1"), 3);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag2"), 5);
+        CHOC_EXPECT_EQ (args.indexOf ("-param2"), 6);
+        CHOC_EXPECT_EQ (args.indexOf ("-param3"), 8);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag3"), -1);
+
+        CHOC_EXPECT_EQ (args.getValueFor ("-param1", false).value(), "foo");
+        CHOC_EXPECT_EQ (args.getValueFor ("-param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("-param3", false).value(), "42");
+
+        CHOC_EXPECT_TRUE (args.removeIfFound ("-flag1"));
+        CHOC_EXPECT_TRUE (args.removeIfFound ("-param1"));
+
+        CHOC_EXPECT_FALSE (args.getValueFor ("-param1", false).has_value());
+        CHOC_EXPECT_EQ (args.getValueFor ("-param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("-param3", false).value(), "42");
+
+        CHOC_EXPECT_EQ (args.removeValueFor ("-param2", "default"), "bar");
+        CHOC_EXPECT_EQ (args.removeValueFor ("-param2", "default"), "default");
+        CHOC_EXPECT_FALSE (args.removeValueFor ("-param2").has_value());
+        CHOC_EXPECT_FALSE (args.getValueFor ("-param2", false).has_value());
+
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("-param3", 101), 42);
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("-param3", 101), 101);
+
+        CHOC_EXPECT_EQ (args.indexOf ("-flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag2"), 3);
+        CHOC_EXPECT_EQ (args.indexOf ("-param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag3"), -1);
+
+        args.removeIndex (3);
+
+        CHOC_EXPECT_EQ (args.indexOf ("-flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("-flag3"), -1);
+    }
+
+
+    {
+        CHOC_TEST (ArgcvParsingMixed)
+
+        const char* argv[] = { "executableName", "other1", "-flag1", "other2", "-param1", "foo", "--flag2", "--param2=bar", "-param3", "42", "other3" };
+
+        choc::ArgumentList args (12, argv);
+
+        CHOC_EXPECT_TRUE (args.contains ("flag1"));
+        CHOC_EXPECT_TRUE (args.contains ("param1"));
+        CHOC_EXPECT_TRUE (args.contains ("flag2"));
+        CHOC_EXPECT_TRUE (args.contains ("param2"));
+        CHOC_EXPECT_TRUE (args.contains ("param3"));
+        CHOC_EXPECT_FALSE (args.contains ("flag3"));
+
+        CHOC_EXPECT_EQ (args.indexOf ("flag1"), 1);
+        CHOC_EXPECT_EQ (args.indexOf ("param1"), 3);
+        CHOC_EXPECT_EQ (args.indexOf ("flag2"), 5);
+        CHOC_EXPECT_EQ (args.indexOf ("param2"), 6);
+        CHOC_EXPECT_EQ (args.indexOf ("param3"), 7);
+        CHOC_EXPECT_EQ (args.indexOf ("flag3"), -1);
+
+        CHOC_EXPECT_EQ (args.getValueFor ("param1", false).value(), "foo");
+        CHOC_EXPECT_EQ (args.getValueFor ("param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("param3", false).value(), "42");
+
+        CHOC_EXPECT_TRUE (args.removeIfFound ("flag1"));
+        CHOC_EXPECT_TRUE (args.removeIfFound ("param1"));
+
+        CHOC_EXPECT_FALSE (args.getValueFor ("param1", false).has_value());
+        CHOC_EXPECT_EQ (args.getValueFor ("param2", false).value(), "bar");
+        CHOC_EXPECT_EQ (args.getValueFor ("param3", false).value(), "42");
+
+        CHOC_EXPECT_EQ (args.removeValueFor ("param2", "default"), "bar");
+        CHOC_EXPECT_EQ (args.removeValueFor ("param2", "default"), "default");
+        CHOC_EXPECT_FALSE (args.removeValueFor ("param2").has_value());
+        CHOC_EXPECT_FALSE (args.getValueFor ("param2", false).has_value());
+
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("param3", 101), 42);
+        CHOC_EXPECT_EQ (args.removeIntValue<int> ("param3", 101), 101);
+
+        CHOC_EXPECT_EQ (args.indexOf ("flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("flag2"), 3);
+        CHOC_EXPECT_EQ (args.indexOf ("param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("flag3"), -1);
+
+        args.removeIndex (3);
+
+        CHOC_EXPECT_EQ (args.indexOf ("flag1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("param1"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("flag2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("param2"), -1);
+        CHOC_EXPECT_EQ (args.indexOf ("flag3"), -1);
+    }
+
+    {
+        CHOC_TEST (ArgcvParsingStringArgs)
+
+        choc::ArgumentList args (choc::text::splitAtWhitespace ("-flag1 --flag2 --param1=foo other stuff"));
+
+        CHOC_EXPECT_TRUE (args.contains ("flag1"));
+        CHOC_EXPECT_EQ (args.removeValueFor ("param1", "default"), "foo");
     }
 }
 
@@ -4135,6 +4317,7 @@ inline bool runAllTests (choc::test::TestProgress& progress, bool multithread)
 
     std::function<void(choc::test::TestProgress&)> testFunctions[] =
     {
+        testArgumentList,
         testExecute,
         testHTTPServer,
         testZLIB,
