@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(choc_tests)
 
-add_executable(choc_tests choc_tests.cpp)
+add_executable(choc_tests choc_tests.cpp choc_tests.h)
 
 # To test V8, there needs to be a suitable folder somewhere with a build
 # set(V8_LOCATION "/path_to_your_v8_folder/v8")
