@@ -229,7 +229,8 @@ inline int ArgumentList::indexOf (std::string_view arg) const
         if (auto singleIndex = indexOf ("-" + std::string (arg)); singleIndex != -1)
             return singleIndex;
 
-        return indexOf ("--" + std::string (arg));
+        if (auto doubleIndex = indexOf ("--" + std::string (arg)); doubleIndex != -1)
+            return doubleIndex;
     }
 
     bool isDoubleDash = isDoubleDashOption (arg);

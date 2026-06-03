@@ -1403,6 +1403,7 @@ inline void testArgumentList (choc::test::TestProgress& progress)
         CHOC_EXPECT_TRUE (args.contains ("--param3"));
         CHOC_EXPECT_FALSE (args.contains ("--flag3"));
 
+        CHOC_EXPECT_EQ (args.indexOf ("other1"), 0);
         CHOC_EXPECT_EQ (args.indexOf ("--flag1"), 1);
         CHOC_EXPECT_EQ (args.indexOf ("--param1"), 3);
         CHOC_EXPECT_EQ (args.indexOf ("--flag2"), 4);
@@ -1458,6 +1459,7 @@ inline void testArgumentList (choc::test::TestProgress& progress)
         CHOC_EXPECT_TRUE (args.contains ("-param3"));
         CHOC_EXPECT_FALSE (args.contains ("-flag3"));
 
+        CHOC_EXPECT_EQ (args.indexOf ("other1"), 0);
         CHOC_EXPECT_EQ (args.indexOf ("-flag1"), 1);
         CHOC_EXPECT_EQ (args.indexOf ("-param1"), 3);
         CHOC_EXPECT_EQ (args.indexOf ("-flag2"), 5);
@@ -1514,6 +1516,7 @@ inline void testArgumentList (choc::test::TestProgress& progress)
         CHOC_EXPECT_TRUE (args.contains ("param3"));
         CHOC_EXPECT_FALSE (args.contains ("flag3"));
 
+        CHOC_EXPECT_EQ (args.indexOf ("other1"), 0);
         CHOC_EXPECT_EQ (args.indexOf ("flag1"), 1);
         CHOC_EXPECT_EQ (args.indexOf ("param1"), 3);
         CHOC_EXPECT_EQ (args.indexOf ("flag2"), 5);
