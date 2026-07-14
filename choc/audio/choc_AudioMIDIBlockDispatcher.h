@@ -286,6 +286,12 @@ inline void AudioMIDIBlockDispatcher::fetchMIDIBlockFromFIFO (choc::fifo::Variab
     auto blockStartTime = lastBlockTime;
     lastBlockTime = HighResolutionSteadyClock::now();
 
+    // The granularity is a *minimum* chunk size, not a snap-to-grid: events keep their
+    // exact frame positions unless splitting there would create a chunk smaller than
+    // midiTimingGranularityFrames, in which case they coalesce onto the previous boundary.
+    // Events pop in time order, so we can track the last accepted boundary as we go.
+    uint32_t lastBoundary = 0;
+
     while (midiFIFOBatchOp.pop ([&] (const void* d, uint32_t totalSize)
     {
         auto data = static_cast<const char*> (d);
@@ -306,7 +312,13 @@ inline void AudioMIDIBlockDispatcher::fetchMIDIBlockFromFIFO (choc::fifo::Variab
             frameIndex = static_cast<int32_t> (numFramesNeeded) - 1;
         }
 
-        auto snappedIndex = static_cast<uint32_t> (frameIndex) % midiTimingGranularityFrames;
+        auto snappedIndex = static_cast<uint32_t> (frameIndex);
+
+        if (snappedIndex - lastBoundary < midiTimingGranularityFrames)
+            snappedIndex = lastBoundary;   // too close to the previous boundary: coalesce onto it
+        else
+            lastBoundary = snappedIndex;   // far enough away: this event opens a new chunk
+
         midiMessageTimes.push_back (snappedIndex);
 
         data += sizeof (MIDIEventTime);
