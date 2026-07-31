@@ -2338,6 +2338,134 @@ inline void testFIFOs (choc::test::TestProgress& progress)
 }
 
 //==============================================================================
+inline void testAudioMIDIBlockDispatcher (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (AudioMIDIBlockDispatcher);
+
+    using Dispatcher = choc::audio::AudioMIDIBlockDispatcher;
+
+    // midiTimingGranularityFrames is a *minimum* chunk size, not a snap-to-grid: events are
+    // rendered at their exact frame positions whenever possible, and the granularity only comes
+    // into play when placing an event exactly would create a chunk smaller than the granularity -
+    // in which case the event is grouped into (rendered at the start of) the current chunk.
+    //
+    // To place events at exact frames we provide our own clock via dispatcher.getCurrentTime.
+    // Running at 1 Hz makes one second equal one frame, so a timestamp N seconds past the epoch
+    // lands at frame N.
+    auto renderBlock = [] (const std::vector<int32_t>& eventFrames, uint32_t granularity,
+                           std::vector<uint32_t>& blockSizes, std::vector<size_t>& midiCounts)
+    {
+        constexpr uint32_t blockSize = 256;
+        choc::buffer::ChannelArrayBuffer<float> inputBuffer (1, blockSize), outputBuffer (1, blockSize);
+
+        Dispatcher dispatcher;
+        dispatcher.reset (1.0);
+        dispatcher.midiTimingGranularityFrames = granularity;
+        dispatcher.setAudioBuffers (inputBuffer, outputBuffer);
+
+        Dispatcher::MIDIEventTime now = {};
+        dispatcher.getCurrentTime = [&now] { return now; };
+
+        auto frameToTime = [] (int32_t frame) { return Dispatcher::MIDIEventTime() + std::chrono::seconds (frame); };
+
+        // Prime the dispatcher at the start of the simulated block.
+        now = frameToTime (0);
+        dispatcher.processInChunks ([] (const Dispatcher::Block&) {});
+
+        for (auto frame : eventFrames)
+        {
+            now = frameToTime (frame);
+            dispatcher.addMIDIEvent (nullptr, choc::midi::noteOn (1, 60, 100));
+        }
+
+        now = frameToTime (static_cast<int32_t> (blockSize));
+
+        blockSizes.clear();
+        midiCounts.clear();
+        dispatcher.processInChunks ([&] (const Dispatcher::Block& block)
+        {
+            blockSizes.push_back (block.audioOutput.getNumFrames());
+            midiCounts.push_back (block.midiMessages.size());
+        });
+    };
+
+    std::vector<uint32_t> blockSizes;
+    std::vector<size_t> midiCounts;
+
+    {
+        CHOC_TEST (ExactPositionWhenFarEnoughApart)
+
+        // 123 is >= the granularity from the start and 133 frames remain after it, so the
+        // event renders at its exact position: blocks of 123 / 133.
+        renderBlock ({ 123 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 2u);
+        CHOC_EXPECT_EQ (blockSizes[0], 123u);
+        CHOC_EXPECT_EQ (blockSizes[1], 133u);
+        CHOC_EXPECT_EQ (midiCounts[0], 0u);
+        CHOC_EXPECT_EQ (midiCounts[1], 1u);
+    }
+
+    {
+        CHOC_TEST (EventsCloserThanGranularityShareAChunk)
+
+        // 123 and 130 are only 7 frames apart (< 32), so splitting between them would make a
+        // 7-frame chunk. Instead 130 is grouped with 123: both land at the start of block 2.
+        renderBlock ({ 123, 130 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 2u);
+        CHOC_EXPECT_EQ (blockSizes[0], 123u);
+        CHOC_EXPECT_EQ (blockSizes[1], 133u);
+        CHOC_EXPECT_EQ (midiCounts[0], 0u);
+        CHOC_EXPECT_EQ (midiCounts[1], 2u);
+    }
+
+    {
+        CHOC_TEST (EventWithinGranularityOfStartRendersAtZero)
+
+        // 20 < 32 from the block start, so an exact split would create a sub-granularity chunk.
+        // The event is grouped into a single full-size block.
+        renderBlock ({ 20 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 1u);
+        CHOC_EXPECT_EQ (blockSizes[0], 256u);
+        CHOC_EXPECT_EQ (midiCounts[0], 1u);
+    }
+
+    {
+        CHOC_TEST (EventsSpacedAtGranularitySplitExactly)
+
+        // 40, 80, 120 are each >= 32 apart, so every event renders exactly: 40 / 40 / 40 / 136.
+        renderBlock ({ 40, 80, 120 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 4u);
+        CHOC_EXPECT_EQ (blockSizes[0], 40u);
+        CHOC_EXPECT_EQ (blockSizes[1], 40u);
+        CHOC_EXPECT_EQ (blockSizes[2], 40u);
+        CHOC_EXPECT_EQ (blockSizes[3], 136u);
+        CHOC_EXPECT_EQ (midiCounts[0], 0u);
+        CHOC_EXPECT_EQ (midiCounts[1], 1u);
+        CHOC_EXPECT_EQ (midiCounts[2], 1u);
+        CHOC_EXPECT_EQ (midiCounts[3], 1u);
+    }
+
+    {
+        CHOC_TEST (ShortTrailingChunkIsAllowed)
+
+        // An event near the end still earns its own boundary even though the remaining chunk
+        // (6 frames) is shorter than the granularity - the buffer end is a natural boundary,
+        // so a short final chunk is acceptable.
+        renderBlock ({ 250 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 2u);
+        CHOC_EXPECT_EQ (blockSizes[0], 250u);
+        CHOC_EXPECT_EQ (blockSizes[1], 6u);
+        CHOC_EXPECT_EQ (midiCounts[0], 0u);
+        CHOC_EXPECT_EQ (midiCounts[1], 1u);
+    }
+}
+
+//==============================================================================
 inline void testMIDIFiles (choc::test::TestProgress& progress)
 {
     auto simpleHash = [] (const std::string& s)
@@ -4337,6 +4465,7 @@ inline bool runAllTests (choc::test::TestProgress& progress, bool multithread)
         testIntToFloat,
         testFIFOs,
         testMIDIFiles,
+        testAudioMIDIBlockDispatcher,
         testJavascript,
         testWebview,
         testCOM,
