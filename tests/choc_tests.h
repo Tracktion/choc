@@ -2463,6 +2463,21 @@ inline void testAudioMIDIBlockDispatcher (choc::test::TestProgress& progress)
         CHOC_EXPECT_EQ (midiCounts[0], 0u);
         CHOC_EXPECT_EQ (midiCounts[1], 1u);
     }
+
+    {
+        CHOC_TEST (EventOnBlockBoundaryIsClampedNotDropped)
+
+        // An event timestamped at exactly the block boundary (frame 256 of a 256-frame block)
+        // must be clamped back to the last valid frame (255) and delivered, not dropped. This
+        // is the boundary case of the general clamp that already handles later timestamps.
+        renderBlock ({ 256 }, 32, blockSizes, midiCounts);
+
+        CHOC_EXPECT_EQ (blockSizes.size(), 2u);
+        CHOC_EXPECT_EQ (blockSizes[0], 255u);
+        CHOC_EXPECT_EQ (blockSizes[1], 1u);
+        CHOC_EXPECT_EQ (midiCounts[0], 0u);
+        CHOC_EXPECT_EQ (midiCounts[1], 1u);
+    }
 }
 
 //==============================================================================

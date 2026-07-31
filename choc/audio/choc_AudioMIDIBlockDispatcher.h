@@ -311,8 +311,12 @@ inline void AudioMIDIBlockDispatcher::fetchMIDIBlockFromFIFO (choc::fifo::Variab
 
             frameIndex = 0;
         }
-        else if (frameIndex > static_cast<int32_t> (numFramesNeeded))
+        else if (frameIndex >= static_cast<int32_t> (numFramesNeeded))
         {
+            // An event landing on (or past) the block's end boundary belongs at the last
+            // valid frame. Clamping with '>' instead of '>=' would leave an event at exactly
+            // numFramesNeeded unclamped, and processInChunks() would then open a chunk
+            // boundary at the block end and drop the event (there is no following chunk).
             frameIndex = static_cast<int32_t> (numFramesNeeded) - 1;
         }
 
