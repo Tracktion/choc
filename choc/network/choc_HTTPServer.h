@@ -315,7 +315,11 @@ struct HTTPServer::Pimpl  : public std::enable_shared_from_this<HTTPServer::Pimp
             ioContext.stop();
 
         for (auto& t : threadPool)
-            t.join();
+            if (t.joinable())
+                t.join();
+
+        threadPool.clear();
+        acceptor.reset();
     }
 
     void reportError (const std::string& message)
