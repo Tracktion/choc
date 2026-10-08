@@ -554,6 +554,51 @@ inline void testStringUtilities (choc::test::TestProgress& progress)
     }
 
     {
+        CHOC_TEST (UTF8TruncatedSequences)
+
+        // Each sequence is cut short by the null terminator, which is followed by bytes
+        // that aren't part of the string and must never be read.
+        for (auto truncated : { "\xc3", "\xe2", "\xe2\x82", "\xf0", "\xf0\x9f", "\xf0\x9f\x98" })
+        {
+            auto buffer = std::string ("a") + truncated + std::string ("\0ZZ", 3);
+            choc::text::UTF8Pointer p (buffer.c_str());
+
+            CHOC_EXPECT_EQ (2u, p.length());
+
+            std::vector<choc::text::UnicodeChar> chars;
+
+            for (auto c : p)
+                chars.push_back (c);
+
+            CHOC_EXPECT_TRUE ((chars == std::vector<choc::text::UnicodeChar> { 'a', 0xfffd }));
+            CHOC_EXPECT_EQ (std::string ("a\\ufffd"), choc::json::addEscapeCharacters (p));
+            CHOC_EXPECT_TRUE (p.find ("ZZ").empty());
+            CHOC_EXPECT_TRUE (p.findEndOfLine().empty());
+        }
+
+        // A truncated sequence mid-string mustn't swallow the character that follows it
+        {
+            choc::text::UTF8Pointer p ("\xe2\x82" "b\xc0" "c");
+            CHOC_EXPECT_EQ (4u, p.length());
+            CHOC_EXPECT_EQ (0xfffdu, p.popFirstChar());
+            CHOC_EXPECT_EQ ((choc::text::UnicodeChar) 'b', p.popFirstChar());
+            CHOC_EXPECT_EQ (0xfffdu, p.popFirstChar());
+            CHOC_EXPECT_EQ ((choc::text::UnicodeChar) 'c', p.popFirstChar());
+            CHOC_EXPECT_TRUE (p.empty());
+        }
+
+        // Valid multi-byte sequences are unaffected
+        {
+            choc::text::UTF8Pointer p ("\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80");
+            CHOC_EXPECT_EQ (3u, p.length());
+            CHOC_EXPECT_EQ (0xe9u, p.popFirstChar());
+            CHOC_EXPECT_EQ (0x20acu, p.popFirstChar());
+            CHOC_EXPECT_EQ (0x1f600u, p.popFirstChar());
+            CHOC_EXPECT_TRUE (p.empty());
+        }
+    }
+
+    {
         CHOC_TEST (TextTable)
 
         choc::text::TextTable table;
