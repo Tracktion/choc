@@ -1892,8 +1892,13 @@ private:
 
         HRESULT STDMETHODCALLTYPE Invoke (ICoreWebView2*, ICoreWebView2PermissionRequestedEventArgs* args) override
         {
-            COREWEBVIEW2_PERMISSION_KIND permissionKind;
-            args->get_PermissionKind (std::addressof (permissionKind));
+            if (args == nullptr)
+                return S_OK;
+
+            auto permissionKind = COREWEBVIEW2_PERMISSION_KIND_UNKNOWN_PERMISSION;
+
+            if (args->get_PermissionKind (std::addressof (permissionKind)) != S_OK)
+                return S_OK;
 
             if (permissionKind == COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ)
                 args->put_State (COREWEBVIEW2_PERMISSION_STATE_ALLOW);
