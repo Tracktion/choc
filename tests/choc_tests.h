@@ -3598,6 +3598,30 @@ static std::string createRandomData (size_t length)
     return out.str().substr (0, length);
 }
 
+// Creates a sequence of 4-byte words picked at random from a small vocabulary. This
+// compresses into lots of short matches with scattered distances, so each deflate
+// block produces far more output than fits in the deflater's output buffer.
+static std::string createShortMatchData (size_t length)
+{
+    uint32_t seed = 12345;
+    auto next = [&] { seed = seed * 1664525u + 1013904223u; return seed >> 8; };
+
+    std::vector<std::string> words (256);
+
+    for (auto& w : words)
+        for (int i = 0; i < 4; ++i)
+            w += static_cast<char> (next() & 0xff);
+
+    std::string result;
+    result.reserve (length + 4);
+
+    while (result.size() < length)
+        result += words[next() % words.size()];
+
+    result.resize (length);
+    return result;
+}
+
 static void testZLIB (choc::test::TestProgress& progress)
 {
     CHOC_CATEGORY (zlib);
@@ -3786,6 +3810,33 @@ static void testZLIB (choc::test::TestProgress& progress)
         performSeekTest (1, choc::zlib::DeflaterStream::CompressionLevel::fastest);
         performSeekTest (100, choc::zlib::DeflaterStream::CompressionLevel::medium);
         performSeekTest (128 * 1024, choc::zlib::DeflaterStream::CompressionLevel::best);
+    }
+
+    {
+        CHOC_TEST (LargeSingleWrite)
+
+        // A large amount of data passed in one write() call, which produces more
+        // compressed output than fits in the deflater's output buffer
+        const auto original = createShortMatchData (200000);
+
+        for (auto compression = choc::zlib::DeflaterStream::CompressionLevel::none;
+             compression <= choc::zlib::DeflaterStream::CompressionLevel::best;
+             compression = (choc::zlib::DeflaterStream::CompressionLevel) (compression + 1))
+        {
+            auto out = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zlib::DeflaterStream deflater (out, compression, 15);
+                deflater.write (original.data(), static_cast<std::streamsize> (original.size()));
+            }
+
+            choc::zlib::InflaterStream in (std::make_shared<std::istringstream> (out->str(), std::ios::binary),
+                                           choc::zlib::InflaterStream::FormatType::zlib);
+
+            std::string result ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+            CHOC_EXPECT_EQ (result.size(), original.size());
+            CHOC_EXPECT_TRUE (result == original);
+        }
     }
 }
 
@@ -4283,6 +4334,110 @@ static void testZipFile (choc::test::TestProgress& progress)
             reader->read (tail.data(), 100);
             CHOC_EXPECT_EQ (reader->gcount(), 100);
             CHOC_EXPECT_TRUE (std::string (tail.data(), 100) == largeContent.substr (largeContent.size() - 100));
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipWriter_LargeFile)
+
+        try
+        {
+            const auto original = createShortMatchData (200000);
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("audio.raw", original);
+            }
+
+            auto readStream = std::make_shared<std::istringstream> (stream->str(), std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 1u);
+            CHOC_EXPECT_EQ (zipFile.items[0].uncompressedSize, original.size());
+
+            auto reader = zipFile.items[0].createReader();
+            std::string content;
+            content.resize (original.size());
+            reader->read (content.data(), static_cast<std::streamsize> (content.size()));
+            CHOC_EXPECT_EQ (reader->gcount(), static_cast<std::streamsize> (original.size()));
+            CHOC_EXPECT_TRUE (content == original);
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipFile_StoredEntryIterator)
+
+        try
+        {
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("stored.txt", "Hello, stored world!", choc::zip::ZipWriter::CompressionLevel::uncompressed);
+                writer.addFile ("deflated.txt", "Hello, deflated world!", choc::zip::ZipWriter::CompressionLevel::best);
+            }
+
+            auto readStream = std::make_shared<std::istringstream> (stream->str(), std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+
+            CHOC_EXPECT_EQ (zipFile.items.size(), 2u);
+
+            auto readAllWithIterator = [] (const choc::zip::ZipFile::Item& item)
+            {
+                auto reader = item.createReader();
+                return std::string ((std::istreambuf_iterator<char> (*reader)), std::istreambuf_iterator<char>());
+            };
+
+            CHOC_EXPECT_EQ (readAllWithIterator (zipFile.items[0]), "Hello, stored world!");
+            CHOC_EXPECT_EQ (readAllWithIterator (zipFile.items[1]), "Hello, deflated world!");
+
+            // Mixing single-character and bulk reads on a stored entry
+            auto reader = zipFile.items[0].createReader();
+            CHOC_EXPECT_EQ (reader->get(), 'H');
+            CHOC_EXPECT_EQ (reader->peek(), 'e');
+            std::string rest (19, ' ');
+            reader->read (rest.data(), 19);
+            CHOC_EXPECT_EQ (rest, "ello, stored world!");
+            CHOC_EXPECT_EQ (reader->get(), std::char_traits<char>::eof());
+        }
+        CHOC_CATCH_UNEXPECTED_EXCEPTION
+    }
+
+    {
+        CHOC_TEST (ZipFile_StoredEntrySeek)
+
+        try
+        {
+            auto stream = std::make_shared<std::ostringstream> (std::ios::binary);
+
+            {
+                choc::zip::ZipWriter writer (stream);
+                writer.addFile ("stored.txt", "Hello, stored world!", choc::zip::ZipWriter::CompressionLevel::uncompressed);
+            }
+
+            auto readStream = std::make_shared<std::istringstream> (stream->str(), std::ios::binary);
+            choc::zip::ZipFile zipFile (readStream);
+            auto reader = zipFile.items[0].createReader();
+
+            reader->seekg (0, std::ios_base::end);
+            CHOC_EXPECT_EQ (reader->tellg(), 20);
+
+            reader->seekg (-6, std::ios_base::end);
+            CHOC_EXPECT_EQ (reader->tellg(), 14);
+            std::string tail (6, ' ');
+            reader->read (tail.data(), 6);
+            CHOC_EXPECT_EQ (tail, "world!");
+
+            // Position must stay correct after single-character reads
+            reader->seekg (0, std::ios_base::beg);
+            CHOC_EXPECT_EQ (reader->get(), 'H');
+            CHOC_EXPECT_EQ (reader->tellg(), 1);
+            reader->seekg (6, std::ios_base::cur);
+            CHOC_EXPECT_EQ (reader->tellg(), 7);
+            CHOC_EXPECT_EQ (reader->get(), 's');
         }
         CHOC_CATCH_UNEXPECTED_EXCEPTION
     }

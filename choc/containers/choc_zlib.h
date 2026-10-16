@@ -918,7 +918,10 @@ private:
                 if (! s->flushBlock (false))
                     return BlockStatus::need_more;  // Output buffer full, need to flush
         }
-        s->flushBlock (flush == FlushState::Z_FINISH);
+
+        if (! s->flushBlock (flush == FlushState::Z_FINISH))
+            return flush == FlushState::Z_FINISH ? BlockStatus::finish_started : BlockStatus::need_more;
+
         return flush == FlushState::Z_FINISH ? BlockStatus::finish_done
                                              : BlockStatus::block_done;
     }
@@ -1007,11 +1010,13 @@ private:
                 s->lookahead--;
                 s->strstart++;
             }
-            if (bflush)
-                s->flushBlock (0);
+            if (bflush && ! s->flushBlock (false))
+                return BlockStatus::need_more;  // Output buffer full, need to flush
         }
 
-        s->flushBlock (flush == FlushState::Z_FINISH);
+        if (! s->flushBlock (flush == FlushState::Z_FINISH))
+            return flush == FlushState::Z_FINISH ? BlockStatus::finish_started : BlockStatus::need_more;
+
         return flush == FlushState::Z_FINISH ? BlockStatus::finish_done : BlockStatus::block_done;
     }
 
@@ -1099,8 +1104,8 @@ private:
                 s->match_length = MIN_MATCH - 1;
                 s->strstart++;
 
-                if (bflush)
-                    s->flushBlock (0);
+                if (bflush && ! s->flushBlock (false))
+                    return BlockStatus::need_more;  // Output buffer full, need to flush
             }
             else if (s->match_available)
             {
@@ -1134,7 +1139,10 @@ private:
             s->tallyLiteral (s->window[s->strstart - 1], bflush);
             s->match_available = 0;
         }
-        s->flushBlock (flush == FlushState::Z_FINISH);
+
+        if (! s->flushBlock (flush == FlushState::Z_FINISH))
+            return flush == FlushState::Z_FINISH ? BlockStatus::finish_started : BlockStatus::need_more;
+
         return flush == FlushState::Z_FINISH ? BlockStatus::finish_done : BlockStatus::block_done;
     }
 

@@ -356,23 +356,70 @@ struct ZipFile::Item::ZipStream  : public  std::istream,
         int64_t newPos = off;
 
         if (dir == std::ios_base::cur)
-            newPos += position;
+            newPos += getCurrentPosition();
         else if (dir == std::ios_base::end)
-            newPos = compressedSize - off;
+            newPos += compressedSize;
 
         return seekpos (static_cast<std::streambuf::pos_type> (newPos), mode);
     }
 
     std::streambuf::pos_type seekpos (std::streambuf::pos_type newPos, std::ios_base::openmode) override
     {
-        if (newPos > compressedSize)
+        auto pos = static_cast<int64_t> (newPos);
+
+        if (pos < 0 || pos > compressedSize)
             return std::streambuf::pos_type (std::streambuf::off_type (-1));
 
-        position = newPos;
+        setg (nullptr, nullptr, nullptr);
+        position = pos;
         return newPos;
     }
 
+    std::streambuf::int_type underflow() override
+    {
+        if (gptr() < egptr())
+            return std::streambuf::traits_type::to_int_type (*gptr());
+
+        auto numRead = readFromFile (buffer, static_cast<std::streamsize> (sizeof (buffer)));
+
+        if (numRead <= 0)
+            return std::streambuf::traits_type::eof();
+
+        setg (buffer, buffer, buffer + numRead);
+        return std::streambuf::traits_type::to_int_type (buffer[0]);
+    }
+
     std::streamsize xsgetn (std::streambuf::char_type* dest, std::streamsize size) override
+    {
+        std::streamsize numDone = 0;
+        auto numBuffered = static_cast<std::streamsize> (egptr() - gptr());
+
+        if (numBuffered > 0)
+        {
+            numDone = std::min (numBuffered, size);
+            std::copy (gptr(), gptr() + numDone, dest);
+            gbump (static_cast<int> (numDone));
+        }
+
+        if (numDone < size)
+            numDone += readFromFile (dest + numDone, size - numDone);
+
+        return numDone;
+    }
+
+private:
+    std::shared_ptr<std::istream> fileStream;
+    const int64_t compressedSize, fileStartOffset;
+    int64_t position = 0; // the position in the file corresponding to egptr()
+    uint32_t headerSize = 0;
+    char buffer[4096];
+
+    int64_t getCurrentPosition()
+    {
+        return position - static_cast<int64_t> (egptr() - gptr());
+    }
+
+    std::streamsize readFromFile (std::streambuf::char_type* dest, std::streamsize size)
     {
         if (headerSize <= 0 || position < 0 || position >= compressedSize)
             return 0;
@@ -388,12 +435,6 @@ struct ZipFile::Item::ZipStream  : public  std::istream,
         position += size;
         return size;
     }
-
-private:
-    std::shared_ptr<std::istream> fileStream;
-    const int64_t compressedSize, fileStartOffset;
-    int64_t position = 0;
-    uint32_t headerSize = 0;
 };
 
 inline std::shared_ptr<std::istream> ZipFile::Item::createReader() const
