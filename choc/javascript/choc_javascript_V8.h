@@ -376,14 +376,15 @@ struct V8Context  : public Context::Pimpl
                     }
                 };
 
-                using IteratorType = decltype (iterator);
+                auto names = propNames.ToLocalChecked();
 
-                propNames.ToLocalChecked()->Iterate (c, +[] (uint32_t, v8::Local<v8::Value> key, void* i)
+                for (uint32_t i = 0; i < names->Length(); ++i)
                 {
-                    (*static_cast<IteratorType*> (i)) (key);
-                    return v8::Array::CallbackResult::kContinue;
-                },
-                std::addressof (iterator));
+                    auto key = names->Get (c, i);
+
+                    if (! key.IsEmpty())
+                        iterator (key.ToLocalChecked());
+                }
             }
 
             auto result = choc::value::createObject (className);
