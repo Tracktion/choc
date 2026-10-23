@@ -107,8 +107,7 @@ struct V8Context  : public Context::Pimpl
                                                               v8::Local<v8::String> specifier,
                                                               v8::Local<v8::FixedArray> /*importAssertions*/)
         {
-            return static_cast<V8Context*> (c->GetIsolate()->GetData (0))
-                ->loadDynamicModule (c, specifier);
+            return getCurrent().loadDynamicModule (c, specifier);
         });
 
         v8::Isolate::Scope isolateScope (isolate);
@@ -345,58 +344,69 @@ struct V8Context  : public Context::Pimpl
         if (value->IsObject())
         {
             auto o = value->ToObject (c).ToLocalChecked();
-            auto propNames = o->GetPropertyNames (c);
-            std::string className;
+            v8::Local<v8::Array> propNames;
 
-            if (propNames.IsEmpty())
+            if (! o->GetPropertyNames (c).ToLocal (std::addressof (propNames)))
                 return {};
 
-            std::vector<std::string> propKeys;
-            std::vector<v8::Local<v8::Value>> propValues;
+            // N.B. Don't use v8::Array::Iterate() here: its callback isn't allowed to call
+            // back into V8, and in newer V8 versions it runs inside its own HandleScope, so
+            // any handles created by the callback are dead by the time it returns.
+            // Each loop iteration below opens its own HandleScope, so the number of live
+            // handles stays bounded however large or deeply nested the object is.
+            auto numProps = propNames->Length();
+            auto classNameIndex = numProps;
+            std::string className;
 
             {
-                auto iterator = [&] (v8::Local<v8::Value> key)
+                auto classNameKey = stringToV8 (objectNameAttribute, v8::NewStringType::kInternalized);
+
+                for (uint32_t i = 0; i < numProps; ++i)
                 {
-                    auto v = o->Get (c, key);
-                    auto nameString = v8StringToStd (key);
+                    v8::HandleScope scope (isolate);
+                    v8::Local<v8::Value> key;
 
-                    if (nameString == objectNameAttribute)
+                    if (propNames->Get (c, i).ToLocal (std::addressof (key)) && key->StrictEquals (classNameKey))
                     {
-                        if (! v.IsEmpty())
-                            className = v8StringToStd (v.ToLocalChecked());
+                        v8::Local<v8::Value> name;
+
+                        if (o->Get (c, key).ToLocal (std::addressof (name)))
+                            className = v8StringToStd (name);
+
+                        classNameIndex = i;
+                        break;
                     }
-                    else
-                    {
-                        propKeys.emplace_back (v8StringToStd (key));
-
-                        if (v.IsEmpty())
-                            propValues.push_back ({});
-                        else
-                            propValues.emplace_back (v.ToLocalChecked());
-                    }
-                };
-
-                using IteratorType = decltype (iterator);
-
-                propNames.ToLocalChecked()->Iterate (c, +[] (uint32_t, v8::Local<v8::Value> key, void* i)
-                {
-                    (*static_cast<IteratorType*> (i)) (key);
-                    return v8::Array::CallbackResult::kContinue;
-                },
-                std::addressof (iterator));
+                }
             }
 
             auto result = choc::value::createObject (className);
 
-            for (size_t i = 0; i < propKeys.size(); ++i)
+            for (uint32_t i = 0; i < numProps; ++i)
             {
-                const auto& keyName = propKeys[i];
-                CHOC_ASSERT (! keyName.empty());
+                if (i == classNameIndex)
+                    continue;
 
-                if (! propValues[i].IsEmpty())
-                    result.setMember (keyName, v8ToChoc (c, propValues[i]));
+                v8::HandleScope scope (isolate);
+                v8::Local<v8::Value> key;
+
+                if (! propNames->Get (c, i).ToLocal (std::addressof (key)))
+                    continue;
+
+                v8::String::Utf8Value keyName (isolate, key);
+
+                if (*keyName == nullptr)
+                    continue;
+
+                std::string_view keyNameView (*keyName, static_cast<size_t> (keyName.length()));
+                CHOC_ASSERT (! keyNameView.empty());
+
+                // property names are unique, so addMember can skip setMember's name lookup
+                v8::Local<v8::Value> member;
+
+                if (o->Get (c, key).ToLocal (std::addressof (member)))
+                    result.addMember (keyNameView, v8ToChoc (c, member));
                 else
-                    result.setMember (keyName, choc::value::Value());
+                    result.addMember (keyNameView, choc::value::Value());
             }
 
             return result;
@@ -522,8 +532,7 @@ struct V8Context  : public Context::Pimpl
         auto ok = mod.ToLocalChecked()->InstantiateModule (localContext, +[] (v8::Local<v8::Context> c, v8::Local<v8::String> specifier,
                                                                               v8::Local<v8::FixedArray>, v8::Local<v8::Module>)
         {
-            return static_cast<V8Context*> (c->GetIsolate()->GetData (0))
-                ->loadStaticModule (c, specifier);
+            return getCurrent().loadStaticModule (c, specifier);
         });
 
         if (ok.IsNothing() || ! ok.ToChecked())
@@ -602,6 +611,16 @@ struct V8Context  : public Context::Pimpl
     };
 
     std::unique_ptr<CurrentCallContext> currentCallContext;
+
+    // N.B. v8::Context::GetIsolate() was removed in V8 15.4. Every entry point into
+    // the isolate opens a v8::Isolate::Scope, so the current isolate is always ours
+    // when V8 calls back into us.
+    static V8Context& getCurrent()
+    {
+        auto currentIsolate = v8::Isolate::GetCurrent();
+        CHOC_ASSERT (currentIsolate != nullptr);
+        return *static_cast<V8Context*> (currentIsolate->GetData (0));
+    }
 
     static constexpr const char* objectNameAttribute = "_objectName";
 };
