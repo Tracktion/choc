@@ -343,6 +343,21 @@ inline void testContainerUtils (choc::test::TestProgress& progress)
         m.reset();
         CHOC_EXPECT_TRUE (m.size() == 0 && m.data() == nullptr);
     }
+
+    {
+        CHOC_TEST (SmallVector alignment)
+
+        struct Aligned16
+        {
+            alignas (16) std::array<int, 4> data;
+        };
+
+        choc::SmallVector<Aligned16, 4> vector;
+        vector.emplace_back (Aligned16 {});
+
+        auto address = reinterpret_cast<std::uintptr_t> (&vector.front());
+        CHOC_EXPECT_EQ (address % 16, 0u);
+    }
 }
 
 inline void testStringUtilities (choc::test::TestProgress& progress)

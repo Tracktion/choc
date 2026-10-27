@@ -25,6 +25,12 @@
 namespace choc
 {
 
+#ifdef _MSC_VER
+// ignore warning that alignment specifier resulted in padding
+#pragma warning (push)
+ #pragma warning (disable: 4324)
+#endif
+
 /**
     A std::vector-style container class, which uses some pre-allocated storage
     to avoid heap allocation when the number of elements is small.
@@ -113,9 +119,11 @@ struct SmallVector
     bool operator!= (span<value_type>) const;
 
 private:
+    static constexpr size_t alignment = std::max (alignof (value_type), alignof (uint64_t));
+
     value_type* elements;
     size_type numElements = 0, numAllocated = numPreallocatedElements;
-    uint64_t internalStorage[(numPreallocatedElements * sizeof (value_type) + sizeof (uint64_t) - 1) / sizeof (uint64_t)];
+    alignas (alignment) uint64_t internalStorage[(numPreallocatedElements * sizeof (value_type) + sizeof (uint64_t) - 1) / sizeof (uint64_t)];
 
     void shrink (size_type);
     value_type* getInternalStorage() noexcept      { return reinterpret_cast<value_type*> (internalStorage); }
@@ -123,6 +131,10 @@ private:
     void resetToInternalStorage() noexcept;
     void freeHeapAndResetToInternalStorage() noexcept;
 };
+
+#ifdef _MSC_VER
+ #pragma warning (pop)
+#endif
 
 
 
