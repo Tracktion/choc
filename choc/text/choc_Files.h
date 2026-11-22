@@ -332,7 +332,9 @@ inline std::string TempFile::createRandomFilename (std::string_view root, std::s
 
 inline TempFile::~TempFile()
 {
-    remove_all (file);
+    // Avoid the possibility of throwing from the destructor
+    std::error_code errorCode;
+    remove_all (file, errorCode);
 }
 
 } // namespace choc::file
