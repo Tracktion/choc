@@ -93,6 +93,11 @@ void writeWithEscapeCharacters (OutputStreamType&, text::UTF8Pointer sourceStrin
 /// Converts a double to a JSON-format string representation.
 std::string doubleToString (double value);
 
+/// Converts a float or double to a JSON-format string representation, using the
+/// shortest string that will round-trip back to the same value of that type.
+template <typename FloatType>
+std::string floatingPointToString (FloatType value);
+
 
 
 //==============================================================================
@@ -177,7 +182,8 @@ inline std::string getEscapedQuotedString (std::string_view s)
     return result.str();
 }
 
-inline std::string doubleToString (double value)
+template <typename FloatType>
+inline std::string floatingPointToString (FloatType value)
 {
     if (std::isfinite (value))  return choc::text::floatToString (value, -1, true);
     if (std::isnan (value))     return "\"NaN\"";
@@ -185,6 +191,8 @@ inline std::string doubleToString (double value)
     return value >= 0 ?  "\"Infinity\""
                       : "\"-Infinity\"";
 }
+
+inline std::string doubleToString (double value)    { return floatingPointToString (value); }
 
 //==============================================================================
 template <typename Stream>
@@ -203,7 +211,8 @@ struct Writer
         if (v.isVoid())                   { out << "null"; return; }
         if (v.isString())                 { out << getEscapedQuotedString (v.getString()); return; }
         if (v.isBool())                   { out << (v.getBool() ? "true" : "false"); return; }
-        if (v.isFloat())                  { out << doubleToString (v.get<double>()); return; }
+        if (v.isFloat32())                { out << floatingPointToString (v.getFloat32()); return; }
+        if (v.isFloat64())                { out << doubleToString (v.getFloat64()); return; }
         if (v.isInt())                    { out << v.get<int64_t>(); return; }
         if (v.isObject())                 return dumpObject (v);
         if (v.isArray() || v.isVector())  return dumpArrayOrVector (v);

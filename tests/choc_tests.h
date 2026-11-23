@@ -1108,6 +1108,129 @@ inline void testJSON (choc::test::TestProgress& progress)
         CHOC_EXPECT_EQ ("1234",           std::string (choc::json::parseValue ("\"1234\"").getString()));
     }
 
+    {
+        CHOC_TEST (ConvertFloat32)
+
+        auto toJSON32 = [] (float f)   { return choc::json::toString (choc::value::createFloat32 (f)); };
+        auto toJSON64 = [] (double d)  { return choc::json::toString (choc::value::createFloat64 (d)); };
+
+        CHOC_EXPECT_EQ ("0.1",                  toJSON32 (0.1f));
+        CHOC_EXPECT_EQ ("0.3",                  toJSON32 (0.3f));
+        CHOC_EXPECT_EQ ("1",                    toJSON32 (1.0f));
+        CHOC_EXPECT_EQ ("1e-30",                toJSON32 (1e-30f));
+        CHOC_EXPECT_EQ ("-146.44112",           toJSON32 (-146.44112f));
+        CHOC_EXPECT_EQ ("3.4028235e38",         toJSON32 (std::numeric_limits<float>::max()));
+        CHOC_EXPECT_EQ ("0.1",                  choc::json::floatingPointToString (0.1f));
+
+        CHOC_EXPECT_EQ ("0.1",                  toJSON64 (0.1));
+        CHOC_EXPECT_EQ ("0.10000000149011612",  toJSON64 (0.10000000149011612));
+        CHOC_EXPECT_EQ ("0.10000000149011612",  toJSON64 (static_cast<double> (0.1f)));
+        CHOC_EXPECT_EQ ("-146.4411163330078",   toJSON64 (static_cast<double> (-146.44112f)));
+
+        CHOC_EXPECT_EQ ("\"NaN\"",              toJSON32 (std::numeric_limits<float>::quiet_NaN()));
+        CHOC_EXPECT_EQ ("\"Infinity\"",         toJSON32 (std::numeric_limits<float>::infinity()));
+        CHOC_EXPECT_EQ ("\"-Infinity\"",        toJSON32 (-std::numeric_limits<float>::infinity()));
+        CHOC_EXPECT_EQ ("\"NaN\"",              toJSON64 (std::numeric_limits<double>::quiet_NaN()));
+        CHOC_EXPECT_EQ ("\"Infinity\"",         toJSON64 (std::numeric_limits<double>::infinity()));
+        CHOC_EXPECT_EQ ("\"-Infinity\"",        toJSON64 (-std::numeric_limits<double>::infinity()));
+
+        auto object = choc::json::create ("a", 0.1f,
+                                          "b", -146.44112f,
+                                          "c", 0.1,
+                                          "d", std::numeric_limits<float>::infinity());
+
+        CHOC_EXPECT_EQ (R"({"a": 0.1, "b": -146.44112, "c": 0.1, "d": "Infinity"})", choc::json::toString (object));
+        CHOC_EXPECT_EQ ("{\n  \"a\": 0.1,\n  \"b\": -146.44112,\n  \"c\": 0.1,\n  \"d\": \"Infinity\"\n}", choc::json::toString (object, true));
+
+        auto array = choc::value::createEmptyArray();
+        array.addArrayElement (0.3f);
+        array.addArrayElement (1e-30f);
+        array.addArrayElement (static_cast<double> (0.3f));
+
+        auto widened = choc::json::doubleToString (static_cast<double> (0.3f));
+
+        CHOC_EXPECT_EQ ("[0.3, 1e-30, " + widened + "]", choc::json::toString (array));
+        CHOC_EXPECT_EQ ("[\n  0.3,\n  1e-30,\n  " + widened + "\n]", choc::json::toString (array, true));
+
+        const float vectorElements[] = { 0.1f, 0.3f, 1.0f };
+        auto vector = choc::value::createVector (vectorElements, 3);
+        CHOC_EXPECT_EQ ("[0.1, 0.3, 1]", choc::json::toString (vector));
+    }
+
+    {
+        CHOC_TEST (Float32RoundTrip)
+
+        auto getBits = [] (float f)
+        {
+            uint32_t bits;
+            std::memcpy (std::addressof (bits), std::addressof (f), sizeof (bits));
+            return bits;
+        };
+
+        auto fromBits = [] (uint32_t bits)
+        {
+            float f;
+            std::memcpy (std::addressof (f), std::addressof (bits), sizeof (f));
+            return f;
+        };
+
+        auto roundTrips = [&] (float original)
+        {
+            auto json = choc::json::toString (choc::value::createFloat32 (original));
+            auto parsed = static_cast<float> (choc::json::parseValue (json).get<double>());
+            return getBits (parsed) == getBits (original);
+        };
+
+        std::vector<float> awkwardValues
+        {
+            0.1f, 0.3f, 1.0f, 1e-30f, -146.44112f, 0.0f, 1.0f / 3.0f, 2.0f / 3.0f,
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::min(),
+            std::numeric_limits<float>::denorm_min(),
+            std::nextafter (std::numeric_limits<float>::min(), 0.0f),
+            fromBits (0x00400000u),
+            fromBits (0x007fffffu),
+            std::nextafter (std::numeric_limits<float>::max(), 0.0f),
+            std::nextafter (0.1f, 1.0f),
+            std::nextafter (0.1f, 0.0f),
+            std::nextafter (1.0f, 0.0f),
+            std::nextafter (1.0f, 2.0f),
+            16777215.0f, 16777216.0f, 16777218.0f,
+            8388607.5f, 8388608.0f,
+            9.403954e-38f, 2.3509887e-38f, 1.17549421e-38f,
+            3.3554432e7f, 1.00000005e9f, 4.2949673e9f,
+        };
+
+        for (auto f : awkwardValues)
+        {
+            CHOC_EXPECT_TRUE (roundTrips (f));
+            CHOC_EXPECT_TRUE (roundTrips (-f));
+        }
+
+        // 7.038531e-26 is the shortest string for this float, and converts straight back to it
+        // with strtof, but the nearest double to it lies so close to a float rounding midpoint
+        // that double-rounding (decimal -> double -> float) lands on the neighbouring float.
+        auto doubleRoundingCase = fromBits (0x15ae43fdu);
+        CHOC_EXPECT_EQ ("7.038531e-26", choc::json::toString (choc::value::createFloat32 (doubleRoundingCase)));
+        CHOC_EXPECT_EQ (getBits (doubleRoundingCase), getBits (std::strtof ("7.038531e-26", nullptr)));
+
+        // A pseudo-random sweep across the whole range of finite bit-patterns
+        uint32_t seed = 12345;
+        int numFailures = 0;
+
+        for (int i = 0; i < 200000; ++i)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            auto f = fromBits (seed);
+
+            if (std::isfinite (f) && ! roundTrips (f))
+                ++numFailures;
+        }
+
+        CHOC_EXPECT_EQ (0, numFailures);
+    }
+
     auto checkError = [&] (const std::string& json, const std::string& message, size_t line, size_t column)
     {
         try
