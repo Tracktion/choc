@@ -2503,6 +2503,84 @@ inline void testFIFOs (choc::test::TestProgress& progress)
             }
         }
     }
+
+    {
+        CHOC_TEST (ExactFit)
+
+        // Items that exactly fill the buffer mustn't make it look empty
+        choc::fifo::VariableSizeFIFO queue;
+        queue.reset (64);
+
+        uint32_t numPushed = 0, numPopped = 0;
+
+        for (uint32_t i = 0; i < 100; ++i)
+        {
+            uint32_t item[] = { i, i, i };
+
+            if (queue.push (item, sizeof (item)))
+                ++numPushed;
+        }
+
+        CHOC_EXPECT_EQ (3u, numPushed);
+
+        queue.popAllAvailable ([&] (const void* data, uint32_t size)
+        {
+            CHOC_EXPECT_EQ (12u, size);
+            CHOC_EXPECT_EQ (numPopped, *static_cast<const uint32_t*> (data));
+            ++numPopped;
+        });
+
+        CHOC_EXPECT_EQ (numPushed, numPopped);
+    }
+
+    {
+        CHOC_TEST (ConcurrentExactFit)
+
+        choc::fifo::VariableSizeFIFO queue;
+        queue.reset (256);
+
+        constexpr uint32_t numItems = 200000;
+        uint32_t numReceived = 0, numBad = 0;
+
+        std::thread writer ([&]
+        {
+            for (uint32_t i = 0; i < numItems;)
+            {
+                uint32_t item[] = { i, i, i };
+
+                if (queue.push (item, sizeof (item)))
+                    ++i;
+            }
+        });
+
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds (20);
+
+        while (numReceived < numItems && numBad == 0 && std::chrono::steady_clock::now() < deadline)
+        {
+            queue.popAllAvailable ([&] (const void* data, uint32_t size)
+            {
+                uint32_t item[3] = {};
+                std::memcpy (item, data, std::min (size, static_cast<uint32_t> (sizeof (item))));
+
+                if (size != sizeof (item) || item[0] != numReceived || item[1] != numReceived || item[2] != numReceived)
+                    ++numBad;
+
+                ++numReceived;
+            });
+        }
+
+        // (if it failed, the queue still has to be emptied so that the writer can finish)
+        std::atomic<bool> writerFinished { false };
+        std::thread joiner ([&] { writer.join(); writerFinished = true; });
+
+        while (! writerFinished)
+            queue.popAllAvailable ([] (const void*, uint32_t) {});
+
+        joiner.join();
+
+        CHOC_EXPECT_EQ (0u, numBad);
+        CHOC_EXPECT_EQ (numItems, numReceived);
+    }
 }
 
 //==============================================================================

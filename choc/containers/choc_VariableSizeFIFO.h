@@ -160,11 +160,12 @@ inline void VariableSizeFIFO::reset (uint32_t totalFIFOSizeBytes)
     buffer.clear();
 
    #if __GNUC__
-    buffer.reserve (capacity + 1u); // this is a workaround for a bug in some GCC versions
+    buffer.reserve (capacity + headerSize); // this is a workaround for a bug in some GCC versions
                                     // that causes a spurious warning when inlining the resize()..
    #endif
 
-    buffer.resize (capacity + 1u);
+    // The extra space is so that a whole header can always be written, even at the last position
+    buffer.resize (capacity + headerSize);
 }
 
 template <typename DataProvider>
@@ -179,13 +180,18 @@ bool VariableSizeFIFO::push (uint32_t numBytes, DataProvider&& writeSourceData)
 
     auto destOffset = writePos.load();
     auto dest = buffer.data() + destOffset;
+    auto currentReadPos = readPos.load();
 
-    if (destOffset >= readPos)
+    if (destOffset >= currentReadPos)
     {
-        // check whether we can fit a contiguous block at the current position
-        if (destOffset + bytesNeeded > capacity)
+        auto endOffset = destOffset + bytesNeeded;
+
+        // check whether we can fit a contiguous block at the current position. If the block would
+        // end exactly at the end of the buffer, the write position would become 0, so that can't be
+        // done if the read position is also 0, because it'd make the FIFO appear to be empty
+        if (endOffset > capacity || (endOffset == capacity && currentReadPos == 0))
         {
-            if (bytesNeeded >= readPos) // check whether there'll be enough space after padding
+            if (bytesNeeded >= currentReadPos) // check whether there'll be enough space after padding
                 return false;
 
             std::memset (dest, 0, headerSize); // header of 0 = skip to the end
@@ -195,7 +201,7 @@ bool VariableSizeFIFO::push (uint32_t numBytes, DataProvider&& writeSourceData)
     }
     else
     {
-        if (destOffset + bytesNeeded >= readPos)
+        if (destOffset + bytesNeeded >= currentReadPos)
             return false;
     }
 
