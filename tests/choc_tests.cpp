@@ -37,4 +37,3 @@ int main (int argc, const char** argv)
 #if CHOC_V8_AVAILABLE
  #include "../choc/javascript/choc_javascript_V8.h"
 #endif
-
